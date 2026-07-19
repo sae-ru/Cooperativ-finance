@@ -1,0 +1,156 @@
+# Административный интерфейс участников и организаций
+
+Статус: обязательный production-контракт admin console.
+
+## Термин «клиент»
+
+В интерфейсе администратора «клиент» является поисковым представлением, но в
+домене разделяется на:
+
+- `User`: учётная запись входа;
+- `Member`: физическое лицо или организация;
+- `Cooperative`: организация/ячейка;
+- `Membership`: участие member в cooperative;
+- `RoleAssignment`: полномочия;
+- `ServiceClient`: внешняя программная интеграция;
+- `Node`: внешний или локальный технический узел.
+
+Одна строка «клиента» не должна смешивать эти объекты и их ответственность.
+
+## Административные роли
+
+| Роль | Зона ответственности |
+|---|---|
+| Member registrar | заведение и проверка участника |
+| Cooperative administrator | memberships и обычные роли своей организации |
+| Data steward | исправление PII по процедуре, duplicate review |
+| Risk administrator | limits только в пределах утверждённой policy |
+| Security administrator | accounts, sessions, privileged access |
+| Node registrar | внешние узлы и certificates |
+| Auditor | read-only история всех административных действий |
+
+«Суперадминистратор», способный единолично менять клиента, пай, роль, лимит,
+ключ и историю, запрещён. Break-glass ограничен временем и аудитом.
+
+## Навигация admin console
+
+- Участники;
+- Организации и членство;
+- Учётные записи и сессии;
+- Роли и полномочия;
+- Паи, лимиты и поручительства;
+- Связанные лица;
+- Согласия и документы;
+- Service clients;
+- Узлы и certificates;
+- Импорт/экспорт;
+- Очередь проверок;
+- Аудит и incidents.
+
+## Карточка участника
+
+Вкладки:
+
+1. Обзор: status, identifiers, cooperative, contact visibility.
+2. Memberships: история входа/выхода.
+3. Accounts: user links, sessions, MFA, lock/recovery.
+4. Roles: scope, period, assigners, bonds.
+5. Shares and risk: раздельные контуры и active exposure.
+6. Obligations: агрегированная безопасная сводка.
+7. Reliability: только контекстные профили.
+8. Documents/consents: versions и expiry.
+9. Related parties: disclosed/confirmed/disputed links.
+10. Audit: administrative and critical events.
+
+Доступ к чувствительным вкладкам определяется отдельными scopes.
+
+## Lifecycle участника
+
+```text
+APPLICANT -> PENDING_VERIFICATION -> LIMITED -> ACTIVE
+          -> REJECTED
+ACTIVE -> SUSPENDED -> ACTIVE
+ACTIVE -> EXIT_PENDING -> CLOSED
+ACTIVE -> DECEASED_OR_INCAPACITATED -> SUCCESSION_REVIEW
+```
+
+Admin action не перескакивает обязательную проверку. Closed member не удаляется
+и не переиспользует identifier.
+
+## Заведение клиента
+
+1. Проверить duplicate по разрешённым identifiers.
+2. Создать Member без автоматического full access.
+3. Зафиксировать legal basis/consent и source document.
+4. Создать Membership со статусом pending/limited.
+5. Создать User отдельно, если нужен вход.
+6. Назначить минимальную роль и срок.
+7. Для privileged role потребовать независимый approval и role bond.
+8. Отправить безопасную локальную activation procedure.
+9. Создать signed administrative event.
+
+## Изменение и блокировка
+
+- PII correction хранит reason и предыдущий hash/доступную историю;
+- role change создаёт новую assignment/version;
+- suspension ограничивает новые действия, но не удаляет obligations;
+- session revoke не равен исключению из cooperative;
+- risk limit не редактируется через общую форму клиента;
+- merge duplicates выполняется case с mapping старых identifiers, а не DELETE;
+- смерть/недееспособность немедленно блокирует ключи и запускает succession.
+
+## Bulk import
+
+Импорт проходит staging, schema validation, duplicate report, dry run, approval
+и chunked application. Строка с ошибкой не создаётся частично. Bulk import не
+назначает privileged roles, limits или shares без отдельного workflow.
+
+## Service clients
+
+Для интеграции фиксируются owner organization, technical contact, scopes,
+network allowlist, credentials/certificates, rate limits, expiry и audit. Один
+service client не используется несколькими независимыми организациями.
+
+## API admin
+
+```text
+GET/POST /admin/members
+GET/PATCH /admin/members/{id}
+POST /admin/members/{id}/verify
+POST /admin/members/{id}/suspend
+POST /admin/members/{id}/start-exit
+POST /admin/members/{id}/merge-case
+GET/POST /admin/cooperatives
+POST /admin/memberships
+POST /admin/role-assignments
+POST /admin/role-assignments/{id}/revoke
+GET /admin/accounts/{id}/sessions
+POST /admin/accounts/{id}/revoke-sessions
+POST /admin/accounts/{id}/recovery-cases
+GET/POST /admin/service-clients
+POST /admin/imports
+POST /admin/imports/{id}/dry-run
+POST /admin/imports/{id}/apply
+GET /admin/audit
+```
+
+## UX защиты
+
+- массовое действие всегда показывает count, filter snapshot и последствия;
+- privileged change имеет preview и independent approval;
+- PII export требует reason и журналируется;
+- destructive-looking action объясняет, что произойдёт с obligations/history;
+- administrator видит только свою organization/scope;
+- impersonation запрещён; support использует controlled view-as с audit без
+  права подписывать от имени участника.
+
+## Acceptance
+
+- можно завести человека, организацию, membership и user отдельно;
+- duplicate check не выполняет silent merge;
+- suspension не удаляет обязательства;
+- role revoke немедленно блокирует новую критическую подпись;
+- администратор организации не видит PII другой организации;
+- один человек не выдаёт себе privileged role;
+- все изменения воспроизводятся из administrative events/audit;
+- external service/client может быть отозван без остановки локальных accounts.
