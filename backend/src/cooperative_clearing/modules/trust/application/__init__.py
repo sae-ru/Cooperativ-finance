@@ -1,0 +1,1 @@
+"""Trust application use cases."""

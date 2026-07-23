@@ -1,0 +1,1 @@
+"""Commodity-rights application services."""

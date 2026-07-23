@@ -34,6 +34,8 @@ SQLite не используется как замена PostgreSQL в integrati
 - share execution <= finalized loss <= reserved max exposure;
 - protected amount не взыскивается;
 - solidarity contribution не меняет credit/reputation;
+- rationing не превышает physical verified available и не создаёт debt/reputation;
+- protected minimum применяется до weighted priority;
 - одна роль не создаёт две независимые подписи;
 - compensation не удаляет исходное событие;
 - permutation input не меняет clearing result.
@@ -41,6 +43,7 @@ SQLite не используется как замена PostgreSQL в integrati
 ## Concurrency tests
 
 - два клиента резервируют последний остаток;
+- два rationing confirm резервируют один verified crisis stock;
 - два погашения одного права;
 - finalize при изменённом obligation version;
 - два approvers финализируют одно решение;
@@ -115,3 +118,88 @@ blob verification, local login, critical read/write smoke, measured RPO/RTO.
 - manual approval для production package.
 
 Flaky test является defect. Его нельзя бессрочно перезапускать до зелёного.
+
+## Проверки Slice 11
+
+Обязательный federation-набор включает lifecycle onboarding/contracts/limits,
+role separation, package canonicalization/signatures, import idempotency,
+blocking conflicts, exposure bounds, key revoke/rotation timeline, incident
+quarantine, paper form checksum/serial/QR uniqueness и PostgreSQL immutability.
+Integration demo проходит production services и повторный seed без новых
+событий.
+
+Эксплуатационный gate дополнительно выполняет `bash -n`/PowerShell parser,
+координированный backup, checksum/archive verification и restore в одноразовые
+DB/blob volumes. Текущий verified baseline: backend 129 tests и 78,41% coverage;
+frontend 103 tests и 83,08% statement coverage; strict mypy и production PWA
+build зелёные.
+
+## Проверки Slice 13
+
+Обязательный набор включает canonical request/response signatures, short TTL,
+source/target/capability binding, replay и altered replay, bounded peer
+transport, partial fan-out, deterministic landed cost, stale/revoked filtering,
+oversell concurrency, separate goods/logistics holds, bilateral exposure,
+idempotent reserve/commit/release, durable saga recovery и worker expiry.
+
+Текущий verified baseline: fresh migration до `0017_peer_reservations`,
+`alembic check`, Ruff/format, strict mypy 213 files, backend 143 tests с 76.08%
+coverage, frontend 45 files/108 tests с 70.29% branch coverage, generated
+OpenAPI types и production PWA build.
+
+## Проверки Slice 14
+
+Обычный backend gate запускается с `pytest -m "not acceptance"`; multi-node
+acceptance имеет отдельную topology и запускается `scripts/test-federation.sh`
+или `.ps1`. Это исключает случайное подключение acceptance к одной тестовой БД.
+
+Обязательный набор проверяет deterministic netting, canonical signatures,
+changed-byte rejection, snapshot/prepare/approval coverage, bilateral exposure,
+certificate finality, идемпотентный local apply, coordinator/participant outage,
+lagging-node recovery и точную reconciliation трёх независимых PostgreSQL.
+Frontend gate проверяет API contracts, role-specific commands, evidence table,
+финальность, recovery и формы policy/obligation/cycle.
+
+Контрольный frontend baseline: 47 files / 115 tests, 82.50% statements, 70.87%
+branches, 75.83% functions, 88.67% lines; typecheck и production PWA build
+зелёные. Трёхузловой acceptance: `1 passed in 11.05s`.
+
+Backend baseline: Ruff, strict mypy 223 files, 158 tests и 75.16% coverage;
+один multi-node acceptance test выделен в отдельную Docker topology.
+
+## Проверки Slice 15
+
+Release gate запускает `scripts/tests/test_release_bundle.py`. Девять негативных
+и позитивных тестов проверяют подпись, expected release, independently pinned
+license policy, altered archive, extra file, path traversal, wrong key,
+blocked license и ложную классификацию.
+
+Живая приёмка дополнительно создаёт bundle из четырёх runtime-образов, выполняет
+verify с повторным `docker load`, копирует только signed `node/` payload и
+запускает новый Compose project с пустыми volumes и `--pull never --no-build`.
+Gate считается пройденным после healthy всех постоянных services, первого
+локального входа и `coopctl verify-journal`.
+## Проверки Slice 16
+
+Операционный drill использует два signed release id и отдельный Compose project.
+Обязательная последовательность: r1 health, FULL backup, target verify/load,
+migration, injected failure, automatic rollback, повторный successful update,
+independent restore drill и destructive restore previous release.
+
+Проверяются exact release selection, node id, schema, runtime ACL, table/event/
+blob counts, application permissions, bounded readiness и signed journal.
+Тестовые release могут разделять один immutable image ID: так проверяется именно
+state machine операции. Migration gate разных production schemas остаётся
+отдельным обязательным тестом.
+## Проверки Slice 17
+
+scripts/test-critical-quality.sh объединяет четыре независимых gate: OpenAPI
+compatibility, migration предыдущей схемы, deterministic property matrix и
+повторяемые PostgreSQL concurrency scenarios. По умолчанию выполняются три
+раунда; один retry после падения не считается успехом.
+
+Проверенный baseline: OpenAPI 298 операций и exact mirror; 200 local и 100
+federated generated graphs; переход 0017 -> 0018, downgrade и re-upgrade с
+сохранением identity; три раунда по 21 critical test; итоговый signed journal
+556/556 без failures. Подробности:
+[implemented_slice_17.md](implemented_slice_17.md).

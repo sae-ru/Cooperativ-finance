@@ -1,0 +1,345 @@
+name: cooperative-clearing-federation-acceptance
+
+x-test-image: &test-image
+  image: cooperative-clearing/backend-test:federation-acceptance
+  security_opt:
+    - no-new-privileges:true
+  networks:
+    - federation-test
+
+x-node-environment: &node-environment
+  COOP_ENVIRONMENT: test
+  COOP_RELEASE: federation-acceptance
+  COOP_LOG_LEVEL: INFO
+  COOP_DEMO_DATA_ENABLED: "false"
+  COOP_DATABASE_PORT: "5432"
+  COOP_DATABASE_NAME: cooperative_clearing
+  COOP_DATABASE_USER: coop_app
+  COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+  COOP_BLOB_ENCRYPTION_KEY_FILE: /run/secrets/blob_encryption_key
+  COOP_NODE_SIGNING_SEED_FILE: /run/secrets/node_signing_seed
+  COOP_BOOTSTRAP_REGISTRAR_PASSWORD_FILE: /run/secrets/bootstrap_registrar_password
+  COOP_BOOTSTRAP_SECURITY_PASSWORD_FILE: /run/secrets/bootstrap_security_password
+  COOP_BOOTSTRAP_AUDITOR_PASSWORD_FILE: /run/secrets/bootstrap_auditor_password
+  COOP_ALLOWED_HOSTS: '["node-a","node-b","node-c","localhost","127.0.0.1"]'
+  COOP_PEER_CONNECT_TIMEOUT_SECONDS: "2"
+
+x-postgres: &postgres
+  image: postgres:18-alpine
+  restart: "no"
+  environment:
+    POSTGRES_DB: cooperative_clearing
+    POSTGRES_USER: coop_migrator
+    POSTGRES_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+  secrets:
+    - postgres_migrator_password
+    - postgres_app_password
+  networks:
+    - federation-test
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U coop_migrator -d cooperative_clearing"]
+    interval: 2s
+    timeout: 3s
+    retries: 30
+    start_period: 10s
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  builder:
+    <<: *test-image
+    build:
+      context: ./backend
+      target: test
+    command: ["true"]
+
+  db-a:
+    <<: *postgres
+    volumes:
+      - db-a-data:/var/lib/postgresql
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+
+  db-b:
+    <<: *postgres
+    volumes:
+      - db-b-data:/var/lib/postgresql
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+
+  db-c:
+    <<: *postgres
+    volumes:
+      - db-c-data:/var/lib/postgresql
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+
+  migrate-a:
+    <<: *test-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-a
+      COOP_NODE_DISPLAY_NAME: Acceptance node A
+      COOP_DATABASE_HOST: db-a
+      COOP_DATABASE_USER: coop_migrator
+      COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      db-a:
+        condition: service_healthy
+
+  migrate-b:
+    <<: *test-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-b
+      COOP_NODE_DISPLAY_NAME: Acceptance node B
+      COOP_DATABASE_HOST: db-b
+      COOP_DATABASE_USER: coop_migrator
+      COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      db-b:
+        condition: service_healthy
+
+  migrate-c:
+    <<: *test-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-c
+      COOP_NODE_DISPLAY_NAME: Acceptance node C
+      COOP_DATABASE_HOST: db-c
+      COOP_DATABASE_USER: coop_migrator
+      COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+    depends_on:
+      builder:
+        condition: service_completed_successfully
+      db-c:
+        condition: service_healthy
+
+  prepare-a:
+    <<: *test-image
+    command: ["sh", "-lc", "coopctl init-node && coopctl bootstrap-identity"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-a
+      COOP_NODE_DISPLAY_NAME: Acceptance node A
+      COOP_DATABASE_HOST: db-a
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_a_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-a-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      migrate-a:
+        condition: service_completed_successfully
+
+  prepare-b:
+    <<: *test-image
+    command: ["sh", "-lc", "coopctl init-node && coopctl bootstrap-identity"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-b
+      COOP_NODE_DISPLAY_NAME: Acceptance node B
+      COOP_DATABASE_HOST: db-b
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_b_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-b-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      migrate-b:
+        condition: service_completed_successfully
+
+  prepare-c:
+    <<: *test-image
+    command: ["sh", "-lc", "coopctl init-node && coopctl bootstrap-identity"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-c
+      COOP_NODE_DISPLAY_NAME: Acceptance node C
+      COOP_DATABASE_HOST: db-c
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_c_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-c-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      migrate-c:
+        condition: service_completed_successfully
+
+  node-a:
+    <<: *test-image
+    command: ["uvicorn", "cooperative_clearing.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-a
+      COOP_NODE_DISPLAY_NAME: Acceptance node A
+      COOP_DATABASE_HOST: db-a
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_a_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-a-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      prepare-a:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  node-b:
+    <<: *test-image
+    command: ["uvicorn", "cooperative_clearing.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-b
+      COOP_NODE_DISPLAY_NAME: Acceptance node B
+      COOP_DATABASE_HOST: db-b
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_b_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-b-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      prepare-b:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  node-c:
+    <<: *test-image
+    command: ["uvicorn", "cooperative_clearing.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-c
+      COOP_NODE_DISPLAY_NAME: Acceptance node C
+      COOP_DATABASE_HOST: db-c
+      COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - source: node_c_signing_seed
+        target: node_signing_seed
+    volumes:
+      - blob-c-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      prepare-c:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2).read()"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  acceptance:
+    <<: *test-image
+    command: ["pytest", "-q", "tests/acceptance/test_three_node_federated_clearing.py"]
+    environment:
+      <<: *node-environment
+      COOP_NODE_CODE: node-a
+      COOP_NODE_DISPLAY_NAME: Acceptance runner
+      COOP_DATABASE_HOST: db-a
+      COOP_BLOB_ROOT: /tmp/acceptance-blobs
+      ACCEPTANCE_NODE_A_SEED_FILE: /run/secrets/node_a_signing_seed
+      ACCEPTANCE_NODE_B_SEED_FILE: /run/secrets/node_b_signing_seed
+      ACCEPTANCE_NODE_C_SEED_FILE: /run/secrets/node_c_signing_seed
+    secrets:
+      - postgres_app_password
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+      - node_a_signing_seed
+      - node_b_signing_seed
+      - node_c_signing_seed
+      - source: node_a_signing_seed
+        target: node_signing_seed
+    depends_on:
+      node-a:
+        condition: service_healthy
+      node-b:
+        condition: service_healthy
+      node-c:
+        condition: service_healthy
+
+secrets:
+  postgres_migrator_password:
+    file: ./backend/tests/acceptance/fixtures/postgres_migrator_password.txt
+  postgres_app_password:
+    file: ./backend/tests/acceptance/fixtures/postgres_app_password.txt
+  blob_encryption_key:
+    file: ./backend/tests/acceptance/fixtures/blob_encryption_key.txt
+  bootstrap_registrar_password:
+    file: ./backend/tests/acceptance/fixtures/bootstrap_registrar_password.txt
+  bootstrap_security_password:
+    file: ./backend/tests/acceptance/fixtures/bootstrap_security_password.txt
+  bootstrap_auditor_password:
+    file: ./backend/tests/acceptance/fixtures/bootstrap_auditor_password.txt
+  node_a_signing_seed:
+    file: ./backend/tests/acceptance/fixtures/node_a_signing_seed.txt
+  node_b_signing_seed:
+    file: ./backend/tests/acceptance/fixtures/node_b_signing_seed.txt
+  node_c_signing_seed:
+    file: ./backend/tests/acceptance/fixtures/node_c_signing_seed.txt
+
+volumes:
+  db-a-data:
+  db-b-data:
+  db-c-data:
+  blob-a-data:
+  blob-b-data:
+  blob-c-data:
+
+networks:
+  federation-test:
+    internal: true

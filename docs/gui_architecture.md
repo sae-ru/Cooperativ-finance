@@ -32,7 +32,8 @@ GUI является рабочим местом по роли, а не унив
 - Сделки и обязательства;
 - Паи и ответственность;
 - Клиринг;
-- Помощь и резервы;
+- Помощь;
+- Резервы и кризис;
 - Споры и надёжность;
 - Узел и синхронизация;
 - Аудит и отчёты.
@@ -166,3 +167,45 @@ Preview показывает неизменяемый summary hash, роль п�
 При недоступности API GUI переключается в read-only cache и drafts. Он не
 имитирует успешную хозяйственную операцию. После восстановления пользователь
 просматривает каждый pending draft перед отправкой.
+
+## Рабочее место «Федерация» Slice 11
+
+Рабочее место разделено на registration/audit, contracts/limits, offline sync,
+security и paper operations. Хозяйственный оператор видит epochs, export и
+формы; технический хранитель отвечает за package transport; security admin
+управляет incidents/quarantine и запрашивает key rotation; auditor принимает
+независимые onboarding, conflict и rotation decisions. Невозможные команды не
+отображаются, но окончательный запрет всегда выполняет API.
+
+Paper queue показывает serial, QR reference, checksum, epoch и state. Ввод
+оригинала требует participant signatures и evidence id. Security queue явно
+показывает old/new key continuity proofs, requester и independent reviewer.
+## Экран эксплуатации
+
+Read-only workspace `Эксплуатация` доступен administrator/security/auditor и
+показывает signed events, outbox/quarantine, sessions, federation
+conflicts/incidents/key rotations/offline epochs/forms, trust cases/appeals и
+crisis state. Обновление выполняется раз в 30 секунд. Экран намеренно не имеет
+команд изменения состояния и не отображает PII или произвольные metric labels.
+
+## Локализация и темы / Localization and themes
+
+### Русский
+
+Интерфейс обнаруживает все файлы `lang/*.xml` во время сборки через Vite-плагин `cooperative-locale-xml`. Каждый файл содержит код и отображаемое имя языка, ключевые сообщения и временный словарь фраз для старых экранов. Добавление языка не требует изменения списка в TypeScript: новый корректный XML автоматически появляется в переключателе.
+
+Новые экраны используют ключи `react-i18next`. Компонент `LanguageBoundary` переводит старые текстовые узлы и доступные имена по словарю `<phrases>`; это переходный слой, а не место для новой бизнес-логики. `ru.xml` является обязательным fallback. Тест проверяет одинаковый набор ключей в русском и английском файлах.
+
+Тема хранится в `localStorage` под ключом `coop.theme`. До первого выбора используется системная настройка. Атрибут `data-theme` на корневом HTML-элементе переключает общие семантические токены поверхностей, текста, границ, состояний и теней. Компоненты не должны хранить собственную тему и не должны задавать отдельную однокрасочную палитру.
+
+Рынок строится вокруг трех понятных задач: **Купить**, **Продать**, **Мои заказы**. Покупатель видит товарные карточки с фотографией и полной ценой с доставкой. Ответственный оператор продавца публикует подписанное предложение через простую форму. Расширенные сетевые фильтры скрыты, пока пользователь сам их не откроет.
+
+### English
+
+The frontend discovers every `lang/*.xml` file at build time through the `cooperative-locale-xml` Vite plugin. Each file defines its language code and label, key-based messages, and a temporary phrase dictionary for legacy screens. Adding a valid XML file automatically adds an option to the language selector without editing a TypeScript registry.
+
+New screens use `react-i18next` message keys. `LanguageBoundary` translates legacy text nodes and accessible labels from `<phrases>` as a migration layer, not as a place for new business logic. `ru.xml` is the required fallback. Tests enforce an identical message-key contract between Russian and English.
+
+The selected theme is stored under `coop.theme` in `localStorage`; the operating-system preference is used before the first explicit selection. The root `data-theme` attribute switches semantic tokens for surfaces, text, borders, states, and shadows. Components must not keep separate theme state or introduce an isolated one-color palette.
+
+The marketplace is organized around three plain tasks: **Buy**, **Sell**, and **My orders**. Buyers compare product cards with photographs and delivered totals. A responsible seller-side operator publishes a signed offer through a short form. Advanced federation filters remain hidden until the user opens them.

@@ -1,0 +1,402 @@
+.federation-view {
+  width: min(1420px, 100%);
+}
+
+.federation-view textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 9px 10px;
+  color: var(--ink);
+  font: 10px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  resize: vertical;
+  background: white;
+  border: 1px solid #c9d2ce;
+  border-radius: 5px;
+}
+
+.federation-view textarea:focus-visible {
+  outline: 3px solid rgba(243, 197, 82, .65);
+  outline-offset: 2px;
+}
+
+.federation-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.federation-metrics .metric strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.federation-command-band,
+.federation-inline-form {
+  min-width: 0;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.federation-command-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.federation-command-band.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.federation-command-band.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.federation-command-band > form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  align-content: start;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px;
+  border-right: 1px solid var(--line);
+}
+
+.federation-command-band > form:last-child {
+  border-right: 0;
+}
+
+.federation-command-band > form > strong {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  color: var(--forest);
+  font-size: 12px;
+}
+
+.federation-command-band > .enrollment-form {
+  grid-template-columns: repeat(4, minmax(145px, 1fr));
+}
+
+.enrollment-form .wide-field,
+.federation-command-band .wide-field {
+  grid-column: 1 / -1;
+}
+
+.federation-inline-form {
+  padding: 12px 15px;
+  background: #eef3f1;
+}
+
+.federation-inline-form > form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.federation-inline-form > label {
+  width: min(560px, 100%);
+}
+
+.federation-table {
+  min-width: 980px;
+}
+
+.federation-table td {
+  max-width: 250px;
+}
+
+.federation-table td > span:not(.status) {
+  display: block;
+  font-size: 10px;
+}
+
+.federation-table th:last-child {
+  width: 126px;
+}
+
+.federation-hash {
+  display: block;
+  max-width: 220px;
+  margin-top: 4px;
+  color: var(--green);
+  font: 8px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.table-actions button,
+.liability-grid article > div > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  padding: 0;
+  color: var(--forest);
+  background: white;
+  border: 1px solid #aabbb4;
+  border-radius: 5px;
+}
+
+.federation-notice,
+.federation-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 14px;
+  font: 10px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+
+.federation-notice {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.federation-error {
+  color: var(--red);
+  background: var(--red-soft);
+  border-color: #e5bbb7;
+}
+
+.responsibility-grid,
+.liability-grid,
+.epoch-grid,
+.conflict-grid,
+.incident-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.responsibility-grid article,
+.liability-grid article,
+.epoch-grid article,
+.conflict-grid article,
+.incident-list article {
+  min-width: 0;
+  padding: 13px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.responsibility-grid article > header,
+.liability-grid article > header,
+.epoch-grid article > header,
+.conflict-grid article > header,
+.incident-list article > header,
+.incident-list article > footer {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.responsibility-grid article > header strong,
+.epoch-grid article > header strong,
+.conflict-grid article > header strong,
+.incident-list article > header strong,
+.epoch-grid article > header span,
+.conflict-grid article > header span,
+.incident-list article > header span {
+  display: block;
+}
+
+.responsibility-grid article > span,
+.epoch-grid article > header span,
+.conflict-grid article > header span,
+.incident-list article > header span,
+.incident-list article > footer > span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.responsibility-grid dl,
+.epoch-grid dl {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 7px 10px;
+  margin: 13px 0;
+  font-size: 10px;
+}
+
+.responsibility-grid dt,
+.epoch-grid dt {
+  color: var(--muted);
+}
+
+.responsibility-grid dd,
+.epoch-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.liability-grid article > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  border-top: 1px solid #edf0ef;
+  font-size: 10px;
+}
+
+.liability-grid article > header {
+  min-height: 34px;
+}
+
+.liability-grid article > header span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.conflict-grid article {
+  border-left: 3px solid var(--amber);
+}
+
+.conflict-grid article > p,
+.incident-list article > p {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.conflict-actions button {
+  min-height: 32px;
+  padding: 0 9px;
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 700;
+  background: white;
+  border: 1px solid #aabbb4;
+  border-radius: 5px;
+}
+
+.incident-list article {
+  border-left: 3px solid var(--red);
+}
+
+.incident-list article > footer {
+  align-items: center;
+  margin-top: 12px;
+}
+
+@media (max-width: 1180px) {
+  .federation-view .view-header {
+    align-items: start;
+    gap: 14px;
+  }
+
+  .federation-view .section-tabs {
+    max-width: 570px;
+    flex-wrap: wrap;
+    justify-content: end;
+  }
+
+  .federation-command-band.three-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .federation-command-band.three-columns > form {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .federation-command-band.three-columns > form:last-child {
+    border-bottom: 0;
+  }
+
+  .responsibility-grid,
+  .liability-grid,
+  .epoch-grid,
+  .conflict-grid,
+  .incident-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 850px) {
+  .federation-command-band.two-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .federation-command-band.two-columns > form {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .federation-command-band.two-columns > form:last-child {
+    border-bottom: 0;
+  }
+
+  .federation-command-band > .enrollment-form {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+
+  .federation-inline-form > form {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .federation-view .view-header {
+    display: grid;
+  }
+
+  .federation-view .section-tabs {
+    justify-content: start;
+  }
+
+  .federation-metrics,
+  .responsibility-grid,
+  .liability-grid,
+  .epoch-grid,
+  .conflict-grid,
+  .incident-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .federation-command-band > form,
+  .federation-command-band > .enrollment-form,
+  .federation-inline-form > form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .federation-command-band .wide-field,
+  .enrollment-form .wide-field {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .federation-metrics,
+  .responsibility-grid,
+  .liability-grid,
+  .epoch-grid,
+  .conflict-grid,
+  .incident-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

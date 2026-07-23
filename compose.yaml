@@ -1,0 +1,292 @@
+name: cooperative-clearing
+
+x-runtime-environment: &runtime-environment
+  COOP_ENVIRONMENT: ${COOP_ENVIRONMENT:-dev}
+  COOP_RELEASE: ${COOP_RELEASE:-0.1.0-dev}
+  COOP_LOG_LEVEL: ${COOP_LOG_LEVEL:-INFO}
+  COOP_NODE_CODE: ${COOP_NODE_CODE:-node-local-01}
+  COOP_NODE_DISPLAY_NAME: ${COOP_NODE_DISPLAY_NAME:-Local cooperative node}
+  COOP_DEMO_DATA_ENABLED: ${COOP_DEMO_DATA_ENABLED:-false}
+  COOP_DATABASE_HOST: postgres
+  COOP_DATABASE_PORT: "5432"
+  COOP_DATABASE_NAME: cooperative_clearing
+  COOP_DATABASE_USER: coop_app
+  COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+  COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+  COOP_BLOB_ENCRYPTION_KEY_FILE: /run/secrets/blob_encryption_key
+  COOP_NODE_SIGNING_SEED_FILE: /run/secrets/node_signing_seed
+  COOP_BOOTSTRAP_REGISTRAR_PASSWORD_FILE: /run/secrets/bootstrap_registrar_password
+  COOP_BOOTSTRAP_SECURITY_PASSWORD_FILE: /run/secrets/bootstrap_security_password
+  COOP_BOOTSTRAP_AUDITOR_PASSWORD_FILE: /run/secrets/bootstrap_auditor_password
+
+x-backend-common: &backend-common
+  image: cooperative-clearing/backend:${COOP_RELEASE:-0.1.0-dev}
+  build:
+    context: ./backend
+    target: runtime
+  restart: "no"
+  environment: *runtime-environment
+  secrets:
+    - postgres_app_password
+    - node_signing_seed
+    - blob_encryption_key
+    - bootstrap_registrar_password
+    - bootstrap_security_password
+    - bootstrap_auditor_password
+  networks:
+    - data
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cooperative_clearing
+      POSTGRES_USER: coop_migrator
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+      - postgres_app_password
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U coop_migrator -d cooperative_clearing"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  postgres-test:
+    image: postgres:18-alpine
+    profiles: ["test"]
+    restart: "no"
+    environment:
+      POSTGRES_DB: cooperative_clearing_test
+      POSTGRES_USER: coop_migrator
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+      - postgres_app_password
+    volumes:
+      - ./infra/postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/10-runtime-role.sh:ro
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U coop_migrator -d cooperative_clearing_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+
+  migrate-test:
+    <<: *backend-common
+    profiles: ["test"]
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *runtime-environment
+      COOP_SERVICE_NAME: migration-test
+      COOP_DATABASE_HOST: postgres-test
+      COOP_DATABASE_NAME: cooperative_clearing_test
+      COOP_DATABASE_USER: coop_migrator
+      COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+  migrate:
+    <<: *backend-common
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *runtime-environment
+      COOP_SERVICE_NAME: migration
+      COOP_DATABASE_USER: coop_migrator
+      COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_migrator_password
+    secrets:
+      - postgres_migrator_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  init-node:
+    <<: *backend-common
+    command: ["coopctl", "init-node"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  bootstrap-identity:
+    <<: *backend-common
+    command: ["coopctl", "bootstrap-identity"]
+    depends_on:
+      init-node:
+        condition: service_completed_successfully
+
+  seed-demo:
+    <<: *backend-common
+    profiles: ["demo"]
+    command: ["coopctl", "seed-demo"]
+    volumes:
+      - blob-data:/var/lib/cooperative-clearing/blobs
+    depends_on:
+      bootstrap-identity:
+        condition: service_completed_successfully
+
+  api:
+    <<: *backend-common
+    restart: unless-stopped
+    environment:
+      <<: *runtime-environment
+      COOP_SERVICE_NAME: api
+    volumes:
+      - blob-data:/var/lib/cooperative-clearing/blobs
+    networks:
+      - app
+      - data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    depends_on:
+      bootstrap-identity:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    <<: *backend-common
+    restart: unless-stopped
+    command: ["coopctl", "worker"]
+    environment:
+      <<: *runtime-environment
+      COOP_SERVICE_NAME: worker
+    depends_on:
+      bootstrap-identity:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    healthcheck:
+      test: ["CMD", "coopctl", "worker-health"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 10s
+
+  backend-tests:
+    image: cooperative-clearing/backend-test:${COOP_RELEASE:-0.1.0-dev}
+    build:
+      context: ./backend
+      target: test
+    profiles: ["test"]
+    environment:
+      <<: *runtime-environment
+      COOP_SERVICE_NAME: backend-tests
+      COOP_DEMO_DATA_ENABLED: "true"
+      COOP_DATABASE_HOST: postgres-test
+      COOP_DATABASE_NAME: cooperative_clearing_test
+    secrets:
+      - postgres_app_password
+      - node_signing_seed
+      - blob_encryption_key
+      - bootstrap_registrar_password
+      - bootstrap_security_password
+      - bootstrap_auditor_password
+    networks:
+      - data
+    depends_on:
+      migrate-test:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    image: cooperative-clearing/frontend:${COOP_RELEASE:-0.1.0-dev}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+  gateway:
+    image: cooperative-clearing/gateway:${COOP_RELEASE:-0.1.0-dev}
+    build:
+      context: ./infra/gateway
+    restart: unless-stopped
+    ports:
+      - "${COOP_HTTP_PORT:-8080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks:
+      - edge
+      - app
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+
+secrets:
+  postgres_migrator_password:
+    file: ./secrets/postgres_migrator_password
+  postgres_app_password:
+    file: ./secrets/postgres_app_password
+  node_signing_seed:
+    file: ./secrets/node_signing_seed
+  blob_encryption_key:
+    file: ./secrets/blob_encryption_key
+  bootstrap_registrar_password:
+    file: ./secrets/bootstrap_registrar_password
+  bootstrap_security_password:
+    file: ./secrets/bootstrap_security_password
+  bootstrap_auditor_password:
+    file: ./secrets/bootstrap_auditor_password
+
+volumes:
+  postgres-data:
+  blob-data:
+
+networks:
+  edge:
+  app:
+    internal: true
+  data:
+    internal: true

@@ -132,6 +132,68 @@ idempotency, audit, OpenAPI и integration tests.
 
 OpenAPI обязан реализовывать перечисленные там команды и scopes; общие CRUD
 endpoints не заменяют state transitions, approvals и audit.
+
+## Реализованный exchange API
+
+Slice 5 публикует scoped чтение сделок, обязательств, исполнений, актов
+приёмки, логистики и споров в `/api/v1/exchange`. Команды покрывают предложение
+и новую версию сделки, личные подтверждения сторон, предъявление и приёмку
+исполнения, открытие и независимое решение спора, explicit overdue scan и
+переходы заказа доставки.
+
+Все exchange-команды требуют `Idempotency-Key`. Условия подтверждаются точной
+парой `terms_version`/`terms_hash`; изменяемые deal, obligation, fulfillment,
+logistics order и dispute требуют `expected_version`. Read endpoints применяют
+participant/carrier/cooperative scope и скрывают чужой объект как `404`.
+Подробный перечень: [implemented_slice_5.md](implemented_slice_5.md).
+
+## Реализованный bounded risk API
+
+Slice 6 публикует participant- и cooperative-scoped реестры политик, паевых
+счетов, append-only взносов, связанных лиц, commitments и liability cases в
+`/api/v1/risk`.
+
+Команды покрывают dual-control политику, открытие счёта и взнос, preview всех
+лимитов, предложение и личное принятие точного `terms_hash`, освобождение
+резерва, независимое решение связанности, открытие и оценку ответственности.
+Каждая изменяющая команда требует `Idempotency-Key`; переход существующего
+агрегата требует `expected_version`.
+
+Preview не создаёт хозяйственного события. Liability assessment фиксирует
+`NOT_EXECUTED` и не меняет баланс пая. Подробный перечень endpoints, roles и
+инвариантов: [implemented_slice_6.md](implemented_slice_6.md).
+
+## Реализованный local clearing API
+
+Slice 7 публикует scoped lifecycle в `/api/v1/clearing`: policy, cycles,
+frozen input, entries, positions, approvals, evidence-backed disputes, proof,
+participant statements и accounting export draft.
+
+Каждая изменяющая команда требует `Idempotency-Key`, а переход существующего
+цикла, policy или dispute требует `expected_version`. Preview approval связан с
+точными `input_hash` и `result_hash`; finalize повторно принимает `result_hash`
+и под PostgreSQL locks проверяет версии frozen obligations. Участник читает
+только собственный контур, клиринговые роли действуют в cooperative scope,
+глобальный аудитор имеет read-only доступ.
+
+`POST /api/v1/clearing/proofs/verify` пересчитывает canonical hashes и чистый
+engine без доверия к сохранённым итогам. Полный lifecycle и перечень endpoints:
+[implemented_slice_7.md](implemented_slice_7.md).
+## Реализованный disputes and trust API
+
+Slice 8 публикует 27 scoped paths в `/api/v1/trust`: dual-control policy,
+дела и ответы, conflict declarations, reasoned decisions, protective measures,
+sanctions, independent appeals, атомарные reputation events, контекстный
+profile, rehabilitation plans/steps и рабочие очереди аудитора/арбитра.
+
+Каждая команда требует `Idempotency-Key`; переход изменяемого объекта также
+требует `expected_version`. Решение ссылается на READY evidence, точную policy
+version и actor role assignment. Участник видит свой контур, cooperative roles
+ограничены scope, а глобальные `AUDITOR`/`SECURITY_ADMIN` получают read-only
+обзор. Активные protective measures исполняются также в identity и bounded-risk
+командах, поэтому запрет роли или новой гарантии не является только UI-флагом.
+
+Полный lifecycle, роли и доказательства: [implemented_slice_8.md](implemented_slice_8.md).
 ## Версионирование
 
 - additive compatible change остаётся в `/api/v1`;
@@ -139,3 +201,82 @@ endpoints не заменяют state transitions, approvals и audit.
 - event schema и HTTP API версионируются независимо;
 - deprecation содержит дату, замену и offline impact;
 - скрытое изменение экономического правила под прежней версией запрещено.
+
+## Реализованный solidarity API
+
+Slice 9 публикует 25 paths в `/api/v1/solidarity`: фонды, кампании и точные bucket balances, обещания, проверенные поступления, приватные заявки, распределения, approval, delivery, жалобы, агрегированные отчёты и рабочие очереди оператора/контролёра. Все 14 команд требуют `Idempotency-Key`; переход существующего объекта дополнительно проверяет `expected_version`, а утверждение распределения - неизменяемый `allocation_hash`.
+
+Read-модель разделяет публичные агрегаты, данные участника и staff scope. Личные evidence refs не попадают в публичные DTO, а campaign report не содержит `recipient_member_id`. Evidence вида `SOLIDARITY_AID` может загрузить активный участник с действующим назначением в кооперативе; доступ к остальным видам evidence не расширен.
+## Реализованный crisis/reserves API
+
+Slice 10 публикует 23 paths в `/api/v1/crisis`: versioned reserve targets,
+append-only physical snapshots, bounded mandates и reviews, rationing
+rules/previews/confirms/cancels, evidence-backed issuance, numbered paper forms,
+immutable reports и рабочие очереди оператора/контролёра.
+
+Каждая команда требует `Idempotency-Key`; transitions также проверяют
+`expected_version`, а activation/approval/confirm - frozen hash. Истёкший
+mandate не даёт capability. Allocation и paper form доступны самому участнику
+либо scoped staff. Полный контракт: [implemented_slice_10.md](implemented_slice_10.md).
+
+## Реализация federation API Slice 11
+
+Префикс `/api/v1/federation` содержит 50 paths: applications, responsibility
+acceptance, technical challenge, identity verification, independent audit,
+activation, trust contracts, bilateral limits, bonds/exposure, incidents,
+key rotations, offline epochs, package export/import/simulation/conflicts/apply,
+receipts и federation paper forms. Все commands используют `Idempotency-Key`;
+state transitions дополнительно требуют version/hash, evidence и независимого
+actor там, где это задано доменным правилом.
+
+OpenAPI всего содержит 226 paths. Копии backend/frontend идентичны по SHA-256
+`25771D6D04143679EAF2D63EC12EACE4BE2FF7B597B948389BADAE4F500CBEE4`, а
+TypeScript schema генерируется из этой спецификации.
+## Operations API
+
+- `GET /api/v1/operations/snapshot` — PII-free read model состояния локального
+  узла;
+- `GET /api/v1/operations/metrics` — Prometheus text exposition с bounded
+  labels.
+
+Оба endpoint требуют `COOPERATIVE_ADMIN`, `SECURITY_ADMIN` или `AUDITOR`.
+Анонимный запрос получает `401`, пользователь без роли — `403`. Endpoint metrics
+не является публичным `/metrics` и должен оставаться за общей auth/gateway
+политикой.
+
+## Реализация federated discovery API Slice 13
+
+Общий OpenAPI содержит 242 paths, из них 64 относятся к
+`/api/v1/federation`. Каталог публикует offers, indexes, logistics quotes,
+direct/indexed/cached search, live verification, purchase intents, отдельные
+goods/logistics reserves, commit/cancel и receipt read model.
+
+`POST /api/v1/federation/peer/messages` принимает только signed envelope
+`CC-PEER-1`. Входящий request связывает message, source, target, capability,
+operation, fingerprint, payload hash и короткое time window. Ответ подписан
+home node и связан с точным request hash. Browser API не принимает внешнюю
+подпись резерва от пользователя: backend получает evidence непосредственно от
+home node.
+
+Commit и cancel являются recoverable двухфазными командами. После сохранения
+`COMMITTING` или `CANCELLING` повтор использует исходный expected version,
+собирает отсутствующие remote acknowledgements и только затем завершает intent.
+Полный контракт и результаты проверок: [implemented_slice_13.md](implemented_slice_13.md).
+
+## Реализация inter-node clearing API Slice 14
+
+Общий OpenAPI содержит 254 paths. Префикс `/api/v1/federated-clearing`
+публикует 12 paths: policies, obligations, cycles, полное evidence и отдельные
+команды collect snapshots, prepare, proposal, collect approvals, local
+approval, commit, recovery и release. Каждая command использует
+`Idempotency-Key`; переходы проверяют текущее состояние, версии и hashes внутри
+PostgreSQL-транзакции.
+
+Межузловая доставка использует существующий authenticated endpoint
+`POST /api/v1/federation/peer/messages` с отдельными clearing operations и
+capabilities. Commit payload содержит полный набор signed prepare receipts и
+approvals, поэтому lagging participant может независимо восстановить evidence,
+проверить certificate и применить результат без общей БД. Canonical peer
+response возвращается без повторной сериализации подписанного документа.
+
+Точный lifecycle и трёхузловое доказательство: [implemented_slice_14.md](implemented_slice_14.md).

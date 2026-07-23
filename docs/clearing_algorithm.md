@@ -1,6 +1,6 @@
 # Клиринговый алгоритм
 
-Статус: production-контракт Crisis MVP.
+Статус: production-контракт Crisis MVP; `LOCAL_NETTING/1.0.0` реализован и проверен в [Slice 7](implemented_slice_7.md).
 
 ## Граница
 

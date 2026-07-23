@@ -1,0 +1,54 @@
+.solidarity-view { width: min(1540px, 100%); padding-bottom: 72px; }
+.solidarity-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.solidarity-metrics .metric strong { min-width: 0; overflow: hidden; font-size: 19px; text-overflow: ellipsis; white-space: nowrap; }
+.solidarity-error { margin: 0; padding: 10px 13px; color: var(--red); font-size: 10px; background: var(--red-soft); border: 1px solid #e5bab7; border-radius: 5px; overflow-wrap: anywhere; }
+.solidarity-scope-strip { display: grid; grid-template-columns: minmax(260px, 1fr) 150px 150px; align-items: end; gap: 12px; padding: 11px 14px; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
+.solidarity-scope-strip > div { display: grid; min-height: 40px; align-content: center; gap: 4px; }
+.solidarity-scope-strip > div > span { color: var(--muted); font-size: 8px; font-weight: 700; text-transform: uppercase; }
+.solidarity-scope-strip > div > strong { font-size: 16px; }
+.solidarity-command-band { display: grid; min-width: 0; gap: 10px; padding: 13px; background: #eef3f1; border-block: 1px solid var(--line); }
+.solidarity-command-grid, .solidarity-two-forms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.solidarity-command-grid form, .solidarity-two-forms form { display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); align-items: end; gap: 9px; padding: 12px; background: white; border: 1px solid var(--line); border-radius: 6px; }
+.solidarity-command-grid form > strong, .solidarity-two-forms form > strong { grid-column: 1 / -1; font-size: 12px; }
+.solidarity-command-grid .wide-field, .solidarity-two-forms .wide-field { grid-column: 1 / -1; }
+.solidarity-command-grid form > button, .solidarity-two-forms form > button { justify-self: start; }
+.solidarity-review-row { display: grid; grid-template-columns: minmax(280px, 1fr) auto auto; align-items: end; gap: 12px; }
+.solidarity-review-row > span { min-height: 40px; padding: 12px; color: var(--muted); font-size: 9px; background: #fff; border: 1px solid var(--line); border-radius: 5px; }
+.solidarity-inline-actions, .table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.solidarity-conflict { width: min(520px, 100%); }
+.solidarity-delivery-form, .solidarity-complaint-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 1.3fr) auto; align-items: end; gap: 9px; }
+.solidarity-table { min-width: 900px; }
+.solidarity-table th:last-child { width: 88px; }
+.solidarity-table code { display: block; max-width: 190px; overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.table-actions button { display: grid; width: 31px; height: 31px; place-items: center; padding: 0; color: var(--forest); background: white; border: 1px solid #aabbb4; border-radius: 4px; }
+.table-actions button:last-child { color: var(--red); }
+.solidarity-report-list { display: grid; }
+.solidarity-report-list > article { min-width: 0; padding: 15px; border-bottom: 1px solid var(--line); }
+.solidarity-report-list > article:last-child { border-bottom: 0; }
+.solidarity-report-list article > header { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, .9fr); align-items: center; gap: 16px; margin-bottom: 12px; }
+.solidarity-report-list header > div { display: grid; gap: 4px; }
+.solidarity-report-list header strong { font-size: 13px; }
+.solidarity-report-list header span { color: var(--muted); font-size: 9px; }
+.solidarity-report-list header code { min-width: 0; overflow: hidden; color: var(--green); font-size: 8px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.solidarity-report-list dl { display: grid; grid-template-columns: repeat(4, auto 1fr); margin: 0 0 12px; border: 1px solid var(--line); }
+.solidarity-report-list dt, .solidarity-report-list dd { margin: 0; padding: 8px; font-size: 9px; border-right: 1px solid var(--line); }
+.solidarity-report-list dt { color: var(--muted); background: #f7f9f8; }
+.solidarity-report-list dd { font-weight: 750; }
+
+@media (max-width: 1120px) {
+  .solidarity-command-grid, .solidarity-two-forms { grid-template-columns: minmax(0, 1fr); }
+  .solidarity-delivery-form, .solidarity-complaint-form { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .solidarity-view .view-header { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 12px; }
+  .solidarity-view .section-tabs { width: 100%; min-width: 0; overflow-x: auto; }
+  .solidarity-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .solidarity-scope-strip, .solidarity-command-grid form, .solidarity-two-forms form, .solidarity-review-row, .solidarity-delivery-form, .solidarity-complaint-form { grid-template-columns: minmax(0, 1fr); }
+  .solidarity-command-grid .wide-field, .solidarity-two-forms .wide-field { grid-column: auto; }
+  .solidarity-command-grid form > button, .solidarity-two-forms form > button, .solidarity-delivery-form > button, .solidarity-complaint-form > button { width: 100%; }
+  .solidarity-report-list article > header { grid-template-columns: minmax(0, 1fr); }
+  .solidarity-report-list header code { text-align: left; }
+  .solidarity-report-list dl { grid-template-columns: auto 1fr auto 1fr; }
+  .solidarity-report-list dt:nth-of-type(n+3), .solidarity-report-list dd:nth-of-type(n+3) { border-top: 1px solid var(--line); }
+}

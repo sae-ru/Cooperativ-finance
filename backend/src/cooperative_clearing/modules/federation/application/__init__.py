@@ -1,0 +1,1 @@
+"""Federation application services."""

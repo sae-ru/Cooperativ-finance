@@ -25,6 +25,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 0. Engineering foundation
 
+Статус: runtime и CI реализованы; подписанный offline bundle, backup/restore automation и production TLS остаются обязательными до завершения slice.
+
 - Python/FastAPI/SQLAlchemy/Alembic skeleton;
 - React/TypeScript PWA skeleton;
 - PostgreSQL, Nginx, Compose;
@@ -37,6 +39,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 1. Identity and audit
 
+Статус: реализован; доказательства и эксплуатационные ограничения приведены в [implemented_slice_1.md](implemented_slice_1.md).
+
 - User, Member, Cooperative, Membership, RoleAssignment;
 - local login, refresh sessions, revoke, step-up interface;
 - RBAC scope и separation of duties;
@@ -46,6 +50,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 Готово: назначение/отзыв роли отражается во всех новых командах и audit.
 
 ## Slice 2. Signed journal and responsibility
+
+Статус: реализован; доказательства и ограничения приведены в [implemented_slice_2.md](implemented_slice_2.md).
 
 - event envelope, canonicalization adapter, signing port;
 - node sequence/hash chain;
@@ -57,6 +63,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 3. Inventory vertical flow
 
+Статус: реализован; доказательства и ограничения приведены в [implemented_slice_3.md](implemented_slice_3.md).
+
 - Product, Unit, Warehouse, InventoryLot;
 - independent attestation, quality, evidence blobs;
 - custody transfer;
@@ -66,6 +74,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 Готово: реальная партия проходит кладовщика и контролёра с печатным актом.
 
 ## Slice 4. Commodity rights
+
+Статус: реализован; доказательства и ограничения приведены в [implemented_slice_4.md](implemented_slice_4.md).
 
 - reservation и lot balance;
 - issue, transfer, freeze, redeem;
@@ -77,6 +87,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 5. Deals and obligations
 
+Статус: реализован; доказательства и ограничения приведены в [implemented_slice_5.md](implemented_slice_5.md).
+
 - versioned terms и party confirmations;
 - obligations, partial fulfillment, acceptance, dispute;
 - due/overdue workflow;
@@ -87,6 +99,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 6. Shares and bounded risk
 
+Статус: реализован; доказательства, ограничения и проверки приведены в [implemented_slice_6.md](implemented_slice_6.md).
+
 - share contours, protected amount, reservations;
 - credit limits, guarantees, role bonds;
 - aggregate related-party exposure;
@@ -96,6 +110,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 Готово: любое рискованное действие показывает и соблюдает max loss.
 
 ## Slice 7. Bilateral clearing
+
+Статус: реализован; доказательства, ограничения и проверки приведены в [implemented_slice_7.md](implemented_slice_7.md).
 
 - pure deterministic engine;
 - input snapshot, preview, dispute window, finalize;
@@ -108,6 +124,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 8. Disputes and trust
 
+Статус: реализован; доказательства, ограничения и проверки приведены в [implemented_slice_8.md](implemented_slice_8.md).
+
 - disputes, conflicts of interest, decisions;
 - sanctions/protective measures;
 - independent appeals и rehabilitation;
@@ -118,6 +136,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 9. Solidarity
 
+Статус: реализован; доказательства, ограничения и проверки приведены в [implemented_slice_9.md](implemented_slice_9.md).
+
 - fund, campaign, pledge, contribution;
 - allocation dual control, delivery proof, complaint;
 - privacy scopes и aggregated report;
@@ -126,6 +146,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 Готово: одна campaign проходит от вклада до подтверждённой выдачи и reconciliation.
 
 ## Slice 10. Reserves and crisis
+
+Статус: реализован; доказательства, ограничения и проверки приведены в [implemented_slice_10.md](implemented_slice_10.md).
 
 - reserve targets/snapshots/thresholds;
 - signed crisis activation/review/close;
@@ -147,9 +169,15 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 - security incident, key rotate/revoke/quarantine.
 
 Готово: два разделённых узла создают контролируемый конфликт и разрешают его
-без удаления истории.
+без удаления истории. Реализация и доказательства: [implemented_slice_11.md](implemented_slice_11.md).
 
 ## Slice 12. Pilot hardening
+
+Инженерный baseline реализован: protected operational snapshot/metrics,
+operator GUI, capacity runner, automated DOM accessibility checks и PII-free
+production evidence pack. Независимые security/legal review, target-host
+capacity, ручная accessibility matrix и фактический шестимесячный пилот остаются
+обязательными внешними критериями. Доказательства: [implemented_slice_12.md](implemented_slice_12.md).
 
 - load/capacity on target hardware;
 - complete observability;
@@ -161,6 +189,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 Федерация нескольких организаций начинается после slice 12 и отдельного ADR.
 
 ## Slice 13. Federated discovery and logistics
+
+Статус: реализован и проверен; evidence: [implemented_slice_13.md](implemented_slice_13.md).
 
 - signed offer index и direct/indexed/cached search;
 - product/unit/quality federation mapping;
@@ -175,6 +205,8 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 ## Slice 14. Inter-node clearing
 
+Статус: реализован и проверен на стенде из трёх независимых узлов; доказательства: [implemented_slice_14.md](implemented_slice_14.md).
+
 - federated obligation references и node positions;
 - signed snapshots и prepare receipts;
 - deterministic proposal и independent node verification;
@@ -186,6 +218,58 @@ Backend и frontend имеют независимые lock-файлы. OpenAPI �
 
 Готово: три узла завершают цикл без общей БД; потеря coordinator после commit
 не нарушает финальность, а lagging node применяет certificate после recovery.
+
+## Slice 15. Signed offline release
+
+Статус: реализован и проверен чистой установкой без pull/build; доказательства:
+[implemented_slice_15.md](implemented_slice_15.md).
+
+- Ed25519 release manifest и независимый public-key fingerprint;
+- полный checksum inventory и запрет unsigned filesystem entries;
+- четыре runtime image archive с immutable content ID;
+- CycloneDX SBOM, license reports и pinned license policy;
+- минимальный node installation payload;
+- общий fail-closed verifier для Linux и PowerShell update;
+- CI contract и негативные tamper tests.
+
+Готово: новый узел устанавливается из подписанного bundle без registry и
+исходного кода. Production key ceremony, ручной license review и внешний
+readiness review остаются отдельными обязательными решениями.
+
+## Slice 16. FULL recovery and update rollback
+
+Статус: реализован и проверен на отдельном update/restore стенде; доказательства:
+[implemented_slice_16.md](implemented_slice_16.md).
+
+- FULL backup требует encrypted recovery material и verified signed release;
+- PostgreSQL dump сохраняет точные runtime ACL;
+- update имеет bounded readiness и управляемые faultpoints;
+- ошибка после migration автоматически возвращает previous release;
+- destructive restore загружает точный release, DB, ACL и blobs;
+- init/bootstrap/health/journal обязательны после recovery.
+
+Готово: interrupted update, application rollback, independent backup restore и
+полный возврат r2 -> r1 проверены. Физический резервный host, production keys,
+реальные custodians и migration разных schemas остаются внешними gates.
+
+## Slice 17. Critical quality gates
+
+Статус: реализован и проверен; доказательства:
+[implemented_slice_17.md](implemented_slice_17.md).
+
+- fail-closed OpenAPI compatibility и exact frontend mirror;
+- committed contract соответствует фактическому приложению;
+- 300 deterministic property graphs для local/federated clearing;
+- isolated 0017 -> 0018 -> 0017 -> 0018 migration drill;
+- три последовательных PostgreSQL concurrency rounds;
+- итоговая проверка подписанного журнала;
+- release job зависит от critical-quality gate.
+
+Готово: локально воспроизводимый gate создает checksum evidence pack и не
+допускает release при несовместимом API, потере данных миграцией, flaky race
+или нарушенной journal sequence. Remote CI на конкретном commit и migration с
+фактического предыдущего production release остаются внешними evidence.
+
 ## Definition of Done для каждого slice
 
 - approved policy/open decision для затронутого поведения;

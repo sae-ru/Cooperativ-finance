@@ -59,6 +59,14 @@ documents, source event ids/hashes, totals и package hash. Повторный �
 идемпотентен. Исправление выполняется correction document, а не заменой ранее
 выданного файла.
 
+## Реализованный draft Slice 7
+
+После `RECONCILED` локальный цикл создаёт один append-only export draft с
+cycle/proof/result hashes, ordered entries, participant statement hashes,
+source event ids, totals и `package_hash`. Повторный reconcile не создаёт новый
+пакет. Draft пригоден для независимой сверки и будущего mapping, но не содержит
+утверждённых debit/credit или налоговых проводок: это остаётся решением
+бухгалтера и применимой юрисдикции.
 ## Reconciliation
 
 Регулярно сверяются:

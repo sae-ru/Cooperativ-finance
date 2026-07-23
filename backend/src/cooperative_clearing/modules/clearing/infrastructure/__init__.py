@@ -1,0 +1,1 @@
+"""Clearing persistence adapters."""

@@ -71,3 +71,13 @@
 Бумажная форма не обходит лимит, protected amount, независимость ролей или
 последующую апелляцию. Emergency exception имеет отдельное основание, предел и
 review. QR не считается доказательством без подписей и сверки содержимого.
+
+## Federation paper forms Slice 11
+
+Федеративная форма отличается от локальной crisis form: она всегда связана с
+конкретными external node и open offline epoch. Serial уникален в пределах узла,
+QR reference глобально уникален, checksum защищает печатный реквизит, payload
+получает canonical SHA-256. Issue и record выполняют разные люди; record требует
+participant signatures и evidence id. Неиспользованный оригинал можно только
+void с причиной, но нельзя удалить. Epoch close блокируется при любой форме
+`ISSUED`.

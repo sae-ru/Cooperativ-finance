@@ -1,0 +1,27 @@
+{
+  "allowed": [
+    "0BSD",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "PSF-2.0",
+    "Python-2.0",
+    "Unicode-3.0",
+    "Zlib"
+  ],
+  "denied": [
+    "AGPL-1.0",
+    "AGPL-1.0-only",
+    "AGPL-1.0-or-later",
+    "AGPL-3.0",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "SSPL-1.0"
+  ],
+  "format": "cooperative-clearing-license-policy-v1",
+  "version": "1"
+}

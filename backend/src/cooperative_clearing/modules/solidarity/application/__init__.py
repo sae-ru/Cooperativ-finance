@@ -1,0 +1,1 @@
+"""Solidarity application services."""

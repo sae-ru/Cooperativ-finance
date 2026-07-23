@@ -99,3 +99,11 @@ burden, participant comprehension, aid delivery и false positive controls.
 Закрываются pending operations, выполняются inventory/accounting reconciliation,
 backup/restore verification, participant survey, independent audit и report о
 residual risks. Решение об expansion принимается отдельно от команды разработки.
+## Пакет ежемесячных доказательств
+
+Каждый период использует
+[evidence_templates/pilot_monthly_report.md](evidence_templates/pilot_monthly_report.md)
+и ссылается на локальный production evidence pack. Исправление кода не считается
+закрытием инцидента без номера релиза, повторной проверки и решения независимого
+контролёра. Шесть календарных месяцев нельзя заменить ускоренным тестовым
+прогоном.

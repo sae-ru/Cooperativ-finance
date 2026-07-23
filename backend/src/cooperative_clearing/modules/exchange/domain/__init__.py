@@ -1,0 +1,1 @@
+"""Pure exchange domain rules."""

@@ -99,3 +99,69 @@ clean host, known-good release, определение времени компр
 Фиксируются фактические RPO/RTO, использованные люди и носители, failed steps,
 отсутствующие blobs, расхождения, ручные решения и corrective actions. Учение
 не считается успешным только по факту запуска UI.
+
+## Исполняемая процедура Slice 11
+
+Согласованный backup локального узла:
+
+```bash
+bash ./scripts/backup-node.sh /var/lib/cooperative-clearing/backups
+```
+
+Финальная строка stdout содержит абсолютный каталог завершённой копии. Каталог
+появляется только после успешных journal, checksum, `pg_restore --list` и
+`tar -tzf` checks. `manifest.env` различает:
+
+- `FULL`: приложены отдельно зашифрованный recovery material и независимо
+  проверенный signed release bundle точной версии;
+- `DATA_ONLY`: отсутствует recovery material или release; такая копия не
+  разрешает production update даже при целых БД и blobs.
+
+Для FULL backup задаются `COOP_ENCRYPTED_RECOVERY_BUNDLE`,
+`COOP_VERIFIED_RELEASE_BUNDLE`, `COOP_RELEASE_PUBLIC_KEY` и независимо
+утверждённый `COOP_RELEASE_LICENSE_POLICY_SHA256`. Вложенный release повторно
+проверяется при backup verification и до destructive restore.
+
+Restore drill без воздействия на рабочий узел:
+
+```bash
+bash ./scripts/verify-backup.sh /var/lib/cooperative-clearing/backups/<backup-id>
+```
+
+Скрипт создаёт одноразовые PostgreSQL container, network и volumes,
+восстанавливает dump и blobs, сверяет schema, таблицы, signed events и число
+файлов, после чего удаляет временные ресурсы. Для Windows operator workstation
+доступны `backup-node.ps1` и `verify-backup.ps1`.
+
+Контролируемый restore является разрушительной операцией и требует двух явных
+подтверждений:
+
+```bash
+COOP_RESTORE_CONFIRM=<backup-id> \
+COOP_RECOVERY_CONFIRMED=yes \
+bash ./scripts/restore-node.sh /path/to/<backup-id>
+```
+
+Перед production restore independently provisioned secrets должны соответствовать
+recovery bundle. После восстановления обязательны migrations, node init,
+identity bootstrap, signed journal verification и `verify-stack`. Автоматизация
+не отменяет двойной контроль носителя и recovery material.
+
+## Проверенное учение Slice 11
+
+Копия `node-20260721T191032Z` прошла checksum/archive verification и независимый
+restore drill: schema `0012_crisis_reserves`, 92 таблицы, 203 signed events и 24
+blob-файла. Учение выполнялось до runtime upgrade на `0014`; оно доказывает
+работоспособность data restore path, но не заменяет FULL restore на резервном
+оборудовании с реальными recovery custodians и измерением RTO/RPO.
+## Проверенное учение Slice 16
+
+FULL backup включает exact release, PostgreSQL ACL, DB, blobs и encrypted
+recovery material. Independent restore создаёт runtime role до replay ACL.
+Update faultpoint после migration вернул previous release и healthy stack.
+Последующий normal update и destructive restore из pre-update backup завершены;
+runtime `coop_app`, init/bootstrap, health и signed journal проверены.
+
+Локальное время полного restore составило 168,5 секунды. Оно не закрывает RTO
+на резервном оборудовании и учение с реальными recovery custodians. Подробности:
+[implemented_slice_16.md](implemented_slice_16.md).

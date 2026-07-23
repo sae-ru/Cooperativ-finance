@@ -1,0 +1,1 @@
+"""Signed journal domain primitives."""

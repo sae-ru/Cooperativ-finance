@@ -1,6 +1,6 @@
 # Межузловой клиринг
 
-Статус: production-архитектура post-pilot federation contour.
+Статус: реализованный инженерный federation contour; реальная эксплуатация допускается только после закрытия production readiness.
 
 ## Назначение
 
@@ -200,22 +200,28 @@ aggregated edges. Proof поддерживает selective disclosure: общи�
 
 ## API
 
+Локальное рабочее API:
+
 ```text
-POST /federation/clearing/cycles
-POST /federation/clearing/cycles/{id}/snapshots
-POST /federation/clearing/cycles/{id}/prepare
-POST /federation/clearing/cycles/{id}/prepare-receipts
-POST /federation/clearing/cycles/{id}/proposal
-POST /federation/clearing/cycles/{id}/verify
-POST /federation/clearing/cycles/{id}/approvals
-POST /federation/clearing/cycles/{id}/commit-certificate
-POST /federation/clearing/cycles/{id}/apply
-POST /federation/clearing/cycles/{id}/apply-receipts
-GET  /federation/clearing/cycles/{id}/proof
-POST /federation/clearing/proofs/verify
-POST /federation/clearing/cycles/{id}/reconcile
+GET/POST /api/v1/federated-clearing/policies
+GET/POST /api/v1/federated-clearing/obligations
+GET/POST /api/v1/federated-clearing/cycles
+GET      /api/v1/federated-clearing/cycles/{cycle_id}
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/snapshots/collect
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/prepare
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/proposal
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/approvals/collect
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/approvals/local
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/commit
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/recover
+POST     /api/v1/federated-clearing/cycles/{cycle_id}/release
 ```
 
+Межузловая доставка использует `POST /api/v1/federation/peer/messages` и
+операции `CLEARING_SNAPSHOT`, `CLEARING_PREPARE`, `CLEARING_PROPOSAL`,
+`CLEARING_STATUS`, `CLEARING_COMMIT`, `CLEARING_RELEASE`. Все изменяющие
+локальные команды требуют `Idempotency-Key`; peer message связывает source,
+target, capability, operation, payload hash, certificate fingerprint и срок.
 ## Acceptance
 
 - coordinator не меняет signed snapshot;

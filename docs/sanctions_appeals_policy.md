@@ -70,3 +70,14 @@ period, независимая проверка. Каждый step имеет ev
 - emergency freeze ограничен временем и review;
 - appeal и rehabilitation доступны из интерфейса;
 - correction отменённого решения видна во всех projections.
+## Реализация Slice 8
+
+Реализованы versioned trust policy, evidence-backed case/response, обязательные
+conflict declarations, original/appeal decision records, временные меры,
+sanction appeal window, independent appeal и rehabilitation steps. Решения,
+conflicts и reputation events защищены append-only trigger. При `OVERTURNED`
+последствия отзываются компенсирующими signed events, а история сохраняется.
+Cross-module enforcement блокирует новые guarantees/commitments и role
+assignment согласно активному scope меры. Автоматического движения паев нет.
+Шкалы fault/sanctions, состав appeal group и условия реабилитации остаются
+`OD-025`, `OD-030`, `OD-031` и `OD-032`.

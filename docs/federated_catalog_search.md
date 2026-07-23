@@ -1,6 +1,6 @@
 # Федеративный поиск товаров и логистики
 
-Статус: production-архитектура post-pilot federation contour.
+Статус: инженерная реализация Slice 13; production-допуск зависит от Slice 14 и общего readiness.
 
 ## Назначение
 

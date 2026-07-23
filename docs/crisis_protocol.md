@@ -1,6 +1,6 @@
 # Кризисный протокол
 
-Статус: архитектура режима; конкретные пороги утверждает пилот.
+Статус: механизм Slice 10 реализован; конкретные пороги и исключения утверждает пилот.
 
 ## Назначение
 
@@ -76,3 +76,19 @@ available, consumption rate, coverage days, quality/expiry и confidence.
 - единоличная выдача самому approving operator;
 - удаление истории режима;
 - использование crisis mode для обхода паевой экспозиции и апелляции.
+## Реализованный контракт Slice 10
+
+Реализация использует `ReserveTarget`, append-only `ReserveSnapshot`,
+`CrisisMandate`, `CrisisReview`, versioned `RationingRule`, frozen
+`RationingPlan`, `RationingAllocation`, evidence-backed `RationIssuance`,
+нумерованный `CrisisPaperForm` и immutable `CrisisReport`.
+
+Protected minimum сначала выделяется каждому eligible участнику. При нехватке
+на сумму минимумов доступный остаток делится поровну; только последующий остаток
+распределяется equal/weighted формулой до maximum per member. Confirm повторно
+проверяет snapshot и совокупный резерв под cooperative lock.
+
+Новая policy version атомарно переводит прежнюю в `RETIRED`. Rule нельзя
+заменить с открытыми allocations, reserve target нельзя заменить во время его
+использования активным мандатом. Истёкший mandate не даёт полномочий независимо
+от задержки worker. Полный состав и доказательства: [implemented_slice_10.md](implemented_slice_10.md).

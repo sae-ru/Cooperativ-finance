@@ -1,5 +1,7 @@
 # Солидарная помощь
 
+Статус реализации: Slice 9 реализован; фактические границы и проверки приведены в [implemented_slice_9.md](implemented_slice_9.md).
+
 Статус: обязательное разделение помощи, торговли и репутации.
 
 ## Назначение
@@ -70,3 +72,11 @@
 Жалоба не изменяет исходную хозяйственную историю. Она может приостановить
 невыданную allocation, открыть audit, создать correction/refund и изменить
 будущую policy. Получатель не теряет базовую помощь за подачу жалобы.
+
+## Реализация Slice 9
+
+Фактический контур использует точные bucket `contribution_form + unit_code`, cooperative advisory lock перед approval и независимые роли `SOLIDARITY_OPERATOR`/`SOLIDARITY_CONTROLLER`. Обещания не входят в остаток; только `VERIFIED` contribution может быть распределён. Approval, delivery и campaign report защищены append-only ограничениями БД.
+
+Жалоба на невыданный allocation переводит его в `SUSPENDED`. Независимое решение может восстановить или отменить allocation, но не переписывает исходные события. Публичный report содержит только агрегаты, правило остатка, hash и список ответственных.
+
+Демонстрационные forms, eligibility policy, residue rule и accounting treatment не считаются governance-решением: `OD-026`, `OD-027`, `OD-028` и `OD-037` остаются `OPEN`.

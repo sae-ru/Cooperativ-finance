@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=80.10.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cooperative-clearing"
+version = "0.1.0"
+description = "Crisis-resilient cooperative clearing node"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "MIT"
+dependencies = [
+  "alembic==1.18.5",
+  "argon2-cffi==25.1.0",
+  "cryptography==49.0.0",
+  "fastapi==0.139.2",
+  "psycopg[binary]==3.3.4",
+  "pydantic-settings==2.14.2",
+  "rfc8785==0.1.4",
+  "sqlalchemy==2.0.51",
+  "uvicorn==0.51.0",
+]
+
+[project.scripts]
+coopctl = "cooperative_clearing.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/versions/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+files = ["src", "tests/unit", "tests/api"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+  "integration: requires a real PostgreSQL instance",
+  "acceptance: requires the isolated multi-node Docker topology",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["cooperative_clearing"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true

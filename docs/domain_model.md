@@ -88,7 +88,8 @@
 - `SolidarityFund`, `AidCampaign`, `Contribution`;
 - `AidAllocation`, `AidDelivery`;
 - `ReserveTarget`, `ReserveSnapshot`;
-- `CrisisActivation`, `CrisisPolicy`, `RationingAllocation`.
+- `CrisisMandate`, `CrisisReview`, `RationingRule`, `RationingPlan`;
+- `RationingAllocation`, `RationIssuance`, `CrisisPaperForm`, `CrisisReport`.
 
 Помощь не создаёт `Obligation`, `CreditPosition` или положительный
 `ReputationEvent` донора.
@@ -123,6 +124,9 @@ attesters/approvers и ожидаемого следующего ответст�
 - критическое действие не остаётся без физического лица;
 - санкция и апелляция не финализируются одной группой людей;
 - помощь не влияет на кредит, голос или репутацию;
+- crisis capability не действует после expiry и не расширяется вне mandate scope;
+- rationing confirm повторно проверяет frozen snapshot и общий verified остаток;
+- базовая ration не создаёт обязательство, пай или reputation event;
 - взыскание не превышает подтверждённую экспозицию.
 
 ## То, что не является агрегатом
@@ -132,3 +136,17 @@ attesters/approvers и ожидаемого следующего ответст�
 - доступный остаток: вычисляемое и транзакционно проверяемое значение;
 - максимальная экспозиция: проекция резервирований и гарантий;
 - sync package: транспортный контейнер, а не хозяйственный источник истины.
+
+## Реализованные federation aggregates Slice 11
+
+`ExternalNode` агрегирует паспорт, application, named responsibility, technical
+challenge, audit status и active trust contract. `NodeTrustContract` ограничивает
+срок, разрешённые события, bilateral limits, bond и exposure. `OfflineEpoch`
+задаёт временную границу для `SyncPackage`, `SyncConflict`, `SyncReceipt` и
+`FederationPaperForm`. `NodeSecurityIncident` и `NodeKeyRotationRequest`
+изменяют допустимость будущих пакетов, не переписывая исторические подписи.
+
+Aggregate transitions выполняются через services с advisory/row locks,
+idempotency journal и signed node event в одной транзакции. Package simulation
+не создаёт хозяйственного эффекта; apply разрешён только после успешной
+проверки и закрытия blocking conflicts.

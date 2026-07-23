@@ -136,6 +136,8 @@ GET /admin/audit
 
 ## UX защиты
 
+- обязательная смена bootstrap-пароля не блокирует штатный выход из сессии;
+- мобильная навигация удерживает активный раздел в видимой области и не показывает системный scrollbar;
 - массовое действие всегда показывает count, filter snapshot и последствия;
 - privileged change имеет preview и independent approval;
 - PII export требует reason и журналируется;
@@ -154,3 +156,10 @@ GET /admin/audit
 - один человек не выдаёт себе privileged role;
 - все изменения воспроизводятся из administrative events/audit;
 - external service/client может быть отозван без остановки локальных accounts.
+## Эксплуатационная сводка
+
+Для `COOPERATIVE_ADMIN`, `SECURITY_ADMIN` и `AUDITOR` доступен отдельный
+read-only раздел: signed journal, outbox/quarantine, sessions, trust/appeals,
+federation conflicts/incidents/key rotations/offline epochs/forms и crisis
+state. Он не даёт обходить специализированные role workspaces и не содержит
+универсального рейтинга человека.

@@ -1,0 +1,1 @@
+"""Personal responsibility domain types."""

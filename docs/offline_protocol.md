@@ -120,3 +120,15 @@ critical event или policy version блокирует package.
 - blob filenames вычисляются по hash, не берутся из user input;
 - импорт работает без network fetch;
 - package receipt подписывается и хранится у обеих сторон.
+
+## Статус реализации Slice 11
+
+Протокол реализован как bounded offline epoch и детерминированный signed ZIP.
+Поддержаны export, import quarantine/inbox, simulation, conflict decisions,
+atomic apply и signed receipt. Проверяются protocol/contract compatibility,
+node/key status, hashes, previous checkpoint, event allowlist и exposure.
+Повторный package id не создаёт повторного хозяйственного эффекта.
+
+Глобальная eventual consistency не обещается: каждый узел хранит собственный
+checkpoint и явно видимый conflict/pending state. Связь может переноситься через
+сменный носитель; локальные операции не зависят от доступности federation.

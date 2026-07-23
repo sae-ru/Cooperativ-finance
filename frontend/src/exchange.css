@@ -1,0 +1,50 @@
+.exchange-view { max-width: 1420px; }
+.exchange-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.exchange-table { min-width: 820px; }
+.deal-detail { overflow: hidden; }
+.deal-terms-strip { display: grid; grid-template-columns: 100px minmax(260px, 1fr) 110px auto; align-items: center; border-bottom: 1px solid var(--line); background: #f7f9f8; }
+.deal-terms-strip > div { display: grid; min-width: 0; gap: 5px; min-height: 68px; align-content: center; padding: 10px 14px; border-right: 1px solid var(--line); }
+.deal-terms-strip > div:last-child { border-right: 0; }
+.deal-terms-strip span { color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.deal-terms-strip code { min-width: 0; overflow: hidden; color: var(--green); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.deal-actions { display: flex !important; flex-direction: row; justify-content: flex-end; gap: 7px !important; }
+.deal-actions button { white-space: nowrap; }
+.panel-error { padding: 0 15px 14px; }
+.deal-editor > form { display: grid; gap: 12px; padding: 15px; }
+.deal-editor .deal-title { max-width: 620px; }
+.deal-editor fieldset { position: relative; display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 11px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 5px; }
+.deal-editor legend { padding: 0 6px; color: var(--green); font-size: 10px; font-weight: 750; }
+.deal-editor .span-two, .exchange-command .span-two { grid-column: span 2; }
+.remove-draft { position: absolute; top: -12px; right: 10px; color: var(--red); background: white; }
+.check-field { display: flex; align-items: center; align-self: end; min-height: 40px; gap: 8px; padding: 0 10px; color: var(--ink); background: #f7f9f8; border: 1px solid var(--line); border-radius: 5px; }
+.check-field input { width: 16px; min-height: 16px; margin: 0; accent-color: var(--forest); }
+.editor-actions { display: flex; justify-content: space-between; gap: 10px; }
+.exchange-selector { padding: 13px 15px; border-bottom: 1px solid var(--line); background: #eef3f1; }
+.exchange-selector label { max-width: 700px; }
+.exchange-command > form { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); align-items: end; gap: 11px; padding: 15px; }
+.exchange-command > form > button { justify-self: start; min-width: 150px; }
+.file-field input { padding: 7px; font-size: 10px; }
+.logistics-table { min-width: 1080px; }
+.logistics-action { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: 6px; min-width: 220px; }
+.logistics-action input { min-height: 32px; padding: 4px; font-size: 8px; }
+.overdue-band { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; background: #fff8e8; border-block: 1px solid #e2c881; }
+.overdue-band > div { display: grid; gap: 3px; }
+.overdue-band strong { font-size: 12px; }
+.overdue-band span { color: var(--muted); font-size: 9px; }
+
+@media (max-width: 1100px) {
+  .deal-editor fieldset, .exchange-command > form { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  .deal-terms-strip { grid-template-columns: 90px minmax(180px, 1fr) 100px; }
+  .deal-actions { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+}
+
+@media (max-width: 760px) {
+  .exchange-view .view-header { align-items: start; gap: 12px; }
+  .exchange-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deal-terms-strip { grid-template-columns: 1fr; }
+  .deal-terms-strip > div { min-height: 56px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .deal-editor fieldset, .exchange-command > form { grid-template-columns: minmax(0, 1fr); }
+  .deal-editor .span-two, .exchange-command .span-two { grid-column: auto; }
+  .editor-actions, .overdue-band { align-items: stretch; flex-direction: column; }
+  .editor-actions button, .overdue-band button { width: 100%; }
+}

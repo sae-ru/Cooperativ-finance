@@ -100,3 +100,37 @@ Operational logs имеют ограниченный срок и rotation. Audit
 Локальный оператор может сформировать зашифрованный bundle с manifest,
 версиями, health, redacted logs и metrics snapshot. Перед экспортом показывается
 перечень включаемых данных; private keys и raw PII никогда не включаются.
+## Реализованный локальный baseline
+
+`GET /api/v1/operations/snapshot` и `GET /api/v1/operations/metrics` доступны
+только ролям `COOPERATIVE_ADMIN`, `SECURITY_ADMIN` и `AUDITOR`. Метрики имеют
+Prometheus text format и используют только bounded labels: route template,
+method и status class. In-memory HTTP counters обнуляются при рестарте процесса;
+хозяйственная история и signed journal от них не зависят.
+
+`coopctl diagnostics` выдаёт PII-free JSON snapshot для локального runbook.
+Раздел GUI `Эксплуатация` обновляет его раз в 30 секунд. Полный локальный
+release evidence собирается `scripts/collect-production-evidence.sh` или `.ps1`;
+raw logs не включаются по умолчанию. Реализация и ограничения зафиксированы в
+[Slice 12](implemented_slice_12.md).
+
+## Peer-сигналы Slice 13
+
+Операционный контур должен показывать без payload/PII: peer requests по
+operation/result, timeout/size/signature/replay rejects, fan-out partial
+results, active/expiring home-node holds, intents в `COMMITTING` и
+`CANCELLING`, oldest saga age, reserved/current exposure и приближение к
+bilateral limits. Alert на недоступность peer не делает локальный node
+неготовым, но блокирует соответствующую внешнюю команду и даёт runbook context.
+
+## Сигналы межузлового клиринга Slice 14
+
+Наблюдаемость должна показывать без хозяйственного payload: число циклов по
+state, oldest prepare, prepare expiry, snapshot/approval/apply readiness по
+bounded node code, certificate age, `COMMITTED_PENDING_APPLY`, lagging nodes,
+recovery attempts, signature/hash rejects и приближение к bilateral exposure.
+
+Alert после commit имеет более высокий приоритет, чем недоступность до commit:
+certificate уже означает экономическую финальность и требует доведения apply.
+Недоступность peer не делает локальный `/health/ready` красным, но блокирует
+новый межузловой переход, которому этот peer необходим.

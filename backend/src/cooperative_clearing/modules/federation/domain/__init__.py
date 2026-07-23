@@ -1,0 +1,1 @@
+"""Pure federation domain rules."""

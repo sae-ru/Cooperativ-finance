@@ -17,21 +17,25 @@
 - [ ] Нет float в количестве, оценке и покрытии.
 - [ ] Партия прослеживается до права, исполнения и получателя.
 - [ ] Нет двойного выпуска, погашения, резервирования и execution.
-- [ ] Protected amount и solidarity contour недоступны взысканию.
+- [x] Protected amount и solidarity contour недоступны взысканию.
 - [ ] Каждая critical command имеет actor/role/scope/evidence/exposure.
 - [ ] Appeal и compensation проверены end-to-end.
+- [x] Reserve status использует только physical verified evidence и bounded snapshot age ([evidence](implemented_slice_10.md)).
+- [x] Crisis mandate имеет dual control, mandatory review, expiry, maximum end и safe state ([evidence](implemented_slice_10.md)).
+- [x] Rationing сохраняет protected minimum, exact stock bound и не создаёт debt/reputation ([evidence](implemented_slice_10.md)).
+- [x] Paper forms имеют unique serial/checksum/expiry, independent record и reconciliation ([evidence](implemented_slice_10.md)).
 - [ ] Admin console разделяет User, Member, Membership, Organization и Node.
 - [ ] Клиринговый cycle проходит freeze/preview/dispute/finalize/reconcile.
 - [ ] Clearing proof и participant statements воспроизводимы.
-- [ ] Active external node имеет owner, named roles и действующий trust contract.
-- [ ] Bilateral node limits и node bond ограничивают внешнюю exposure.
-- [ ] Quarantine, rehabilitation и disconnect узла проверены end-to-end.
-- [ ] Federated offer search проверяет подпись, home node и freshness.
-- [ ] Landed cost воспроизводима, а estimated logistics явно отделена.
-- [ ] Goods/logistics reservation saga имеет expiry и компенсации.
-- [ ] Inter-node prepare не превышает bilateral exposure.
-- [ ] Commit certificate требует approvals всех affected home nodes.
-- [ ] Pending local apply и reconciliation восстановлены после сбоя.
+- [x] Active external node имеет owner, named roles и действующий trust contract ([evidence](implemented_slice_11.md)).
+- [x] Bilateral node limits и node bond ограничивают внешнюю exposure ([evidence](implemented_slice_11.md)).
+- [x] Quarantine, revoke и контролируемое восстановление узла проверены end-to-end ([evidence](implemented_slice_11.md)).
+- [x] Federated offer search проверяет подпись, home node и freshness ([evidence](implemented_slice_13.md)).
+- [x] Landed cost воспроизводима, а estimated logistics явно отделена ([evidence](implemented_slice_13.md)).
+- [x] Goods/logistics reservation saga имеет expiry и компенсации ([evidence](implemented_slice_13.md)).
+- [x] Inter-node prepare не превышает bilateral exposure ([evidence](implemented_slice_14.md)).
+- [x] Commit certificate требует approvals всех affected home nodes ([evidence](implemented_slice_14.md)).
+- [x] Pending local apply и reconciliation восстановлены после сбоя ([evidence](implemented_slice_14.md)).
 
 ## Security
 
@@ -39,28 +43,28 @@
 - [ ] Production keys сгенерированы и разделены по назначению.
 - [ ] Private keys/secrets отсутствуют в Git/images/plain backup.
 - [ ] Local auth, revoke, step-up и break-glass протестированы.
-- [ ] Release/package/event signatures имеют independent test vectors.
+- [x] Release/package/event signatures имеют independent test vectors ([evidence](implemented_slice_15.md), [evidence](implemented_slice_11.md)).
 - [ ] Critical/high findings закрыты или formal accepted risk подписан.
 - [ ] Incident drill key compromise выполнен.
 
 ## Resilience
 
-- [ ] Узел устанавливается без Интернета и публичного registry.
+- [x] Узел устанавливается без Интернета и публичного registry ([evidence](implemented_slice_15.md)).
 - [ ] Полный restore на резервном оборудовании укладывается в RTO.
 - [ ] RPO подтверждён измерением и сверкой событий.
-- [ ] Backup включает DB, blobs, manifest, trust data и release.
-- [ ] Update, interrupted update и rollback испытаны.
-- [ ] Paper forms и последующий ввод испытаны.
-- [ ] Offline split/sync/conflict drill завершён.
-- [ ] Работа при потере broker/federation не блокирует local critical path.
+- [x] FULL backup включает DB, blobs, manifest, trust data и verified release ([evidence](implemented_slice_16.md)).
+- [x] Update, injected interrupted update, application rollback и FULL restore испытаны ([evidence](implemented_slice_16.md)).
+- [x] Paper forms и последующий независимый ввод испытаны локально и в federation epoch ([evidence](implemented_slice_10.md), [evidence](implemented_slice_11.md)).
+- [x] Offline export/import/simulation/conflict/apply drill завершён на integration-стенде ([evidence](implemented_slice_11.md)).
+- [x] Federation не является обязательной runtime-зависимостью local critical path ([evidence](implemented_slice_11.md)).
 
 ## Quality
 
 - [ ] CI release gates зелёные на конкретном commit.
 - [ ] Migration с предыдущего production release проверена.
-- [ ] Clearing golden/property/permutation tests зелёные.
-- [ ] Concurrency tests выполнены многократно.
-- [ ] OpenAPI compatibility report принят.
+- [x] Clearing golden/property/permutation tests зелёные ([evidence](implemented_slice_17.md)).
+- [x] Concurrency tests выполнены многократно ([evidence](implemented_slice_17.md)).
+- [x] OpenAPI compatibility report принят как инженерный gate ([evidence](implemented_slice_17.md)).
 - [ ] Browser/device/accessibility matrix пройдена.
 - [ ] Capacity test выполнен на минимальном host.
 - [ ] Нет flaky critical tests.
@@ -89,3 +93,74 @@
 Production readiness review создаёт подписанный протокол с release id, node,
 списком evidence, открытыми residual risks, сроком следующего review и людьми,
 принявшими решение. Checkbox без evidence link не считается выполненным.
+
+## Текущее доказательство Slice 11
+
+Code-level gates, миграции, signed package flow, role separation, paper forms и
+изолированный restore drill пройдены. Это не переводит систему в production:
+по-прежнему открыты юридические policies, независимый security review, FULL
+restore с recovery custodians, измерение RTO/RPO, capacity/accessibility matrix,
+подписанный offline release bundle и шестимесячный пилот. Checkbox внешнего
+процесса нельзя закрыть результатом unit/integration-теста.
+## Текущее доказательство Slice 12
+
+Инженерный baseline observability, protected metrics/snapshot, capacity runner,
+automated DOM accessibility checks и PII-free production evidence pack проверен.
+Штатные gates: backend 129 тестов и 78,41% coverage, frontend 103 теста и 83,08%
+statement coverage, OpenAPI 228 paths, deployed stack и signed journal зелёные.
+Подробности: [implemented_slice_12.md](implemented_slice_12.md).
+
+Локальный smoke `500` запросов, `424,258 RPS`, `p95=51,839 ms` не закрывает
+capacity checkbox на минимальном целевом host. Automated DOM audit не закрывает
+ручную browser/device/screen-reader matrix. Security review, legal review,
+FULL restore с custodians и фактический шестимесячный pilot остаются внешними
+обязательными критериями. Формы подписываемых решений находятся в
+[evidence_templates](evidence_templates/production_readiness_decision.md).
+## Текущее доказательство Slice 14
+
+Межузловой prepare/commit/apply проверен на трёх независимых PostgreSQL, включая
+недоступный при commit узел, same-certificate recovery и точную reconciliation.
+Ruff, strict mypy, 158 backend tests с 75,16% coverage, 115 frontend tests,
+typecheck/build и отдельный acceptance зелёные. Подробности:
+[implemented_slice_14.md](implemented_slice_14.md).
+
+Это закрывает только три отмеченных инженерных инварианта inter-node clearing.
+Юридические, организационные, security, target-host и pilot checkbox остаются
+открытыми и требуют внешних подписанных evidence.
+## Текущее доказательство Slice 15
+
+Signed offline bundle проверяет Ed25519 manifest, полный filesystem inventory,
+content ID четырёх runtime-образов, SBOM и license policy до `docker load`.
+Девять tamper tests зелёные. Чистый узел с пустыми volumes установлен и
+проверен с `--pull never --no-build`; подробности:
+[implemented_slice_15.md](implemented_slice_15.md).
+
+Закрыты только два отмеченных инженерных checkbox. Использованный ключ был
+одноразовым и удалён. Production key ceremony, ручное решение по 160
+`review_required` лицензиям, remote CI на конкретном commit, update/rollback,
+security review, target-host и pilot evidence остаются открытыми.
+## Текущее доказательство Slice 16
+
+FULL backup теперь требует и encrypted recovery material, и verified exact
+release; PostgreSQL ACL, DB, blobs, schema и journal входят в проверяемый
+контур. Independent restore и destructive restore завершены. Faultpoint после
+migration автоматически вернул previous release, а повторный update прошёл.
+Подробности: [implemented_slice_16.md](implemented_slice_16.md).
+
+Закрыты только два отмеченных инженерных checkbox. RTO/RPO на резервном
+оборудовании, power-loss drill, migration разных production schemas, production
+keys/custodians и внешние security/legal/pilot evidence остаются открытыми.
+## Текущее доказательство Slice 17
+
+OpenAPI baseline и два snapshots совпадают для 298 операций. Триста
+детерминированных clearing graphs прошли permutation/bounds/conservation.
+Migration 0017 -> 0018, допустимый downgrade и re-upgrade сохранили node и
+identity state. После исправления найденной зависимости теста от порядка данных
+три полных concurrency rounds дали 21 + 21 + 21 passed; journal содержит 556
+последовательных проверенных событий. Подробности:
+[implemented_slice_17.md](implemented_slice_17.md).
+
+Отмечены только три инженерных checkbox. Remote CI на конкретном commit,
+фактический previous production release, длительная flaky history, target host,
+manual accessibility и внешние security/legal/pilot evidence остаются
+открытыми.

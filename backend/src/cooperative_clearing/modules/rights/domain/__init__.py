@@ -1,0 +1,1 @@
+"""Commodity-rights domain rules."""

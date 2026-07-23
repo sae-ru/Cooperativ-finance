@@ -9,13 +9,17 @@ secrets/
 # Runtime and generated data
 data/
 backups/
+.operations/
 artifacts/
+evidence/
 dist/
 build/
 coverage/
+.coverage
 node_modules/
 __pycache__/
 *.py[cod]
+*.tsbuildinfo
 
 # Editors and operating systems
 .idea/

@@ -1,0 +1,159 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory)]
+    [ValidatePattern("^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$")]
+    [string] $TargetRelease,
+    [string] $OfflineBundle,
+    [switch] $Build,
+    [switch] $AllowDataOnlyBackup
+)
+
+$ErrorActionPreference = "Stop"
+$utf8 = [Text.UTF8Encoding]::new($false)
+$root = Split-Path -Parent $PSScriptRoot
+$compose = @("compose", "--project-directory", $root, "-f", (Join-Path $root "compose.yaml"))
+$envFile = Join-Path $root ".env"
+$current = if ($env:COOP_RELEASE) { $env:COOP_RELEASE } else { "0.1.0-dev" }
+if (Test-Path $envFile) {
+    $stored = Get-Content $envFile | Where-Object { $_ -match "^COOP_RELEASE=" } | Select-Object -Last 1
+    if ($stored) { $current = $stored.Substring("COOP_RELEASE=".Length) }
+}
+if ($current -eq $TargetRelease) { throw "Release $TargetRelease is already selected" }
+$environment = if ($env:COOP_ENVIRONMENT) {
+    $env:COOP_ENVIRONMENT
+} else { $null }
+if (-not $environment -and (Test-Path $envFile)) {
+    $environmentLine = Get-Content $envFile |
+        Where-Object { $_ -match "^COOP_ENVIRONMENT=" } |
+        Select-Object -Last 1
+    if ($environmentLine) {
+        $environment = $environmentLine.Substring("COOP_ENVIRONMENT=".Length)
+    }
+}
+if (-not $environment) { $environment = "dev" }
+$failpoint = if ($env:COOP_UPDATE_FAILPOINT) {
+    $env:COOP_UPDATE_FAILPOINT
+} else { "none" }
+if ($failpoint -notin @("none", "after-release-switch", "after-migration", "after-startup")) {
+    throw "Unsupported COOP_UPDATE_FAILPOINT: $failpoint"
+}
+if ($environment -eq "prod" -and $failpoint -ne "none") {
+    throw "Update faultpoints are forbidden in production"
+}
+if ($environment -eq "prod" -and -not $OfflineBundle) {
+    throw "Production update requires a signed offline bundle"
+}
+if ($environment -eq "prod" -and $Build) {
+    throw "Production update cannot build images from source"
+}
+$httpPort = if ($env:COOP_HTTP_PORT) { $env:COOP_HTTP_PORT } else { $null }
+if (-not $httpPort -and (Test-Path $envFile)) {
+    $portLine = Get-Content $envFile |
+        Where-Object { $_ -match "^COOP_HTTP_PORT=" } |
+        Select-Object -Last 1
+    if ($portLine) { $httpPort = $portLine.Substring("COOP_HTTP_PORT=".Length) }
+}
+if (-not $httpPort) { $httpPort = "8080" }
+
+if ($OfflineBundle) {
+    $bundle = (Resolve-Path -LiteralPath $OfflineBundle).Path
+    if (-not $env:COOP_RELEASE_PUBLIC_KEY) {
+        throw "COOP_RELEASE_PUBLIC_KEY must name the independently provisioned public key"
+    }
+    $verification = @(
+        (Join-Path $PSScriptRoot "release_bundle.py")
+        "verify"
+        "--bundle"
+        $bundle
+        "--public-key"
+        $env:COOP_RELEASE_PUBLIC_KEY
+        "--expected-release"
+        $TargetRelease
+        "--load-images"
+    )
+    if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
+        $verification += @(
+            "--expected-policy-sha256",
+            $env:COOP_RELEASE_LICENSE_POLICY_SHA256
+        )
+    }
+    & python @verification
+    if ($LASTEXITCODE -ne 0) { throw "Offline bundle verification failed" }
+}
+$backupArgs = @{}
+if ($env:COOP_BACKUP_ROOT) { $backupArgs.BackupRoot = $env:COOP_BACKUP_ROOT }
+if ($env:COOP_ENCRYPTED_RECOVERY_BUNDLE) {
+    $backupArgs.EncryptedRecoveryBundle = $env:COOP_ENCRYPTED_RECOVERY_BUNDLE
+}
+if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
+    $backupArgs.VerifiedReleaseBundle = $env:COOP_VERIFIED_RELEASE_BUNDLE
+}
+$backup = & (Join-Path $PSScriptRoot "backup-node.ps1") @backupArgs | Select-Object -Last 1
+$kindLine = Get-Content (Join-Path $backup "manifest.env") | Where-Object { $_ -match "^backup_kind=" }
+$kind = $kindLine.Substring("backup_kind=".Length)
+if ($kind -ne "FULL") {
+    if ($environment -eq "prod" -or -not $AllowDataOnlyBackup) {
+        throw "Update refused: pre-update backup is DATA_ONLY"
+    }
+}
+
+$operations = Join-Path $root ".operations"
+New-Item -ItemType Directory -Path $operations -Force | Out-Null
+$stateLines = @(
+    "previous_release=$current"
+    "target_release=$TargetRelease"
+    "preupdate_backup=$backup"
+    "updated_at=$([DateTime]::UtcNow.ToString('o'))"
+)
+[IO.File]::WriteAllLines(
+    (Join-Path $operations "previous-release.env"),
+    [string[]] $stateLines,
+    $utf8
+)
+
+$lines = if (Test-Path $envFile) { @(Get-Content $envFile) } else { @() }
+$found = $false
+$lines = $lines | ForEach-Object {
+    if ($_ -match "^COOP_RELEASE=") { $found = $true; "COOP_RELEASE=$TargetRelease" } else { $_ }
+}
+if (-not $found) { $lines += "COOP_RELEASE=$TargetRelease" }
+[IO.File]::WriteAllLines($envFile, [string[]] $lines, $utf8)
+$env:COOP_RELEASE = $TargetRelease
+if ($failpoint -eq "after-release-switch") {
+    & (Join-Path $PSScriptRoot "rollback-node.ps1") -Release $current
+    throw "Injected update failure after release switch"
+}
+
+if ($Build) {
+    & docker @compose build migrate api worker frontend gateway
+    if ($LASTEXITCODE -ne 0) { throw "Release build failed" }
+}
+else {
+    foreach ($image in @("backend", "frontend", "gateway")) {
+        $imageName = "cooperative-clearing/{0}:{1}" -f $image, $TargetRelease
+        & docker image inspect $imageName | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Release image is unavailable: $imageName" }
+    }
+}
+
+try {
+    & docker @compose run --rm migrate
+    if ($LASTEXITCODE -ne 0) { throw "Migration failed" }
+    if ($failpoint -eq "after-migration") {
+        throw "Injected update failure after migration"
+    }
+    & docker @compose up -d api worker frontend gateway
+    if ($LASTEXITCODE -ne 0) { throw "Runtime startup failed" }
+    if ($failpoint -eq "after-startup") {
+        throw "Injected update failure after startup"
+    }
+    & (Join-Path $PSScriptRoot "verify-stack.ps1") -BaseUrl "http://127.0.0.1:$httpPort"
+    & docker @compose run --rm --no-deps api coopctl verify-journal
+    if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
+}
+catch {
+    & (Join-Path $PSScriptRoot "rollback-node.ps1") -Release $current
+    throw
+}
+
+Write-Host "Updated $current -> $TargetRelease; backup: $backup"

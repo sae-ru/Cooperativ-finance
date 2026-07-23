@@ -169,3 +169,12 @@ reconciles obligations и сохраняет verification keys. Emergency revoke
 - node quarantine сохраняет local history и доказательства;
 - disconnect не оставляет неразобранную bilateral exposure;
 - весь onboarding воспроизводим из signed events и документов.
+
+## Статус реализации Slice 11
+
+Application, passport/identity verification, technical challenge, пять named
+responsibility assignments, independent audit и activation реализованы в
+backend, PostgreSQL constraints, OpenAPI и role-based GUI. Узел не активируется
+без принятия каждой ответственности конкретным пользователем. После activation
+хозяйственное взаимодействие всё равно запрещено до active trust contract и
+применимых bilateral limits.
