@@ -14,6 +14,7 @@ import {
   type RationingAllocation, type RationingPlan, type RationingRule,
 } from "./api/crisis";
 import { getInventoryMembers, uploadEvidence } from "./api/inventory";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./crisis.css";
 
@@ -32,10 +33,8 @@ function hasRole(principal: Principal, ...roles: RoleCode[]) {
   return principal.roles.some((grant) => roles.includes(grant.role));
 }
 
-function errorText(error: unknown) {
-  return error instanceof AdminApiError
-    ? `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`
-    : "Операция не выполнена";
+function errorText(error: unknown): string {
+  return userErrorMessage(error);
 }
 
 function Status({ value }: { value: string }) {

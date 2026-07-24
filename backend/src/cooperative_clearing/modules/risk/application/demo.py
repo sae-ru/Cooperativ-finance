@@ -59,6 +59,14 @@ async def seed_demo_risk(session: AsyncSession, settings: Settings) -> None:
         "demo-risk-share-register-v1",
         "Opening entry in the demo cooperative share register.",
     )
+    farmer_account_evidence = await _evidence(
+        session,
+        settings,
+        registrar,
+        cooperative_id,
+        "demo-risk-farmer-share-register-v1",
+        "Opening entry for the ordinary demo member in the cooperative share register.",
+    )
     service = RiskService(settings)
     proposed_policy = await service.propose_policy(
         session,
@@ -108,6 +116,23 @@ async def seed_demo_risk(session: AsyncSession, settings: Settings) -> None:
     account = await session.get(ShareAccount, opened.object_id)
     if account is None:
         raise RuntimeError("demo share account was not created")
+    farmer_opened = await service.open_account(
+        session,
+        principal=registrar,
+        policy_id=policy.id,
+        member_id=stable_id("member", "demo-member-ivan"),
+        contour=ShareContour.GUARANTEE,
+        opening_balance=Decimal("50"),
+        protected_amount=Decimal("10"),
+        source_reference="DEMO-SHARE-REGISTER-FARMER-V1",
+        evidence_ids=[farmer_account_evidence],
+        idempotency_key="demo-risk-account-open-farmer-v1",
+        request_id=None,
+    )
+    farmer_account = await session.get(ShareAccount, farmer_opened.object_id)
+    if farmer_account is None:
+        raise RuntimeError("demo farmer share account was not created")
+
     proposed_commitment = await service.propose_commitment(
         session,
         principal=security,
@@ -148,6 +173,9 @@ async def seed_demo_risk(session: AsyncSession, settings: Settings) -> None:
         or account.status != "ACTIVE"
         or account.balance != Decimal("100")
         or account.protected_amount != Decimal("40")
+        or farmer_account.status != "ACTIVE"
+        or farmer_account.balance != Decimal("50")
+        or farmer_account.protected_amount != Decimal("10")
         or commitment.status != "ACTIVE"
         or commitment.max_loss != Decimal("25")
     ):

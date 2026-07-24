@@ -61,6 +61,7 @@ import {
   type ShareAccount,
   type ShareContour,
 } from "./api/risk";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./risk.css";
 
@@ -98,10 +99,7 @@ function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
 }
 
 function errorText(error: unknown): string {
-  if (error instanceof AdminApiError) {
-    return `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`;
-  }
-  return "Операция не выполнена";
+  return userErrorMessage(error);
 }
 
 function memberName(members: InventoryMember[], id: string | null): string {

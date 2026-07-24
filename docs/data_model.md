@@ -52,6 +52,17 @@
 PII хранится в отдельной таблице с более строгими правами и собственным сроком
 хранения. Хозяйственные события ссылаются на стабильный `member_id`.
 
+### `identity.participant_addresses`
+
+`id`, `member_id`, `cooperative_id`, `label`, `purpose`, `region_code`,
+`address_text`, `contact_name`, `contact_phone`, `instructions`,
+`is_default_pickup`, `is_default_delivery`, `status`, timestamps, `version`.
+
+Адресная книга приватна и читается только владельцем `member_id`. Назначение ограничено
+значениями `PICKUP`, `DELIVERY`, `BOTH`; удаление переводит запись в `ARCHIVED`.
+Активное имя уникально внутри участника и кооператива, а конкурентное изменение требует
+`expected_version`. Точные адреса предложений, заказов и рейсов являются отдельными
+неизменяемыми снимками и намеренно не ссылаются на изменяемую запись адресной книги.
 ### `identity.role_assignments`
 
 `id`, `member_id`, `cooperative_id`, `role_code`, `scope_type`, `scope_id`,
@@ -475,3 +486,15 @@ node positions, apply receipts и reconciliation proofs. Все значимые
 apply меняют остатки и `NodeExposure` под row/advisory locks. Signed evidence и
 финальные записи защищены append-only triggers; runtime role не имеет DELETE, а
 populated downgrade заблокирован.
+## Реализованная schema кабинета участника Slice 18
+
+Revisions `0019_exchange_participant` и `0020_purchase_deal_bridge` связывают
+обычного участника, предложение, подтверждённое намерение обмена, локальную
+сделку и обязательства. Revision `0021_logistics_contacts` добавляет приватные
+снимки точек забора и доставки в предложение, заказ и рейс. Revision
+`0022_participant_addresses` добавляет версионируемую личную адресную книгу со
+статусом архивирования и основными точками забора и доставки.
+
+Адресная книга является удобным источником заполнения, но не изменяемой ссылкой
+сделки. Хозяйственная запись хранит собственный снимок точного адреса, контакта и
+инструкций. Общий каталог получает только публичный код района.

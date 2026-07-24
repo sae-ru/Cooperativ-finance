@@ -1192,6 +1192,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exchange/fulfillments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Visible Fulfillments */
+        get: operations["list_visible_fulfillments_api_v1_exchange_fulfillments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exchange/fulfillments/{fulfillment_id}/acceptance": {
         parameters: {
             query?: never;
@@ -1605,6 +1622,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/federation/catalog/offers/{record_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Offer Image */
+        get: operations["offer_image_api_v1_federation_catalog_offers__record_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/federation/catalog/offers/{record_id}/verify": {
         parameters: {
             query?: never;
@@ -1786,6 +1820,23 @@ export interface paths {
         put?: never;
         /** Issue Logistics Quote */
         post: operations["issue_logistics_quote_api_v1_federation_logistics_quotes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/federation/logistics/quotes/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Logistics Quotes */
+        get: operations["list_my_logistics_quotes_api_v1_federation_logistics_quotes_mine_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2116,6 +2167,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/federation/offers/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List My Offers */
+        get: operations["list_my_offers_api_v1_federation_offers_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/federation/offers/publish": {
         parameters: {
             query?: never;
@@ -2332,6 +2400,23 @@ export interface paths {
         put?: never;
         /** Commit Purchase */
         post: operations["commit_purchase_api_v1_federation_purchase_intents__intent_id__commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/federation/purchase-intents/{intent_id}/materialize-deal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Materialize Purchase Deal */
+        post: operations["materialize_purchase_deal_api_v1_federation_purchase_intents__intent_id__materialize_deal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2893,6 +2978,75 @@ export interface paths {
         };
         /** Operational Snapshot */
         get: operations["operational_snapshot_api_v1_operations_snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Participant Addresses */
+        get: operations["list_participant_addresses_api_v1_participant_addresses_get"];
+        put?: never;
+        /** Create Participant Address */
+        post: operations["create_participant_address_api_v1_participant_addresses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant/addresses/{address_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Participant Address */
+        put: operations["update_participant_address_api_v1_participant_addresses__address_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant/addresses/{address_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Participant Address */
+        post: operations["archive_participant_address_api_v1_participant_addresses__address_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participant/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Participant Dashboard */
+        get: operations["participant_dashboard_api_v1_participant_dashboard_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6291,6 +6445,8 @@ export interface components {
              * Format: uuid
              */
             proposed_event_id: string;
+            /** Source Purchase Intent Id */
+            source_purchase_intent_id: string | null;
             /** Status */
             status: string;
             /** Terms Hash */
@@ -7328,6 +7484,12 @@ export interface components {
              * Format: date-time
              */
             delivery_due_at: string;
+            /** Destination Contact Name */
+            destination_contact_name: string | null;
+            /** Destination Contact Phone */
+            destination_contact_phone: string | null;
+            /** Destination Instructions */
+            destination_instructions: string | null;
             /** Destination Text */
             destination_text: string;
             /**
@@ -7345,6 +7507,12 @@ export interface components {
              * Format: uuid
              */
             offered_event_id: string;
+            /** Origin Contact Name */
+            origin_contact_name: string | null;
+            /** Origin Contact Phone */
+            origin_contact_phone: string | null;
+            /** Origin Instructions */
+            origin_instructions: string | null;
             /** Origin Text */
             origin_text: string;
             /** Picked Up At */
@@ -8277,6 +8445,14 @@ export interface components {
             origin_precision: string;
             /** Origin Region */
             origin_region: string;
+            /** Pickup Address Text */
+            pickup_address_text?: string | null;
+            /** Pickup Contact Name */
+            pickup_contact_name?: string | null;
+            /** Pickup Contact Phone */
+            pickup_contact_phone?: string | null;
+            /** Pickup Instructions */
+            pickup_instructions?: string | null;
             /** Price Policy Version */
             price_policy_version: string;
             /** Product Code */
@@ -8630,6 +8806,150 @@ export interface components {
             expected_version: number;
             /** Rationale */
             rationale: string;
+        };
+        /** ParticipantAddressArchiveRequest */
+        ParticipantAddressArchiveRequest: {
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** ParticipantAddressCollection */
+        ParticipantAddressCollection: {
+            /** Data */
+            data: components["schemas"]["ParticipantAddressResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ParticipantAddressResponse */
+        ParticipantAddressResponse: {
+            /** Address Text */
+            address_text: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Contact Phone */
+            contact_phone: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Instructions */
+            instructions: string | null;
+            /** Is Default Delivery */
+            is_default_delivery: boolean;
+            /** Is Default Pickup */
+            is_default_pickup: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "PICKUP" | "DELIVERY" | "BOTH";
+            /** Region Code */
+            region_code: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ACTIVE" | "ARCHIVED";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** ParticipantAddressUpdateRequest */
+        ParticipantAddressUpdateRequest: {
+            /** Address Text */
+            address_text: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Contact Phone */
+            contact_phone: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Expected Version */
+            expected_version: number;
+            /** Instructions */
+            instructions?: string | null;
+            /**
+             * Is Default Delivery
+             * @default false
+             */
+            is_default_delivery: boolean;
+            /**
+             * Is Default Pickup
+             * @default false
+             */
+            is_default_pickup: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "PICKUP" | "DELIVERY" | "BOTH";
+            /** Region Code */
+            region_code: string;
+        };
+        /** ParticipantAddressWriteRequest */
+        ParticipantAddressWriteRequest: {
+            /** Address Text */
+            address_text: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Contact Phone */
+            contact_phone: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Instructions */
+            instructions?: string | null;
+            /**
+             * Is Default Delivery
+             * @default false
+             */
+            is_default_delivery: boolean;
+            /**
+             * Is Default Pickup
+             * @default false
+             */
+            is_default_pickup: boolean;
+            /** Label */
+            label: string;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "PICKUP" | "DELIVERY" | "BOTH";
+            /** Region Code */
+            region_code: string;
+        };
+        /** ParticipantEnvelope */
+        ParticipantEnvelope: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Request Id */
+            request_id: string;
         };
         /** PeerMessageRequest */
         PeerMessageRequest: {
@@ -9125,6 +9445,14 @@ export interface components {
         };
         /** PurchaseIntentCreateRequest */
         PurchaseIntentCreateRequest: {
+            /** Delivery Address Text */
+            delivery_address_text: string;
+            /** Delivery Contact Name */
+            delivery_contact_name: string;
+            /** Delivery Contact Phone */
+            delivery_contact_phone: string;
+            /** Delivery Instructions */
+            delivery_instructions?: string | null;
             /** Destination Region */
             destination_region: string;
             /**
@@ -9191,6 +9519,13 @@ export interface components {
             home_node_code: string;
             /** Liability Limit */
             liability_limit: string;
+            /**
+             * Offer Record Id
+             * Format: uuid
+             */
+            offer_record_id: string;
+            /** Origin Region */
+            origin_region: string;
             /**
              * Quote Id
              * Format: uuid
@@ -10232,7 +10567,7 @@ export interface components {
          * RoleCode
          * @enum {string}
          */
-        RoleCode: "MEMBER_REGISTRAR" | "COOPERATIVE_ADMIN" | "DATA_STEWARD" | "WAREHOUSE_CUSTODIAN" | "INVENTORY_CONTROLLER" | "LOGISTICS_OPERATOR" | "RIGHTS_OPERATOR" | "RISK_ADMIN" | "CLEARING_OPERATOR" | "CLEARING_CONTROLLER" | "CLEARING_FINALIZER" | "SOLIDARITY_OPERATOR" | "SOLIDARITY_CONTROLLER" | "CRISIS_OPERATOR" | "CRISIS_CONTROLLER" | "SECURITY_ADMIN" | "NODE_REGISTRAR" | "NODE_TECHNICAL_CUSTODIAN" | "NODE_SECURITY_ADMIN" | "NODE_BUSINESS_OPERATOR" | "NODE_AUDITOR" | "AUDITOR" | "ARBITRATOR";
+        RoleCode: "EXCHANGE_PARTICIPANT" | "MEMBER_REGISTRAR" | "COOPERATIVE_ADMIN" | "DATA_STEWARD" | "WAREHOUSE_CUSTODIAN" | "INVENTORY_CONTROLLER" | "LOGISTICS_OPERATOR" | "RIGHTS_OPERATOR" | "RISK_ADMIN" | "CLEARING_OPERATOR" | "CLEARING_CONTROLLER" | "CLEARING_FINALIZER" | "SOLIDARITY_OPERATOR" | "SOLIDARITY_CONTROLLER" | "CRISIS_OPERATOR" | "CRISIS_CONTROLLER" | "SECURITY_ADMIN" | "NODE_REGISTRAR" | "NODE_TECHNICAL_CUSTODIAN" | "NODE_SECURITY_ADMIN" | "NODE_BUSINESS_OPERATOR" | "NODE_AUDITOR" | "AUDITOR" | "ARBITRATOR";
         /** RoleCollection */
         RoleCollection: {
             /** Data */
@@ -15305,6 +15640,26 @@ export interface operations {
             };
         };
     };
+    list_visible_fulfillments_api_v1_exchange_fulfillments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_FulfillmentResponse_"];
+                };
+            };
+        };
+    };
     accept_fulfillment_api_v1_exchange_fulfillments__fulfillment_id__acceptance_post: {
         parameters: {
             query?: never;
@@ -16272,6 +16627,37 @@ export interface operations {
             };
         };
     };
+    offer_image_api_v1_federation_catalog_offers__record_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     verify_offer_api_v1_federation_catalog_offers__record_id__verify_post: {
         parameters: {
             query?: never;
@@ -16637,6 +17023,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_logistics_quotes_api_v1_federation_logistics_quotes_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectCollection"];
                 };
             };
         };
@@ -17358,6 +17764,37 @@ export interface operations {
             };
         };
     };
+    list_my_offers_api_v1_federation_offers_mine_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     publish_offer_api_v1_federation_offers_publish_post: {
         parameters: {
             query?: never;
@@ -17822,6 +18259,37 @@ export interface operations {
                 "application/json": components["schemas"]["PurchaseCommitRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    materialize_purchase_deal_api_v1_federation_purchase_intents__intent_id__materialize_deal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                intent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             201: {
@@ -18902,6 +19370,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationalSnapshotEnvelope"];
+                };
+            };
+        };
+    };
+    list_participant_addresses_api_v1_participant_addresses_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantAddressCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_participant_address_api_v1_participant_addresses_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantAddressWriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_participant_address_api_v1_participant_addresses__address_id__put: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                address_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantAddressUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_participant_address_api_v1_participant_addresses__address_id__archive_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                address_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantAddressArchiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    participant_dashboard_api_v1_participant_dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantEnvelope"];
                 };
             };
         };

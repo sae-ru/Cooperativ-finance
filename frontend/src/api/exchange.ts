@@ -110,6 +110,12 @@ export type LogisticsOrder = {
   unit_id: string;
   origin_text: string;
   destination_text: string;
+  origin_contact_name: string | null;
+  origin_contact_phone: string | null;
+  origin_instructions: string | null;
+  destination_contact_name: string | null;
+  destination_contact_phone: string | null;
+  destination_instructions: string | null;
   pickup_due_at: string;
   delivery_due_at: string;
   status: string;
@@ -183,6 +189,8 @@ export const getObligations = () =>
   request<Obligation[]>("/api/v1/exchange/obligations");
 export const getFulfillments = (obligationId: string) =>
   request<Fulfillment[]>(`/api/v1/exchange/obligations/${obligationId}/fulfillments`);
+export const getVisibleFulfillments = () =>
+  request<Fulfillment[]>("/api/v1/exchange/fulfillments");
 export const getAcceptances = () =>
   request<Acceptance[]>("/api/v1/exchange/acceptances");
 export const getLogisticsOrders = () =>
@@ -220,7 +228,7 @@ export const confirmDeal = (deal: Deal) =>
   });
 
 export const submitFulfillment = (
-  obligation: Obligation,
+  obligation: Pick<Obligation, "id" | "version">,
   payload: {
     quantity: string;
     quality_claim: string;
@@ -236,7 +244,7 @@ export const submitFulfillment = (
 });
 
 export const acceptFulfillment = (
-  obligation: Obligation,
+  obligation: Pick<Obligation, "id" | "version">,
   fulfillment: Fulfillment,
   payload: {
     accepted_quantity: string;

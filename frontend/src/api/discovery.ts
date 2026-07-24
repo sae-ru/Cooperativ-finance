@@ -41,6 +41,8 @@ export type FederatedOffer = {
 
 export type LogisticsQuote = {
   record_id: string;
+  offer_record_id: string;
+  origin_region: string;
   quote_id: string;
   quote_version: number;
   home_node_code: string;
@@ -61,6 +63,25 @@ export type LogisticsQuote = {
   signed_at: string;
   valid_until: string;
   signer_fingerprint: string;
+};
+
+export type LogisticsQuoteDraft = {
+  offer_record_id: string;
+  destination_region: string;
+  capacity: string;
+  transport_cost: string;
+  handling_cost: string;
+  delivery_from: string;
+  delivery_until: string;
+  liability_limit: string;
+  valid_until: string;
+};
+
+export type DeliveryDetails = {
+  address_text: string;
+  contact_name: string;
+  contact_phone: string;
+  instructions: string;
 };
 
 export type SearchCandidate = {
@@ -93,14 +114,20 @@ export type SearchFilters = {
 };
 
 export type OfferDraft = {
+  kind: "PRODUCT" | "SERVICE";
   product_code: string;
   description: string;
   quantity_available: string;
   unit_code: string;
   minimum_batch: string;
   origin_region: string;
+  pickup_address_text: string;
+  pickup_contact_name: string;
+  pickup_contact_phone: string;
+  pickup_instructions: string;
   unit_price: string;
   available_until: string;
+  image_evidence_id: string | null;
 };
 export type PeerStatus = {
   node_code: string;
@@ -135,6 +162,10 @@ export type PurchaseIntent = {
   quantity: string;
   unit_code: string;
   destination_region: string;
+  delivery_address_text: string | null;
+  delivery_contact_name: string | null;
+  delivery_contact_phone: string | null;
+  delivery_instructions: string | null;
   max_landed_cost: string;
   landed_cost_breakdown: Record<string, unknown>;
   cost_status: string;
@@ -148,6 +179,10 @@ export type PurchaseIntent = {
   committed_at: string | null;
   closed_at: string | null;
   version: number;
+  product_code?: string | null;
+  product_description?: string | null;
+  seller_ref?: string | null;
+  seller_node_code?: string | null;
 };
 
 export type ReservationReceipt = {
@@ -194,14 +229,21 @@ export function publishOffer(draft: OfferDraft, sellerRef: string) {
       divisible: true,
       origin_region: draft.origin_region,
       origin_precision: "DISTRICT",
+      pickup_address_text: draft.pickup_address_text,
+      pickup_contact_name: draft.pickup_contact_name,
+      pickup_contact_phone: draft.pickup_contact_phone,
+      pickup_instructions: draft.pickup_instructions || null,
       availability_from: now.toISOString(),
       availability_until: availableUntil.toISOString(),
       fulfillment_deadline: new Date(availableUntil.getTime() + 24 * 60 * 60_000).toISOString(),
       unit_price: draft.unit_price,
       mandatory_fee_per_unit: "0",
       valuation_unit: "COOP",
-      price_policy_version: "MARKET-UI-V1",
-      handling_requirements: {},
+      price_policy_version: "MARKET-UI-V2",
+      handling_requirements: {
+        offer_kind: draft.kind,
+        image_evidence_id: draft.image_evidence_id,
+      },
       counterparty_policy: {},
       geography_policy: {},
       guarantee_terms: {},
@@ -212,6 +254,36 @@ export function publishOffer(draft: OfferDraft, sellerRef: string) {
     }),
   });
 }
+export function publishLogisticsQuote(draft: LogisticsQuoteDraft, carrierRef: string) {
+  const signedAt = new Date();
+  const costs: Record<string, string> = { transport: draft.transport_cost };
+  if (Number(draft.handling_cost) > 0) costs.handling = draft.handling_cost;
+  return request<CommandResult>("/api/v1/federation/logistics/quotes", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      offer_record_id: draft.offer_record_id,
+      carrier_ref: carrierRef,
+      destination_region: draft.destination_region,
+      route_legs: [{ mode: "ROAD", from: "OFFER_ORIGIN", to: draft.destination_region }],
+      custody_transfers: 1,
+      capacity: draft.capacity,
+      cost_components: costs,
+      cost_status: "CONFIRMED",
+      delivery_from: new Date(draft.delivery_from).toISOString(),
+      delivery_until: new Date(draft.delivery_until).toISOString(),
+      liability_limit: draft.liability_limit,
+      bond_ref: null,
+      assumptions: [],
+      signed_at: signedAt.toISOString(),
+      valid_until: new Date(draft.valid_until).toISOString(),
+    }),
+  });
+}
+
+export const getMyLogisticsQuotes = () =>
+  request<LogisticsQuote[]>("/api/v1/federation/logistics/quotes/mine");
+
 export async function searchCatalog(filters: SearchFilters): Promise<SearchResponse> {
   return requestDirect<SearchResponse>(
     "/api/v1/federation/catalog/search",
@@ -233,7 +305,11 @@ export const getReservationReceipts = (intentId: string) =>
     `/api/v1/federation/purchase-intents/${intentId}/receipts`,
   );
 
-export const createPurchaseIntent = (candidate: SearchCandidate, quantity: string) => {
+export const createPurchaseIntent = (
+  candidate: SearchCandidate,
+  quantity: string,
+  delivery: DeliveryDetails,
+) => {
   if (!candidate.quote || !candidate.landed_cost) throw new Error("LOGISTICS_QUOTE_REQUIRED");
   return request<CommandResult>("/api/v1/federation/purchase-intents", {
     method: "POST",
@@ -243,6 +319,10 @@ export const createPurchaseIntent = (candidate: SearchCandidate, quantity: strin
       quote_record_id: candidate.quote.record_id,
       quantity,
       destination_region: candidate.quote.destination_region,
+      delivery_address_text: delivery.address_text,
+      delivery_contact_name: delivery.contact_name,
+      delivery_contact_phone: delivery.contact_phone,
+      delivery_instructions: delivery.instructions || null,
       max_landed_cost: candidate.landed_cost,
       expires_at: new Date(Date.now() + 30 * 60_000).toISOString(),
     }),
@@ -276,5 +356,19 @@ export const cancelPurchase = (intent: PurchaseIntent, reason: string) =>
     body: JSON.stringify({
       reason,
       expected_version: intent.cancellation_expected_version ?? intent.version,
+    }),
+  });
+
+export const getMyOffers = () =>
+  request<FederatedOffer[]>("/api/v1/federation/offers/mine");
+
+export const revokeOffer = (offer: FederatedOffer, reason: string) =>
+  request<CommandResult>("/api/v1/federation/offers/revoke", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      offer_id: offer.offer_id,
+      expected_version: offer.offer_version,
+      reason,
     }),
   });

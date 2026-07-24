@@ -37,6 +37,11 @@ def test_bounded_amount_rejects_unsafe_values(value: str) -> None:
     assert error.value.code == "AMOUNT_INVALID"
 
 
+@pytest.mark.parametrize("value", ["10.000000000000000", "0E-15", "1.2300000000000"])
+def test_bounded_amount_accepts_safe_trailing_zeroes(value: str) -> None:
+    assert bounded_amount(value) == Decimal(value)
+
+
 def test_node_codes_are_ascii_canonical() -> None:
     assert normalize_code("  west-01.demo ") == "WEST-01.DEMO"
     with pytest.raises(DomainError):

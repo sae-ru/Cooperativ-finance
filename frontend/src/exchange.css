@@ -1,6 +1,41 @@
 .exchange-view { max-width: 1420px; }
 .exchange-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .exchange-table { min-width: 820px; }
+.participant-exchange-view { width: 100%; min-width: 0; max-width: 1120px; }
+.participant-exchange-metrics { width: 100%; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.participant-exchange-list { overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.participant-exchange-row { display: grid; grid-template-columns: minmax(250px, 1.5fr) minmax(180px, 1fr) minmax(150px, .7fr) auto; align-items: center; gap: 18px; min-height: 88px; padding: 15px 18px; border-top: 1px solid var(--line); }
+.participant-exchange-row > div { display: grid; min-width: 0; gap: 4px; }
+.participant-exchange-row span, .participant-exchange-row small { color: var(--muted); font-size: 10px; }
+.participant-exchange-row strong { overflow-wrap: anywhere; font-size: 13px; }
+.participant-exchange-product { grid-template-columns: 38px minmax(0, 1fr) !important; align-items: center; }
+.participant-exchange-product > div { display: grid; min-width: 0; gap: 4px; }
+.participant-exchange-product > svg { color: var(--green); }
+.participant-fulfillment-section { overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.participant-fulfillment-section .results-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+.participant-fulfillment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; }
+.participant-fulfillment-card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 15px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); }
+.participant-fulfillment-card > header { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.participant-fulfillment-card > header > div { display: grid; min-width: 0; gap: 4px; }
+.participant-fulfillment-card > header > div > span { color: var(--green); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.participant-fulfillment-card h3 { margin: 0; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.participant-fulfillment-card > dl { display: grid; grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr); gap: 10px; margin: 0; padding: 10px; background: var(--canvas); border-radius: 5px; }
+.participant-fulfillment-card dt { color: var(--muted); font-size: 8px; }
+.participant-fulfillment-card dd { margin: 4px 0 0; font-size: 10px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.participant-route-details .span-two { grid-column: 1 / -1; }
+.participant-route-details dd { display: grid; gap: 3px; }
+.participant-route-details dd strong { font-size: 10px; }
+.participant-route-details dd small { color: var(--muted); font-size: 9px; font-weight: 500; }
+.participant-fulfillment-card > form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 9px; }
+.participant-fulfillment-card > form > p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.participant-fulfillment-card > form .span-two { grid-column: 1 / -1; }
+.participant-fulfillment-card > form > button { justify-self: start; min-width: 170px; }
+.participant-proof-upload { display: flex; min-height: 40px; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); cursor: pointer; }
+.participant-proof-upload:hover { border-color: var(--green); }
+.participant-proof-upload span { min-width: 0; overflow: hidden; font-size: 9px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.participant-proof-upload input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; }
+.participant-fulfillment-message { display: flex; min-height: 46px; align-items: center; gap: 9px; padding: 10px; color: var(--amber); background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber) 25%, var(--line)); border-radius: 5px; font-size: 10px; line-height: 1.4; }
+.participant-fulfillment-message.good { color: var(--green); background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 25%, var(--line)); }
 .deal-detail { overflow: hidden; }
 .deal-terms-strip { display: grid; grid-template-columns: 100px minmax(260px, 1fr) 110px auto; align-items: center; border-bottom: 1px solid var(--line); background: #f7f9f8; }
 .deal-terms-strip > div { display: grid; min-width: 0; gap: 5px; min-height: 68px; align-content: center; padding: 10px 14px; border-right: 1px solid var(--line); }
@@ -24,15 +59,28 @@
 .exchange-command > form { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); align-items: end; gap: 11px; padding: 15px; }
 .exchange-command > form > button { justify-self: start; min-width: 150px; }
 .file-field input { padding: 7px; font-size: 10px; }
-.logistics-table { min-width: 1080px; }
-.logistics-action { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: 6px; min-width: 220px; }
-.logistics-action input { min-height: 32px; padding: 4px; font-size: 8px; }
+.logistics-table { min-width: 760px; table-layout: fixed; }
+.logistics-table th:nth-child(1) { width: 10%; }
+.logistics-table th:nth-child(2) { width: 33%; }
+.logistics-table th:nth-child(3) { width: 13%; }
+.logistics-table th:nth-child(4) { width: 8%; }
+.logistics-table th:nth-child(5) { width: 15%; }
+.logistics-table th:nth-child(6) { width: 21%; }
+.logistics-action { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 6px; min-width: 0; }
+.logistics-action .compact-command { width: 100%; }
+.logistics-action > small { grid-column: 1 / -1; color: var(--muted); font-size: 8px; line-height: 1.35; }
+.logistics-proof-upload { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: var(--surface-raised); cursor: pointer; }
+.logistics-proof-upload:hover { border-color: var(--green); }
+.logistics-proof-upload span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-weight: 700; }
+.logistics-proof-upload input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; pointer-events: none; }
 .overdue-band { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 15px; background: #fff8e8; border-block: 1px solid #e2c881; }
 .overdue-band > div { display: grid; gap: 3px; }
 .overdue-band strong { font-size: 12px; }
 .overdue-band span { color: var(--muted); font-size: 9px; }
 
 @media (max-width: 1100px) {
+  .participant-exchange-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .participant-exchange-row > div:nth-child(2), .participant-exchange-row > div:nth-child(3) { grid-column: 1 / -1; padding-left: 50px; }
   .deal-editor fieldset, .exchange-command > form { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
   .deal-terms-strip { grid-template-columns: 90px minmax(180px, 1fr) 100px; }
   .deal-actions { grid-column: 1 / -1; border-top: 1px solid var(--line); }
@@ -41,10 +89,29 @@
 @media (max-width: 760px) {
   .exchange-view .view-header { align-items: start; gap: 12px; }
   .exchange-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .participant-exchange-metrics { width: 100%; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .participant-fulfillment-grid { grid-template-columns: minmax(0, 1fr); }
+  .participant-fulfillment-card > form { grid-template-columns: minmax(0, 1fr); }
+  .participant-fulfillment-card > form .span-two, .participant-fulfillment-card > form > p { grid-column: auto; }
   .deal-terms-strip { grid-template-columns: 1fr; }
   .deal-terms-strip > div { min-height: 56px; border-right: 0; border-bottom: 1px solid var(--line); }
   .deal-editor fieldset, .exchange-command > form { grid-template-columns: minmax(0, 1fr); }
   .deal-editor .span-two, .exchange-command .span-two { grid-column: auto; }
   .editor-actions, .overdue-band { align-items: stretch; flex-direction: column; }
   .editor-actions button, .overdue-band button { width: 100%; }
+  .logistics-table { display: block; min-width: 0; }
+  .logistics-table thead { display: none; }
+  .logistics-table tbody { display: grid; gap: 10px; padding: 10px; }
+  .logistics-table tr { display: grid; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  .logistics-table td { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 9px; padding: 7px 0; border: 0; border-top: 1px solid var(--line-soft); }
+  .logistics-table td:first-child { border-top: 0; }
+  .logistics-table td::before { content: attr(data-label); color: var(--muted); font-size: 9px; font-weight: 750; }
 }
+
+.logistics-route-cell { display: grid; gap: 8px; min-width: 0; padding-block: 3px; }
+.logistics-route-cell > div { display: grid; gap: 3px; padding-left: 10px; border-left: 3px solid var(--green); }
+.logistics-route-cell > div:nth-child(2) { border-left-color: var(--yellow); }
+.logistics-route-cell span { color: var(--muted); font-size: 8px; font-weight: 750; text-transform: uppercase; }
+.logistics-route-cell strong { font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.logistics-route-cell small { color: var(--muted); font-size: 8px; line-height: 1.35; overflow-wrap: anywhere; }
+.logistics-route-cell code { justify-self: start; color: var(--muted); font-size: 8px; }

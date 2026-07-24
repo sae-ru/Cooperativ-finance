@@ -150,7 +150,7 @@ class ReleaseBundleVerificationTests(unittest.TestCase):
             "created_at": "2026-07-22T00:00:00+00:00",
             "source": {"commit": "0" * 40, "dirty": False, "dirty_entries": []},
             "compatibility": {
-                "database_schema_revision": "0018_inter_node_clearing",
+                "database_schema_revision": "0021_logistics_contacts",
                 "protocols": {
                     "peer": "CC-PEER-1",
                     "sync": "1.0",

@@ -342,6 +342,6 @@ describe("ClearingView operations", () => {
   it("reports base registry loading errors", async () => {
     vi.mocked(clearing.getClearingCycles).mockRejectedValue(new Error("offline"));
     renderView(actor("AUDITOR", memberA));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Операция не выполнена");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The action could not be completed. Check the data and try again.");
   });
 });

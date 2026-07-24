@@ -252,6 +252,6 @@ describe("ResponsibilityView", () => {
       must_change_password: false,
       roles: [{ assignment_id: targetRoleId, role: "DATA_STEWARD", cooperative_id: cooperativeId }],
     });
-    expect(await screen.findByText(/AUTHORIZATION_DENIED · request-1/)).toBeInTheDocument();
+    expect(await screen.findByText("You do not have permission to perform this action. Contact the cooperative administrator.")).toBeInTheDocument();
   });
 });

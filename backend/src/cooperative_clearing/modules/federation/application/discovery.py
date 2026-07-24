@@ -65,7 +65,7 @@ from cooperative_clearing.modules.journal.domain.crypto import (
 from cooperative_clearing.shared.core.config import Environment, Settings
 from cooperative_clearing.shared.domain.errors import DomainError
 
-OFFER_PUBLISH_ROLES = {RoleCode.NODE_BUSINESS_OPERATOR}
+OFFER_PUBLISH_ROLES = {RoleCode.EXCHANGE_PARTICIPANT, RoleCode.NODE_BUSINESS_OPERATOR}
 QUOTE_PUBLISH_ROLES = {RoleCode.LOGISTICS_OPERATOR, RoleCode.NODE_BUSINESS_OPERATOR}
 
 
@@ -132,6 +132,10 @@ class DiscoveryService:
         divisible: bool,
         origin_region: str,
         origin_precision: str,
+        pickup_address_text: str | None = None,
+        pickup_contact_name: str | None = None,
+        pickup_contact_phone: str | None = None,
+        pickup_instructions: str | None = None,
         availability_from: datetime,
         availability_until: datetime,
         fulfillment_deadline: datetime,
@@ -282,51 +286,81 @@ class DiscoveryService:
             actor=actor,
             payload={**command_payload, "offer_record_id": str(row_id)},
         )
-        session.add(
-            FederatedOffer(
-                id=row_id,
-                offer_id=offer_id,
-                offer_version=offer_version,
-                external_node_id=external_node_id,
-                home_node_code=home_node_code,
-                seller_ref=str(payload["seller_ref"]),
-                product_code=normalized_product,
-                description=str(payload["description"]),
-                quality_grade=str(payload["quality_grade"]),
-                certificate_refs=certificate_refs,
-                quantity_available=quantity,
-                quantity_is_band=quantity_is_band,
-                unit_code=normalized_unit,
-                unit_scale=unit_scale,
-                minimum_batch=minimum,
-                divisible=divisible,
-                origin_region=str(payload["origin_region"]),
-                origin_precision=origin_precision,
-                availability_from=availability_from,
-                availability_until=availability_until,
-                fulfillment_deadline=fulfillment_deadline,
-                unit_price=price,
-                mandatory_fee_per_unit=fee,
-                valuation_unit=normalized_valuation,
-                price_policy_version=str(payload["price_policy_version"]),
-                handling_requirements=handling_requirements,
-                counterparty_policy=counterparty_policy,
-                geography_policy=geography_policy,
-                guarantee_terms=guarantee_terms,
-                source_mode="LOCAL" if external_node_id is None else source_mode.value,
-                status="ACTIVE",
-                node_sequence=node_sequence,
-                signed_at=signed_at,
-                valid_until=valid_until,
-                payload=payload,
-                payload_hash=str(command_payload["payload_hash"]),
-                node_signature=signature,
-                signer_fingerprint=fingerprint,
-                publisher_member_id=actor.person_id,
-                publisher_role_assignment_id=actor.role_assignment_id,
-                published_event_id=event.event_id,
-            )
+        offer_row = FederatedOffer(
+            id=row_id,
+            offer_id=offer_id,
+            offer_version=offer_version,
+            external_node_id=external_node_id,
+            home_node_code=home_node_code,
+            seller_ref=str(payload["seller_ref"]),
+            product_code=normalized_product,
+            description=str(payload["description"]),
+            quality_grade=str(payload["quality_grade"]),
+            certificate_refs=certificate_refs,
+            quantity_available=quantity,
+            quantity_is_band=quantity_is_band,
+            unit_code=normalized_unit,
+            unit_scale=unit_scale,
+            minimum_batch=minimum,
+            divisible=divisible,
+            origin_region=str(payload["origin_region"]),
+            origin_precision=origin_precision,
+            pickup_address_text=(
+                self._bounded_text(pickup_address_text, 500)
+                if external_node_id is None and pickup_address_text
+                else None
+            ),
+            pickup_contact_name=(
+                self._bounded_text(pickup_contact_name, 200)
+                if external_node_id is None and pickup_contact_name
+                else None
+            ),
+            pickup_contact_phone=(
+                self._bounded_text(pickup_contact_phone, 80)
+                if external_node_id is None and pickup_contact_phone
+                else None
+            ),
+            pickup_instructions=(
+                self._bounded_text(pickup_instructions, 2000)
+                if external_node_id is None and pickup_instructions
+                else None
+            ),
+            availability_from=availability_from,
+            availability_until=availability_until,
+            fulfillment_deadline=fulfillment_deadline,
+            unit_price=price,
+            mandatory_fee_per_unit=fee,
+            valuation_unit=normalized_valuation,
+            price_policy_version=str(payload["price_policy_version"]),
+            handling_requirements=handling_requirements,
+            counterparty_policy=counterparty_policy,
+            geography_policy=geography_policy,
+            guarantee_terms=guarantee_terms,
+            source_mode="LOCAL" if external_node_id is None else source_mode.value,
+            status="ACTIVE",
+            node_sequence=node_sequence,
+            signed_at=signed_at,
+            valid_until=valid_until,
+            payload=payload,
+            payload_hash=str(command_payload["payload_hash"]),
+            node_signature=signature,
+            signer_fingerprint=fingerprint,
+            publisher_member_id=actor.person_id,
+            publisher_role_assignment_id=actor.role_assignment_id,
+            published_event_id=event.event_id,
         )
+        session.add(offer_row)
+        if (
+            external_node_id is None
+            and str(handling_requirements.get("offer_kind", "")).upper() == "SERVICE"
+        ):
+            await self._add_service_fulfillment_quote(
+                session,
+                principal=principal,
+                actor=actor,
+                offer=offer_row,
+                request_id=request_id,
+            )
         await audit_federation_action(
             session,
             principal,
@@ -337,6 +371,117 @@ class DiscoveryService:
             request_id,
         )
         return complete_federation_command(record, event.event_id, row_id)
+
+    async def _add_service_fulfillment_quote(
+        self,
+        session: AsyncSession,
+        *,
+        principal: Principal,
+        actor: ActorClaim,
+        offer: FederatedOffer,
+        request_id: UUID | None,
+    ) -> None:
+        quote_id = uuid4()
+        row_id = uuid4()
+        route_legs: list[object] = [
+            {
+                "kind": "SERVICE_FULFILLMENT",
+                "region": offer.origin_region,
+            }
+        ]
+        route_payload = {
+            "origin_region": offer.origin_region,
+            "destination_region": offer.origin_region,
+            "capacity": self._decimal(offer.quantity_available),
+            "unit_code": offer.unit_code,
+            "route_legs": route_legs,
+        }
+        route_hash = payload_hash(route_payload)
+        assumptions = ["NO_PHYSICAL_LOGISTICS_REQUIRED"]
+
+        def build(node_code: str) -> dict[str, object]:
+            return {
+                "quote_id": str(quote_id),
+                "quote_version": 1,
+                "offer_id": str(offer.offer_id),
+                "offer_version": offer.offer_version,
+                "home_node_code": node_code,
+                "carrier_ref": self._bounded_text(offer.seller_ref, 160),
+                "route_request_hash": route_hash,
+                **route_payload,
+                "custody_transfers": 0,
+                "cost_components": {},
+                "valuation_unit": offer.valuation_unit,
+                "cost_status": CostStatus.CONFIRMED.value,
+                "delivery_from": utc_timestamp(offer.availability_from),
+                "delivery_until": utc_timestamp(offer.fulfillment_deadline),
+                "liability_limit": "0",
+                "bond_ref": None,
+                "assumptions": assumptions,
+                "signed_at": utc_timestamp(offer.signed_at),
+                "valid_until": utc_timestamp(offer.valid_until),
+            }
+
+        home_node_code, signature, fingerprint = await self._artifact_signature(
+            session,
+            external_node_id=None,
+            capability="LOGISTICS",
+            payload_builder=build,
+            external_signature=None,
+        )
+        payload = build(home_node_code)
+        event = await self.journal.append(
+            session,
+            event_type="federation.service_fulfillment_quote_issued",
+            aggregate_type="logistics_quote",
+            aggregate_id=quote_id,
+            aggregate_version=1,
+            actor=actor,
+            payload={**payload, "quote_record_id": str(row_id)},
+        )
+        session.add(
+            LogisticsQuote(
+                id=row_id,
+                quote_id=quote_id,
+                quote_version=1,
+                offer_record_id=offer.id,
+                external_node_id=None,
+                home_node_code=home_node_code,
+                carrier_ref=str(payload["carrier_ref"]),
+                route_request_hash=route_hash,
+                origin_region=offer.origin_region,
+                destination_region=offer.origin_region,
+                route_legs=route_legs,
+                custody_transfers=0,
+                capacity=offer.quantity_available,
+                unit_code=offer.unit_code,
+                cost_components={},
+                valuation_unit=offer.valuation_unit,
+                cost_status=CostStatus.CONFIRMED.value,
+                delivery_from=offer.availability_from,
+                delivery_until=offer.fulfillment_deadline,
+                liability_limit=Decimal("0"),
+                bond_ref=None,
+                assumptions=assumptions,
+                status="ACTIVE",
+                signed_at=offer.signed_at,
+                valid_until=offer.valid_until,
+                payload=payload,
+                payload_hash=payload_hash(payload),
+                node_signature=signature,
+                signer_fingerprint=fingerprint,
+                issued_event_id=event.event_id,
+            )
+        )
+        await audit_federation_action(
+            session,
+            principal,
+            "SERVICE_FULFILLMENT_QUOTE_ISSUED",
+            "LogisticsQuote",
+            row_id,
+            event.event_id,
+            request_id,
+        )
 
     async def revoke_offer(
         self,
@@ -361,6 +506,11 @@ class DiscoveryService:
         ).scalar_one_or_none()
         if offer is None:
             raise federation_error("OFFER_NOT_FOUND", 404)
+        may_manage_node_catalog = any(
+            grant.role is RoleCode.NODE_BUSINESS_OPERATOR for grant in principal.roles
+        )
+        if offer.publisher_member_id != principal.member_id and not may_manage_node_catalog:
+            raise federation_error("OFFER_PUBLISHER_MISMATCH", 403)
         payload = {
             "offer_id": str(offer_id),
             "offer_version": offer.offer_version,
@@ -990,6 +1140,10 @@ class DiscoveryService:
         quote_record_id: UUID,
         quantity: Decimal,
         destination_region: str,
+        delivery_address_text: str | None = None,
+        delivery_contact_name: str | None = None,
+        delivery_contact_phone: str | None = None,
+        delivery_instructions: str | None = None,
         max_landed_cost: Decimal,
         expires_at: datetime,
         idempotency_key: str,
@@ -1000,8 +1154,15 @@ class DiscoveryService:
         quote = await session.get(LogisticsQuote, quote_record_id)
         if offer is None or quote is None or quote.offer_record_id != offer.id:
             raise federation_error("PURCHASE_SELECTION_INVALID", 404)
+        offer_maximum_age_seconds = min(
+            604_800,
+            max(1, int((offer.valid_until - offer.signed_at).total_seconds())),
+        )
         offer_verification = await self.verify_offer(
-            session, offer, live=True, maximum_age_seconds=1
+            session,
+            offer,
+            live=True,
+            maximum_age_seconds=offer_maximum_age_seconds,
         )
         quote_verification = await self.verify_quote(session, quote)
         ensure_reservable(offer_verification.freshness, signature_verified=offer_verification.valid)
@@ -1043,6 +1204,26 @@ class DiscoveryService:
             "quantity": self._decimal(requested),
             "unit_code": offer.unit_code,
             "destination_region": self._bounded_text(destination_region, 200),
+            "delivery_address_text": (
+                self._bounded_text(delivery_address_text, 500)
+                if delivery_address_text
+                else None
+            ),
+            "delivery_contact_name": (
+                self._bounded_text(delivery_contact_name, 200)
+                if delivery_contact_name
+                else None
+            ),
+            "delivery_contact_phone": (
+                self._bounded_text(delivery_contact_phone, 80)
+                if delivery_contact_phone
+                else None
+            ),
+            "delivery_instructions": (
+                self._bounded_text(delivery_instructions, 2000)
+                if delivery_instructions
+                else None
+            ),
             "landed_cost_breakdown": breakdown,
             "cost_status": cost.status.value,
             "expires_at": utc_timestamp(expiry),
@@ -1080,6 +1261,10 @@ class DiscoveryService:
                 quantity=requested,
                 unit_code=offer.unit_code,
                 destination_region=str(summary["destination_region"]),
+                delivery_address_text=summary["delivery_address_text"],
+                delivery_contact_name=summary["delivery_contact_name"],
+                delivery_contact_phone=summary["delivery_contact_phone"],
+                delivery_instructions=summary["delivery_instructions"],
                 max_landed_cost=maximum,
                 landed_cost_breakdown=breakdown,
                 cost_status=cost.status.value,

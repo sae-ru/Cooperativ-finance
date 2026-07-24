@@ -412,3 +412,49 @@ html[data-theme="dark"] .receipt-act {
   color: var(--ink);
   background: var(--surface);
 }
+/* Guided account onboarding */
+.onboarding-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(190px, 1fr));
+  gap: 12px;
+  padding: 15px;
+}
+.onboarding-form .primary-button { align-self: end; justify-self: start; min-width: 160px; }
+.form-note,
+.form-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 15px;
+  font-size: 11px;
+  border-top: 1px solid var(--line);
+}
+.form-note { color: var(--amber); background: var(--amber-soft); }
+.form-success { color: var(--green); background: var(--green-soft); }
+.onboarding-panel > .form-error { padding: 0 15px 13px; }
+.access-heading { gap: 14px; }
+.access-heading h2 { flex: 1; }
+.access-heading label {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 240px);
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.access-heading input { min-height: 32px; }
+.access-details > summary {
+  padding: 15px;
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .onboarding-form { grid-template-columns: minmax(0, 1fr); }
+  .onboarding-form .primary-button { width: 100%; }
+  .access-heading { align-items: start; flex-wrap: wrap; padding-block: 10px; }
+  .access-heading h2 { flex-basis: 100%; }
+  .access-heading label { grid-template-columns: minmax(0, 1fr); width: 100%; }
+}

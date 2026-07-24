@@ -39,6 +39,11 @@ class Deal(Base):
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    source_purchase_intent_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("federation.purchase_intents.id", ondelete="RESTRICT"),
+        unique=True,
+    )
     cooperative_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
     )
@@ -334,6 +339,12 @@ class LogisticsOrder(Base):
     )
     origin_text: Mapped[str] = mapped_column(String(500), nullable=False)
     destination_text: Mapped[str] = mapped_column(String(500), nullable=False)
+    origin_contact_name: Mapped[str | None] = mapped_column(String(200))
+    origin_contact_phone: Mapped[str | None] = mapped_column(String(80))
+    origin_instructions: Mapped[str | None] = mapped_column(Text)
+    destination_contact_name: Mapped[str | None] = mapped_column(String(200))
+    destination_contact_phone: Mapped[str | None] = mapped_column(String(80))
+    destination_instructions: Mapped[str | None] = mapped_column(Text)
     pickup_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     delivery_due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     status: Mapped[str] = mapped_column(String(24), nullable=False)

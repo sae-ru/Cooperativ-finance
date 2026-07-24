@@ -60,14 +60,15 @@ describe("FederationView failures", () => {
     vi.mocked(admin.getRoles).mockResolvedValue([]);
   });
 
-  it("shows a stable API error code and request identifier", async () => {
+  it("shows a helpful message without internal diagnostics", async () => {
     vi.mocked(federation.getFederationNodes).mockRejectedValue(
       new AdminApiError("FEDERATION_UNAVAILABLE", "request-11", 503),
     );
 
     renderView();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("FEDERATION_UNAVAILABLE · request-11");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The server cannot complete this action right now. Try again later.");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("request-11");
   });
 
   it("does not expose internals for an unstructured transport failure", async () => {
@@ -75,7 +76,7 @@ describe("FederationView failures", () => {
 
     renderView();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Операция не выполнена");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The action could not be completed. Check the data and try again.");
     expect(screen.getByRole("alert")).not.toHaveTextContent("socket details");
   });
 });

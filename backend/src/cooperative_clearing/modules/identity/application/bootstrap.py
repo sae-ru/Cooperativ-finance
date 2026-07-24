@@ -12,6 +12,7 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     Cooperative,
     Member,
     Membership,
+    ParticipantAddress,
     RoleAssignment,
     UserAccount,
 )
@@ -20,6 +21,8 @@ from cooperative_clearing.shared.core.secrets import read_text_secret
 from cooperative_clearing.shared.core.security import PasswordService
 
 BOOTSTRAP_LOGINS = ("registrar", "security", "auditor")
+DEMO_MEMBER_LOGIN = "farmer"
+DEMO_MEMBER_PASSWORD = "CoopDemo-Farmer-2026!"
 
 
 def stable_id(kind: str, value: str) -> UUID:
@@ -150,6 +153,7 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
         ("demo-member-mikhail", "Mikhail Orlov", "SUSPENDED", "D-0004"),
         ("demo-member-pavel", "Pavel Lebedev", "ACTIVE", "D-0005"),
         ("demo-member-nina", "Nina Smirnova", "ACTIVE", "D-0006"),
+        ("demo-member-ivan", "Ivan Milkman", "ACTIVE", "D-0007"),
     )
     for key, display_name, status, member_number in members:
         member_id = stable_id("member", key)
@@ -196,6 +200,117 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
             update(UserAccount)
             .where(UserAccount.id == stable_id("bootstrap-user", login))
             .values(member_id=stable_id("member", member_key), updated_at=datetime.now(UTC))
+        )
+
+    demo_member_user_id = stable_id("demo-user", DEMO_MEMBER_LOGIN)
+    demo_member = insert(UserAccount).values(
+        id=demo_member_user_id,
+        login=DEMO_MEMBER_LOGIN,
+        password_hash=PasswordService().hash(DEMO_MEMBER_PASSWORD),
+        member_id=stable_id("member", "demo-member-ivan"),
+        status="ACTIVE",
+        must_change_password=False,
+    )
+    await session.execute(demo_member.on_conflict_do_nothing(index_elements=[UserAccount.id]))
+    demo_member_role = insert(RoleAssignment).values(
+        id=stable_id("demo-role", f"{DEMO_MEMBER_LOGIN}:EXCHANGE_PARTICIPANT"),
+        user_id=demo_member_user_id,
+        role_code="EXCHANGE_PARTICIPANT",
+        cooperative_id=cooperative_id,
+        status="ACTIVE",
+        granted_by_user_id=stable_id("bootstrap-user", "registrar"),
+        approved_by_user_id=stable_id("bootstrap-user", "auditor"),
+        approved_at=datetime.now(UTC),
+    )
+    await session.execute(
+        demo_member_role.on_conflict_do_update(
+            index_elements=[RoleAssignment.id],
+            set_={"status": "ACTIVE", "cooperative_id": cooperative_id},
+        )
+    )
+
+    demo_addresses = (
+        (
+            "farm",
+            "Ферма",
+            "BOTH",
+            "EAST-DISTRICT",
+            "Тверская область, деревня Берёзовка, Ферма 7",
+            "Иван",
+            "+7 900 555-01-07",
+            "Въезд через зелёные ворота, позвонить за 30 минут",
+            True,
+            True,
+        ),
+        (
+            "home",
+            "Дом",
+            "DELIVERY",
+            "EAST-DISTRICT",
+            "Тверская область, деревня Берёзовка, дом 12",
+            "Иван",
+            "+7 900 555-01-07",
+            "Оставить у крыльца только после звонка",  # noqa: RUF001
+            False,
+            False,
+        ),
+        (
+            "warehouse",
+            "Склад",
+            "PICKUP",
+            "EAST-DISTRICT",
+            "Тверская область, посёлок Восточный, Склад 3",
+            "Иван",
+            "+7 900 555-01-07",
+            "Погрузка со стороны рампы",  # noqa: RUF001
+            False,
+            False,
+        ),
+    )
+    for (
+        key,
+        label,
+        purpose,
+        region_code,
+        address_text,
+        contact_name,
+        contact_phone,
+        instructions,
+        is_default_pickup,
+        is_default_delivery,
+    ) in demo_addresses:
+        address_statement = insert(ParticipantAddress).values(
+            id=stable_id("participant-address", f"{DEMO_MEMBER_LOGIN}:{key}"),
+            member_id=stable_id("member", "demo-member-ivan"),
+            cooperative_id=cooperative_id,
+            label=label,
+            purpose=purpose,
+            region_code=region_code,
+            address_text=address_text,
+            contact_name=contact_name,
+            contact_phone=contact_phone,
+            instructions=instructions,
+            is_default_pickup=is_default_pickup,
+            is_default_delivery=is_default_delivery,
+            status="ACTIVE",
+        )
+        await session.execute(
+            address_statement.on_conflict_do_update(
+                index_elements=[ParticipantAddress.id],
+                set_={
+                    "label": address_statement.excluded.label,
+                    "purpose": address_statement.excluded.purpose,
+                    "region_code": address_statement.excluded.region_code,
+                    "address_text": address_statement.excluded.address_text,
+                    "contact_name": address_statement.excluded.contact_name,
+                    "contact_phone": address_statement.excluded.contact_phone,
+                    "instructions": address_statement.excluded.instructions,
+                    "is_default_pickup": address_statement.excluded.is_default_pickup,
+                    "is_default_delivery": address_statement.excluded.is_default_delivery,
+                    "status": "ACTIVE",
+                    "updated_at": datetime.now(UTC),
+                },
+            )
         )
 
     demo_arbitrator_user_id = stable_id("demo-user", "nina-arbitrator")

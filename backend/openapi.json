@@ -4898,6 +4898,18 @@
             "title": "Proposed Event Id",
             "type": "string"
           },
+          "source_purchase_intent_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Purchase Intent Id"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -4926,6 +4938,7 @@
         },
         "required": [
           "id",
+          "source_purchase_intent_id",
           "cooperative_id",
           "title",
           "status",
@@ -7431,6 +7444,39 @@
             "title": "Delivery Due At",
             "type": "string"
           },
+          "destination_contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Contact Name"
+          },
+          "destination_contact_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Contact Phone"
+          },
+          "destination_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Instructions"
+          },
           "destination_text": {
             "title": "Destination Text",
             "type": "string"
@@ -7449,6 +7495,39 @@
             "format": "uuid",
             "title": "Offered Event Id",
             "type": "string"
+          },
+          "origin_contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Contact Name"
+          },
+          "origin_contact_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Contact Phone"
+          },
+          "origin_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Instructions"
           },
           "origin_text": {
             "title": "Origin Text",
@@ -7516,6 +7595,12 @@
           "unit_id",
           "origin_text",
           "destination_text",
+          "origin_contact_name",
+          "origin_contact_phone",
+          "origin_instructions",
+          "destination_contact_name",
+          "destination_contact_phone",
+          "destination_instructions",
           "pickup_due_at",
           "delivery_due_at",
           "status",
@@ -9765,6 +9850,57 @@
             "title": "Origin Region",
             "type": "string"
           },
+          "pickup_address_text": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 5,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Address Text"
+          },
+          "pickup_contact_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Contact Name"
+          },
+          "pickup_contact_phone": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 5,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Contact Phone"
+          },
+          "pickup_instructions": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Instructions"
+          },
           "price_policy_version": {
             "maxLength": 80,
             "minLength": 1,
@@ -10608,6 +10744,329 @@
           "rationale"
         ],
         "title": "PaperFormVoidRequest",
+        "type": "object"
+      },
+      "ParticipantAddressArchiveRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "ParticipantAddressArchiveRequest",
+        "type": "object"
+      },
+      "ParticipantAddressCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantAddressResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ParticipantAddressCollection",
+        "type": "object"
+      },
+      "ParticipantAddressResponse": {
+        "properties": {
+          "address_text": {
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "title": "Region Code",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone",
+          "instructions",
+          "is_default_pickup",
+          "is_default_delivery",
+          "status",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "ParticipantAddressResponse",
+        "type": "object"
+      },
+      "ParticipantAddressUpdateRequest": {
+        "properties": {
+          "address_text": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "maxLength": 80,
+            "minLength": 5,
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "default": false,
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "default": false,
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$",
+            "title": "Region Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone",
+          "expected_version"
+        ],
+        "title": "ParticipantAddressUpdateRequest",
+        "type": "object"
+      },
+      "ParticipantAddressWriteRequest": {
+        "properties": {
+          "address_text": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "maxLength": 80,
+            "minLength": 5,
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "default": false,
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "default": false,
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$",
+            "title": "Region Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone"
+        ],
+        "title": "ParticipantAddressWriteRequest",
+        "type": "object"
+      },
+      "ParticipantEnvelope": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ParticipantEnvelope",
         "type": "object"
       },
       "PeerMessageRequest": {
@@ -11675,6 +12134,36 @@
       },
       "PurchaseIntentCreateRequest": {
         "properties": {
+          "delivery_address_text": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Delivery Address Text",
+            "type": "string"
+          },
+          "delivery_contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Delivery Contact Name",
+            "type": "string"
+          },
+          "delivery_contact_phone": {
+            "maxLength": 80,
+            "minLength": 5,
+            "title": "Delivery Contact Phone",
+            "type": "string"
+          },
+          "delivery_instructions": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Instructions"
+          },
           "destination_region": {
             "maxLength": 200,
             "minLength": 1,
@@ -11728,6 +12217,9 @@
           "quote_record_id",
           "quantity",
           "destination_region",
+          "delivery_address_text",
+          "delivery_contact_name",
+          "delivery_contact_phone",
           "max_landed_cost",
           "expires_at"
         ],
@@ -11817,6 +12309,15 @@
             "title": "Liability Limit",
             "type": "string"
           },
+          "offer_record_id": {
+            "format": "uuid",
+            "title": "Offer Record Id",
+            "type": "string"
+          },
+          "origin_region": {
+            "title": "Origin Region",
+            "type": "string"
+          },
           "quote_id": {
             "format": "uuid",
             "title": "Quote Id",
@@ -11861,6 +12362,8 @@
         },
         "required": [
           "record_id",
+          "offer_record_id",
+          "origin_region",
           "quote_id",
           "quote_version",
           "home_node_code",
@@ -14360,6 +14863,7 @@
       },
       "RoleCode": {
         "enum": [
+          "EXCHANGE_PARTICIPANT",
           "MEMBER_REGISTRAR",
           "COOPERATIVE_ADMIN",
           "DATA_STEWARD",
@@ -24526,6 +25030,32 @@
         ]
       }
     },
+    "/api/v1/exchange/fulfillments": {
+      "get": {
+        "operationId": "list_visible_fulfillments_api_v1_exchange_fulfillments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_FulfillmentResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Visible Fulfillments",
+        "tags": [
+          "exchange"
+        ]
+      }
+    },
     "/api/v1/exchange/fulfillments/{fulfillment_id}/acceptance": {
       "post": {
         "operationId": "accept_fulfillment_api_v1_exchange_fulfillments__fulfillment_id__acceptance_post",
@@ -26237,6 +26767,52 @@
         ]
       }
     },
+    "/api/v1/federation/catalog/offers/{record_id}/image": {
+      "get": {
+        "operationId": "offer_image_api_v1_federation_catalog_offers__record_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Offer Image",
+        "tags": [
+          "federated-discovery"
+        ]
+      }
+    },
     "/api/v1/federation/catalog/offers/{record_id}/verify": {
       "post": {
         "operationId": "verify_offer_api_v1_federation_catalog_offers__record_id__verify_post",
@@ -26852,6 +27428,32 @@
           }
         ],
         "summary": "Issue Logistics Quote",
+        "tags": [
+          "federated-discovery"
+        ]
+      }
+    },
+    "/api/v1/federation/logistics/quotes/mine": {
+      "get": {
+        "operationId": "list_my_logistics_quotes_api_v1_federation_logistics_quotes_mine_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Logistics Quotes",
         "tags": [
           "federated-discovery"
         ]
@@ -28166,6 +28768,56 @@
         ]
       }
     },
+    "/api/v1/federation/offers/mine": {
+      "get": {
+        "operationId": "list_my_offers_api_v1_federation_offers_mine_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Offers",
+        "tags": [
+          "federated-discovery"
+        ]
+      }
+    },
     "/api/v1/federation/offers/publish": {
       "post": {
         "operationId": "publish_offer_api_v1_federation_offers_publish_post",
@@ -29008,6 +29660,54 @@
           }
         ],
         "summary": "Commit Purchase",
+        "tags": [
+          "federated-discovery"
+        ]
+      }
+    },
+    "/api/v1/federation/purchase-intents/{intent_id}/materialize-deal": {
+      "post": {
+        "operationId": "materialize_purchase_deal_api_v1_federation_purchase_intents__intent_id__materialize_deal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "intent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Intent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Materialize Purchase Deal",
         "tags": [
           "federated-discovery"
         ]
@@ -30810,6 +31510,275 @@
         "summary": "Operational Snapshot",
         "tags": [
           "operations"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses": {
+      "get": {
+        "operationId": "list_participant_addresses_api_v1_participant_addresses_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantAddressCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Participant Addresses",
+        "tags": [
+          "participant"
+        ]
+      },
+      "post": {
+        "operationId": "create_participant_address_api_v1_participant_addresses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Participant Address",
+        "tags": [
+          "participant"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses/{address_id}": {
+      "put": {
+        "operationId": "update_participant_address_api_v1_participant_addresses__address_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Participant Address",
+        "tags": [
+          "participant"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses/{address_id}/archive": {
+      "post": {
+        "operationId": "archive_participant_address_api_v1_participant_addresses__address_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Archive Participant Address",
+        "tags": [
+          "participant"
+        ]
+      }
+    },
+    "/api/v1/participant/dashboard": {
+      "get": {
+        "operationId": "participant_dashboard_api_v1_participant_dashboard_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Participant Dashboard",
+        "tags": [
+          "participant"
         ]
       }
     },

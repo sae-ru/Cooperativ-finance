@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 previous_revision="${COOP_MIGRATION_FROM:-0017_peer_reservations}"
-expected_head="${COOP_MIGRATION_HEAD:-0018_inter_node_clearing}"
+expected_head="${COOP_MIGRATION_HEAD:-0021_logistics_contacts}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 project="${COOP_MIGRATION_PROJECT:-coop-migration-${timestamp,,}}"
 report="${COOP_MIGRATION_REPORT:-$root_dir/evidence/migration-$timestamp.json}"

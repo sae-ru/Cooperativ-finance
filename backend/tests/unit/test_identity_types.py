@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from cooperative_clearing.modules.identity.domain.types import (
+    PRIVILEGED_ROLES,
     MemberStatus,
     Principal,
     RoleCode,
@@ -37,6 +38,10 @@ def test_login_normalization_and_validation() -> None:
     with pytest.raises(DomainError) as failure:
         normalize_login(" ")
     assert failure.value.code == "LOGIN_INVALID"
+
+
+def test_exchange_participant_is_a_scoped_non_privileged_role() -> None:
+    assert RoleCode.EXCHANGE_PARTICIPANT not in PRIVILEGED_ROLES
 
 
 def test_role_scope_and_password_change_gate() -> None:

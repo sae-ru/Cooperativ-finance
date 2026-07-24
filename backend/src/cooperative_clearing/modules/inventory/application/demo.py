@@ -50,6 +50,42 @@ async def seed_demo_catalog(session: AsyncSession, settings: Settings) -> DemoCa
         idempotency_key="demo-catalog-unit-kg-v1",
         request_id=None,
     )
+    await service.create_unit(
+        session,
+        principal=registrar,
+        cooperative_id=cooperative_id,
+        code="L",
+        name="Литр",
+        symbol="л",
+        dimension="VOLUME",
+        decimal_scale=3,
+        idempotency_key="demo-catalog-unit-liter-v1",
+        request_id=None,
+    )
+    await service.create_unit(
+        session,
+        principal=registrar,
+        cooperative_id=cooperative_id,
+        code="PCS",
+        name="Штука",
+        symbol="шт",
+        dimension="COUNT",
+        decimal_scale=0,
+        idempotency_key="demo-catalog-unit-piece-v1",
+        request_id=None,
+    )
+    await service.create_unit(
+        session,
+        principal=registrar,
+        cooperative_id=cooperative_id,
+        code="HOUR",
+        name="Час работы",
+        symbol="ч",
+        dimension="TIME",
+        decimal_scale=2,
+        idempotency_key="demo-catalog-unit-hour-v1",
+        request_id=None,
+    )
     product = await service.create_product(
         session,
         principal=registrar,

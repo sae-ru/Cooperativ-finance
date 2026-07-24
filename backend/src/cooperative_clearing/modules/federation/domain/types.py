@@ -113,7 +113,8 @@ def bounded_amount(value: Decimal | str, *, allow_zero: bool = True) -> Decimal:
         amount = Decimal(value)
     except (InvalidOperation, ValueError) as exc:
         raise federation_error("AMOUNT_INVALID", 422) from exc
-    exponent = amount.as_tuple().exponent
+    significant_amount = amount.normalize() if amount != 0 else Decimal(0)
+    exponent = significant_amount.as_tuple().exponent
     if (
         not amount.is_finite()
         or amount < 0

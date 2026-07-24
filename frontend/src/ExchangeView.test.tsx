@@ -7,7 +7,9 @@ import ExchangeView from "./ExchangeView";
 import type { Principal, RoleCode } from "./api/admin";
 import * as admin from "./api/admin";
 import * as exchange from "./api/exchange";
+import * as discovery from "./api/discovery";
 import * as inventory from "./api/inventory";
+import * as participant from "./api/participant";
 
 vi.mock("./api/admin", async () => {
   const actual = await vi.importActual<typeof import("./api/admin")>("./api/admin");
@@ -27,8 +29,25 @@ vi.mock("./api/exchange", async () => {
     ]),
   );
 });
+vi.mock("./api/discovery", async () => {
+  const actual = await vi.importActual<typeof import("./api/discovery")>("./api/discovery");
+  return Object.fromEntries(
+    Object.entries(actual).map(([key, value]) => [
+      key,
+      typeof value === "function" ? vi.fn() : value,
+    ]),
+  );
+});
 vi.mock("./api/inventory", async () => {
   const actual = await vi.importActual<typeof import("./api/inventory")>("./api/inventory");
+  return Object.fromEntries(
+    Object.entries(actual).map(([key, value]) => [
+      key,
+      typeof value === "function" ? vi.fn() : value,
+    ]),
+  );
+});vi.mock("./api/participant", async () => {
+  const actual = await vi.importActual<typeof import("./api/participant")>("./api/participant");
   return Object.fromEntries(
     Object.entries(actual).map(([key, value]) => [
       key,
@@ -138,6 +157,12 @@ const logisticsOrder: exchange.LogisticsOrder = {
   unit_id: unitId,
   origin_text: "Поле",
   destination_text: "Основной склад",
+  origin_contact_name: "Ivan Seller",
+  origin_contact_phone: "+1 555 010 1000",
+  origin_instructions: "Farm gate",
+  destination_contact_name: "John Buyer",
+  destination_contact_phone: "+1 555 010 2000",
+  destination_instructions: "Warehouse two",
   pickup_due_at: "2035-07-20T10:00:00Z",
   delivery_due_at: "2035-07-20T12:00:00Z",
   status: "OFFERED",
@@ -157,6 +182,37 @@ const commandResult = {
   event_id: "60000000-0000-0000-0000-000000000099",
   object_id: obligation.id,
   replayed: false,
+};const participantDashboard: participant.ParticipantDashboard = {
+  profile: {
+    member_id: ownerId,
+    display_name: "John Buyer",
+    member_status: "ACTIVE",
+    login: "participant",
+    last_login_at: null,
+    member_since: "2026-07-20T09:00:00Z",
+  },
+  memberships: [],
+  shares: {
+    denomination: "COOP",
+    total_balance: "0",
+    available: "0",
+    protected: "0",
+    reserved: "0",
+    accounts: [],
+    account_missing: true,
+  },
+  exchange_position: {
+    earned_settled: "0",
+    expected_incoming: "0",
+    expected_outgoing: "0",
+  },
+  offers: [],
+  purchases: [],
+  sales: [],
+  obligations: [],
+  commitments: [],
+  generated_at: "2026-07-24T10:00:00Z",
+  cooperative_count: 1,
 };
 function principal(role: RoleCode, memberId: string): Principal {
   return {
@@ -182,6 +238,8 @@ function renderView(value: Principal) {
 describe("ExchangeView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(discovery.getPurchaseIntents).mockResolvedValue([]);
+    vi.mocked(participant.getParticipantDashboard).mockResolvedValue(participantDashboard);
     vi.mocked(admin.getCooperatives).mockResolvedValue([{
       id: cooperativeId,
       code: "DEMO",
@@ -253,6 +311,7 @@ describe("ExchangeView", () => {
     vi.mocked(exchange.getLogisticsOrders).mockResolvedValue([]);
     vi.mocked(exchange.getDisputes).mockResolvedValue([dispute]);
     vi.mocked(exchange.getFulfillments).mockResolvedValue([]);
+    vi.mocked(exchange.getVisibleFulfillments).mockResolvedValue([]);
     vi.mocked(exchange.confirmDeal).mockResolvedValue({
       event_id: "event-confirm",
       object_id: deal.id,
@@ -437,7 +496,10 @@ describe("ExchangeView", () => {
     vi.mocked(exchange.getLogisticsOrders).mockResolvedValue([logisticsOrder]);
     renderView(principal("LOGISTICS_OPERATOR", adminId));
     await user.click(await screen.findByRole("button", { name: "Логистика" }));
-    await user.click(screen.getByRole("button", { name: "Принять" }));
+    expect(screen.getByText("10 кг")).toBeInTheDocument();
+    expect(screen.getByText("Основной склад").closest("td")).toHaveAttribute("data-label", "Route");
+    expect(screen.getByText(/Ivan Seller/).closest("small")).toHaveAttribute("data-i18n-ignore", "true");
+    await user.click(screen.getByRole("button", { name: "Accept delivery job" }));
 
     await waitFor(() => expect(exchange.transitionLogisticsOrder).toHaveBeenCalled());
     expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[0]?.slice(0, 3)).toEqual([
@@ -545,60 +607,244 @@ describe("ExchangeView", () => {
     vi.mocked(exchange.getObligations).mockResolvedValue([activeObligation]);
     const user = userEvent.setup();
 
-    vi.mocked(exchange.getLogisticsOrders).mockResolvedValue([{
+    const acceptedOrder: exchange.LogisticsOrder = {
       ...logisticsOrder,
       status: "ACCEPTED",
       carrier_user_id: "10000000-0000-0000-0000-000000000001",
       accepted_event_id: "event-accepted",
       accepted_at: "2026-07-20T09:30:00Z",
       version: 2,
-    }]);
-    const pickupView = renderView(principal("LOGISTICS_OPERATOR", adminId));
+    };
+    const inTransitOrder: exchange.LogisticsOrder = {
+      ...acceptedOrder,
+      status: "IN_TRANSIT",
+      pickup_event_id: "event-pickup",
+      picked_up_at: "2026-07-20T10:00:00Z",
+      version: 3,
+    };
+    vi.mocked(exchange.getLogisticsOrders)
+      .mockResolvedValueOnce([acceptedOrder])
+      .mockResolvedValue([inTransitOrder]);
+    renderView(principal("LOGISTICS_OPERATOR", adminId));
     await user.click(await screen.findByRole("button", { name: "Логистика" }));
     await user.upload(
-      screen.getByLabelText(`Акт ${logisticsOrder.id.slice(0, 8)}`),
+      screen.getByLabelText("Add pickup record"),
       new File(["pickup"], "pickup.txt", { type: "text/plain" }),
     );
-    await user.click(screen.getByRole("button", { name: "Забрать" }));
+    await user.click(screen.getByRole("button", { name: "Confirm pickup" }));
     await waitFor(() => expect(exchange.transitionLogisticsOrder).toHaveBeenCalled());
     expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[0]?.[1]).toBe("pickup");
     expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[0]?.[2]).toEqual([
       "evidence-1",
     ]);
-    pickupView.unmount();
 
-    vi.mocked(exchange.transitionLogisticsOrder).mockClear();
-    vi.mocked(exchange.getLogisticsOrders).mockResolvedValue([{
-      ...logisticsOrder,
-      status: "IN_TRANSIT",
-      carrier_user_id: "10000000-0000-0000-0000-000000000001",
-      accepted_event_id: "event-accepted",
-      pickup_event_id: "event-pickup",
-      accepted_at: "2026-07-20T09:30:00Z",
-      picked_up_at: "2026-07-20T10:00:00Z",
-      version: 3,
-    }]);
-    renderView(principal("LOGISTICS_OPERATOR", adminId));
-    await user.click(await screen.findByRole("button", { name: "Логистика" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Report delivery" })).toBeDisabled());
     await user.upload(
-      screen.getByLabelText(`Акт ${logisticsOrder.id.slice(0, 8)}`),
+      screen.getByLabelText("Add delivery record"),
       new File(["delivery"], "delivery.txt", { type: "text/plain" }),
     );
-    await user.click(screen.getByRole("button", { name: "Доставить" }));
-    await waitFor(() => expect(exchange.transitionLogisticsOrder).toHaveBeenCalled());
-    expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[0]?.[1]).toBe("deliver");
+    await user.click(screen.getByRole("button", { name: "Report delivery" }));
+    await waitFor(() => expect(exchange.transitionLogisticsOrder).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[1]?.[1]).toBe("deliver");
+    expect(vi.mocked(exchange.transitionLogisticsOrder).mock.calls[1]?.[2]).toEqual([
+      "evidence-1",
+    ]);
+  });
+  it("shows a simple personal exchange history to a basic participant", async () => {
+    vi.mocked(discovery.getPurchaseIntents).mockResolvedValue([{
+      id: "intent-1",
+      buyer_node_code: "node-demo-01",
+      buyer_member_id: ownerId,
+      offer_record_id: "offer-1",
+      quote_record_id: "quote-1",
+      quantity: "100.000",
+      unit_code: "PCS",
+      destination_region: "EAST-DISTRICT",
+      delivery_address_text: "12 Farm Road, Barn 2",
+      delivery_contact_name: "John Buyer",
+      delivery_contact_phone: "+1 555 010 2000",
+      delivery_instructions: "Warehouse two",
+      max_landed_cost: "31.00",
+      landed_cost_breakdown: { landed_cost: "31.00" },
+      cost_status: "CONFIRMED",
+      summary_hash: `sha256:${"b".repeat(64)}`,
+      status: "COMMITTED",
+      commit_request_hash: `sha256:${"c".repeat(64)}`,
+      commit_expected_version: 3,
+      cancellation_expected_version: null,
+      created_at: "2026-07-24T10:00:00Z",
+      expires_at: "2026-07-24T11:00:00Z",
+      committed_at: "2026-07-24T10:05:00Z",
+      closed_at: null,
+      version: 4,
+      product_code: "NAIL.STEEL.100MM",
+      product_description: "Galvanized steel nails",
+      seller_ref: "LOCAL-HARDWARE-01",
+      seller_node_code: "node-demo-01",
+    }]);
+
+    renderView(principal("EXCHANGE_PARTICIPANT", ownerId));
+
+    expect(await screen.findByRole("heading", { name: "Deals without the bookkeeping" })).toBeInTheDocument();
+    expect(screen.getByText("Nails")).toBeInTheDocument();
+    expect(screen.getByText("LOCAL-HARDWARE-01")).toBeInTheDocument();
+    expect(screen.getByText("Exchange confirmed")).toBeInTheDocument();
+    expect(exchange.getDeals).not.toHaveBeenCalled();
+    expect(inventory.getUnits).not.toHaveBeenCalled();
   });
 
+  it("lets the supplying participant confirm handover after carrier delivery", async () => {
+    const participantObligation: participant.ParticipantObligation = {
+      id: obligation.id,
+      deal_id: deal.id,
+      cooperative_id: cooperativeId,
+      debtor_member_id: ownerId,
+      creditor_member_id: recipientId,
+      source_purchase_intent_id: "intent-1",
+      direction: "OWE",
+      subject_type: "PRODUCT",
+      description: "Fresh farm milk",
+      quantity_total: "10.000",
+      quantity_submitted: "0.000",
+      quantity_fulfilled: "0.000",
+      quantity_cleared: "0.000",
+      unit_id: unitId,
+      unit_code: "L",
+      unit_symbol: "l",
+      unit_dimension: "VOLUME",
+      due_at: "2035-07-21T10:00:00Z",
+      fulfillment_place: "Buyer barn",
+      partial_allowed: true,
+      evidence_required: true,
+      status: "ACTIVE",
+      version: 1,
+      valuation_source: "10 COOP",
+      clearing_allowed: false,
+    };
+    vi.mocked(participant.getParticipantDashboard).mockResolvedValue({
+      ...participantDashboard,
+      profile: { ...participantDashboard.profile, member_id: ownerId },
+      obligations: [participantObligation],
+    });
+    const deliveredOrder: exchange.LogisticsOrder = {
+      ...logisticsOrder,
+      obligation_id: participantObligation.id,
+      destination_text: "Buyer barn",
+      status: "DELIVERED",
+      delivered_event_id: "event-delivered",
+      delivered_at: "2026-07-24T10:30:00Z",
+      version: 4,
+    };
+    vi.mocked(exchange.getLogisticsOrders).mockResolvedValue([deliveredOrder]);
+    const user = userEvent.setup();
+    renderView(principal("EXCHANGE_PARTICIPANT", ownerId));
+
+    const button = await screen.findByRole("button", { name: "Goods handed over" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText("Pickup point")).toBeInTheDocument();
+    expect(screen.getByText("Ivan Seller · +1 555 010 1000")).toBeInTheDocument();
+    expect(screen.getByText("John Buyer · +1 555 010 2000")).toBeInTheDocument();
+    const proof = new File(["handover"], "handover.txt", { type: "text/plain" });
+    await user.upload(screen.getByLabelText("Add photo or handover record"), proof);
+    await user.click(button);
+
+    await waitFor(() => expect(exchange.submitFulfillment).toHaveBeenCalled());
+    expect(inventory.uploadEvidence).toHaveBeenCalledWith(
+      cooperativeId,
+      proof,
+      "FULFILLMENT_ACT",
+    );
+    expect(vi.mocked(exchange.submitFulfillment).mock.calls[0]?.[0]).toEqual(
+      participantObligation,
+    );
+    expect(vi.mocked(exchange.submitFulfillment).mock.calls[0]?.[1]).toMatchObject({
+      quantity: "10",
+      location_text: "Buyer barn",
+      logistics_order_id: deliveredOrder.id,
+      evidence_ids: ["evidence-1"],
+    });
+  });
+
+  it("lets the receiving participant record quantity and condition", async () => {
+    const participantObligation: participant.ParticipantObligation = {
+      id: obligation.id,
+      deal_id: deal.id,
+      cooperative_id: cooperativeId,
+      debtor_member_id: ownerId,
+      creditor_member_id: recipientId,
+      source_purchase_intent_id: "intent-1",
+      direction: "RECEIVE",
+      subject_type: "PRODUCT",
+      description: "Fresh farm milk",
+      quantity_total: "10.000",
+      quantity_submitted: "10.000",
+      quantity_fulfilled: "0.000",
+      quantity_cleared: "0.000",
+      unit_id: unitId,
+      unit_code: "L",
+      unit_symbol: "l",
+      unit_dimension: "VOLUME",
+      due_at: "2035-07-21T10:00:00Z",
+      fulfillment_place: "Buyer barn",
+      partial_allowed: true,
+      evidence_required: true,
+      status: "ACTIVE",
+      version: 2,
+      valuation_source: "10 COOP",
+      clearing_allowed: false,
+    };
+    const submitted: exchange.Fulfillment = {
+      ...fulfillment,
+      obligation_id: participantObligation.id,
+      quantity: "10.000",
+      accepted_quantity: "0.000",
+      status: "SUBMITTED",
+      version: 1,
+    };
+    vi.mocked(participant.getParticipantDashboard).mockResolvedValue({
+      ...participantDashboard,
+      profile: { ...participantDashboard.profile, member_id: recipientId },
+      obligations: [participantObligation],
+    });
+    vi.mocked(exchange.getVisibleFulfillments).mockResolvedValue([submitted]);
+    const user = userEvent.setup();
+    renderView(principal("EXCHANGE_PARTICIPANT", recipientId));
+
+    expect(await screen.findByDisplayValue("10.000")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Condition"), "SHORTAGE_OR_DAMAGE");
+    const accepted = screen.getByLabelText("Quantity actually received");
+    await user.clear(accepted);
+    await user.type(accepted, "9.500");
+    const proof = new File(["receipt"], "receipt.txt", { type: "text/plain" });
+    await user.upload(screen.getByLabelText("Add photo or receipt record"), proof);
+    await user.click(screen.getByRole("button", { name: "Confirm receipt" }));
+
+    await waitFor(() => expect(exchange.acceptFulfillment).toHaveBeenCalled());
+    expect(inventory.uploadEvidence).toHaveBeenCalledWith(
+      cooperativeId,
+      proof,
+      "ACCEPTANCE_ACT",
+    );
+    expect(vi.mocked(exchange.acceptFulfillment).mock.calls[0]?.[0]).toEqual(
+      participantObligation,
+    );
+    expect(vi.mocked(exchange.acceptFulfillment).mock.calls[0]?.[1]).toEqual(submitted);
+    expect(vi.mocked(exchange.acceptFulfillment).mock.calls[0]?.[2]).toMatchObject({
+      accepted_quantity: "9.500",
+      quality_status: "SHORTAGE_OR_DAMAGE",
+      evidence_ids: ["evidence-1"],
+    });
+  });
   it("renders request-aware and generic registry failures", async () => {
     vi.mocked(exchange.getDeals).mockRejectedValue(
       new admin.AdminApiError("EXCHANGE_DOWN", "request-1", 503),
     );
     const failedView = renderView(principal("DATA_STEWARD", ownerId));
-    expect(await screen.findByText("EXCHANGE_DOWN · request-1")).toBeInTheDocument();
+    expect(await screen.findByText("The server cannot complete this action right now. Try again later.")).toBeInTheDocument();
     failedView.unmount();
 
     vi.mocked(exchange.getDeals).mockRejectedValue(new Error("network"));
     renderView(principal("DATA_STEWARD", ownerId));
-    expect(await screen.findByText("Операция не выполнена")).toBeInTheDocument();
+    expect(await screen.findByText("The action could not be completed. Check the data and try again.")).toBeInTheDocument();
   });
 });

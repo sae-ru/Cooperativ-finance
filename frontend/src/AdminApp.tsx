@@ -55,6 +55,7 @@ import {
 } from "./api/admin";
 import { useSystemStatus } from "./features/system/use-system-status";
 import InterfaceControls from "./InterfaceControls";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./admin.css";
 
@@ -65,6 +66,7 @@ const DiscoveryView = lazy(() => import("./DiscoveryView"));
 const ExchangeView = lazy(() => import("./ExchangeView"));
 const FederationView = lazy(() => import("./FederationView"));
 const InventoryView = lazy(() => import("./InventoryView"));
+const MemberHomeView = lazy(() => import("./MemberHomeView"));
 const OperationsView = lazy(() => import("./OperationsView"));
 const ResponsibilityView = lazy(() => import("./ResponsibilityView"));
 const RightsView = lazy(() => import("./RightsView"));
@@ -72,9 +74,10 @@ const RiskView = lazy(() => import("./RiskView"));
 const SolidarityView = lazy(() => import("./SolidarityView"));
 const TrustView = lazy(() => import("./TrustView"));
 
-type View = "overview" | "members" | "access" | "responsibility" | "discovery" | "exchange" | "clearing" | "federatedClearing" | "risk" | "trust" | "solidarity" | "crisis" | "inventory" | "rights" | "federation" | "operations" | "audit";
+type View = "memberHome" | "overview" | "members" | "access" | "responsibility" | "discovery" | "exchange" | "clearing" | "federatedClearing" | "risk" | "trust" | "solidarity" | "crisis" | "inventory" | "rights" | "federation" | "operations" | "audit";
 
 const roleNames: Record<RoleCode, string> = {
+  EXCHANGE_PARTICIPANT: "Участник обмена",
   MEMBER_REGISTRAR: "Регистратор участников",
   COOPERATIVE_ADMIN: "Администратор кооператива",
   DATA_STEWARD: "Распорядитель данных",
@@ -116,10 +119,7 @@ const statusNames: Record<string, string> = {
 };
 
 function errorText(error: unknown): string {
-  if (error instanceof AdminApiError) {
-    return `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`;
-  }
-  return "Операция не выполнена";
+  return userErrorMessage(error);
 }
 
 function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
@@ -227,7 +227,7 @@ const transitions: Record<string, string[]> = {
   SUSPENDED: ["ACTIVE", "EXITED"]
 };
 
-function MembersView() {
+function MembersView({ principal }: { principal: Principal }) {
   const client = useQueryClient();
   const members = useQuery({ queryKey: ["members"], queryFn: getMembers });
   const memberships = useQuery({ queryKey: ["memberships"], queryFn: getMemberships });
@@ -236,18 +236,22 @@ function MembersView() {
   const [identifier, setIdentifier] = useState("");
   const [membershipMember, setMembershipMember] = useState("");
   const [memberNumber, setMemberNumber] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+  const [membershipMessage, setMembershipMessage] = useState("");
+  const cooperativeId = principal.roles.find((item) => ["MEMBER_REGISTRAR", "COOPERATIVE_ADMIN"].includes(item.role) && item.cooperative_id)?.cooperative_id ?? cooperatives.data?.find((item) => item.status === "ACTIVE")?.id ?? "";
+  const visibleMembers = (members.data ?? []).filter((item) => item.display_name.toLocaleLowerCase().includes(memberSearch.trim().toLocaleLowerCase())).slice(0, 25);
   const invalidate = () => Promise.all([client.invalidateQueries({ queryKey: ["members"] }), client.invalidateQueries({ queryKey: ["memberships"] }), client.invalidateQueries({ queryKey: ["admin-overview"] })]);
   const addMember = useMutation({ mutationFn: () => createMember({ display_name: name, ...(identifier ? { identifier_type: "EXTERNAL_REFERENCE", identifier_value: identifier } : {}) }), onSuccess: async () => { setName(""); setIdentifier(""); await invalidate(); } });
   const changeStatus = useMutation({ mutationFn: ({ member, target }: { member: Member; target: string }) => transitionMember(member, target), onSuccess: invalidate });
-  const addMembership = useMutation({ mutationFn: () => createMembership({ cooperative_id: cooperatives.data?.[0]?.id ?? "", member_id: membershipMember, member_number: memberNumber }), onSuccess: async () => { setMembershipMember(""); setMemberNumber(""); await invalidate(); } });
+  const addMembership = useMutation({ mutationFn: () => createMembership({ cooperative_id: cooperativeId, member_id: membershipMember, member_number: memberNumber }), onSuccess: async () => { setMembershipMember(""); setMemberNumber(""); setMembershipMessage("Членство оформлено"); await invalidate(); } });
   if (members.isPending || memberships.isPending || cooperatives.isPending) return <Loading />;
   if (members.isError || memberships.isError || cooperatives.isError) return <ErrorPanel error={members.error ?? memberships.error ?? cooperatives.error} />;
   return (
     <div className="view-stack">
       <header className="view-header"><div><span className="eyebrow">Реестр</span><h1>Участники</h1><p>{members.data?.length ?? 0} записей</p></div></header>
       <section className="action-band"><form onSubmit={(event) => { event.preventDefault(); addMember.mutate(); }}><label>Имя участника<input value={name} onChange={(e) => setName(e.target.value)} required /></label><label>Внешний идентификатор<input value={identifier} onChange={(e) => setIdentifier(e.target.value)} /></label><button className="primary-button" type="submit" disabled={addMember.isPending}><Plus size={17} /><span>Добавить</span></button></form>{addMember.isError ? <p className="form-error">{errorText(addMember.error)}</p> : null}</section>
-      <section className="panel"><div className="panel-heading"><h2>Карточки участников</h2><span>{members.data?.length ?? 0}</span></div><div className="table-wrap"><table><thead><tr><th>Имя</th><th>Статус</th><th>Версия</th><th>Создан</th><th>Действие</th></tr></thead><tbody>{members.data?.map((member) => <tr key={member.id}><td><strong>{member.display_name}</strong><small>{member.id}</small></td><td><Status value={member.status} /></td><td>{member.version}</td><td>{formatLocalDateTime(member.created_at)}</td><td><select aria-label={`Новый статус ${member.display_name}`} defaultValue="" onChange={(e) => { if (e.target.value) changeStatus.mutate({ member, target: e.target.value }); e.target.value = ""; }}><option value="">Изменить</option>{(transitions[member.status] ?? []).map((value) => <option key={value} value={value}>{statusNames[value] ?? value}</option>)}</select></td></tr>)}</tbody></table></div></section>
-      <section className="action-band"><form onSubmit={(event) => { event.preventDefault(); addMembership.mutate(); }}><label>Участник<select value={membershipMember} onChange={(e) => setMembershipMember(e.target.value)} required><option value="">Выберите</option>{members.data?.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label><label>Номер пая<input value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} required /></label><button className="primary-button" type="submit"><Plus size={17} /><span>Членство</span></button></form></section>
+      <section className="panel"><div className="panel-heading access-heading"><h2>Карточки участников</h2><label>Поиск по имени<input value={memberSearch} onChange={(event) => setMemberSearch(event.target.value)} /></label><span>{visibleMembers.length} из {members.data?.length ?? 0}</span></div><div className="table-wrap"><table><thead><tr><th>Имя</th><th>Статус</th><th>Версия</th><th>Создан</th><th>Действие</th></tr></thead><tbody>{visibleMembers.map((member) => <tr key={member.id}><td><strong>{member.display_name}</strong></td><td><Status value={member.status} /></td><td>{member.version}</td><td>{formatLocalDateTime(member.created_at)}</td><td><select aria-label={`Новый статус ${member.display_name}`} defaultValue="" onChange={(e) => { if (e.target.value) changeStatus.mutate({ member, target: e.target.value }); e.target.value = ""; }}><option value="">Изменить</option>{(transitions[member.status] ?? []).map((value) => <option key={value} value={value}>{statusNames[value] ?? value}</option>)}</select></td></tr>)}</tbody></table></div></section>
+      <section className="action-band"><form onSubmit={(event) => { event.preventDefault(); setMembershipMessage(""); addMembership.mutate(); }}><label>Участник<select value={membershipMember} onChange={(e) => setMembershipMember(e.target.value)} required><option value="">Выберите</option>{members.data?.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}</select></label><label>Номер пая<input value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} required /></label><button className="primary-button" type="submit" disabled={addMembership.isPending || !cooperativeId}><Plus size={17} /><span>{addMembership.isPending ? "Оформляем" : "Оформить членство"}</span></button></form>{addMembership.isError ? <p className="form-error">{errorText(addMembership.error)}</p> : null}{membershipMessage ? <p className="form-success" role="status"><Check size={16} />{membershipMessage}</p> : null}</section>
       <section className="panel"><div className="panel-heading"><h2>Членства</h2><span>{memberships.data?.length ?? 0}</span></div><div className="rows">{memberships.data?.map((item) => <div className="data-row" key={item.id}><strong>{item.member_number}</strong><span>{members.data?.find((member) => member.id === item.member_id)?.display_name ?? item.member_id}</span><Status value={item.status} /></div>)}</div></section>
     </div>
   );
@@ -259,29 +263,130 @@ function AccessView({ principal }: { principal: Principal }) {
   const roles = useQuery({ queryKey: ["roles"], queryFn: getRoles });
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: getSessions });
   const cooperatives = useQuery({ queryKey: ["cooperatives"], queryFn: getCooperatives });
+  const members = useQuery({ queryKey: ["members"], queryFn: getMembers });
   const [loginValue, setLoginValue] = useState("");
   const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [memberId, setMemberId] = useState("");
+  const [profile, setProfile] = useState<"PARTICIPANT" | "SELLER" | "TECHNICAL">("PARTICIPANT");
+  const [accountSearch, setAccountSearch] = useState("");
   const [targetUser, setTargetUser] = useState("");
-  const [targetRole, setTargetRole] = useState<RoleCode>("AUDITOR");
-  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["users"] }), client.invalidateQueries({ queryKey: ["roles"] }), client.invalidateQueries({ queryKey: ["sessions"] }), client.invalidateQueries({ queryKey: ["admin-overview"] })]);
-  const addUser = useMutation({ mutationFn: () => createUser({ login: loginValue, temporary_password: temporaryPassword, member_id: null }), onSuccess: async () => { setLoginValue(""); setTemporaryPassword(""); await refresh(); } });
-  const addRole = useMutation({ mutationFn: () => assignRole({ user_id: targetUser, role: targetRole, cooperative_id: ["SECURITY_ADMIN", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR", "AUDITOR"].includes(targetRole) ? null : (cooperatives.data?.[0]?.id ?? null) }), onSuccess: refresh });
+  const [targetRole, setTargetRole] = useState<RoleCode>("EXCHANGE_PARTICIPANT");
+  const [createdMessage, setCreatedMessage] = useState("");
+
+  useEffect(() => {
+    if (!memberId) {
+      const activeMember = members.data?.find((item) => item.status === "ACTIVE");
+      if (activeMember) setMemberId(activeMember.id);
+    }
+  }, [memberId, members.data]);
+
+  const refresh = () => Promise.all([
+    client.invalidateQueries({ queryKey: ["users"] }),
+    client.invalidateQueries({ queryKey: ["roles"] }),
+    client.invalidateQueries({ queryKey: ["sessions"] }),
+    client.invalidateQueries({ queryKey: ["admin-overview"] })
+  ]);
+  const addUser = useMutation({
+    mutationFn: async () => {
+      const linkedMemberId = profile === "TECHNICAL" ? null : memberId;
+      const created = await createUser({
+        login: loginValue,
+        temporary_password: temporaryPassword,
+        member_id: linkedMemberId
+      });
+      if (profile !== "TECHNICAL") {
+        const cooperativeId = cooperatives.data?.[0]?.id ?? null;
+        await assignRole({
+          user_id: created.object_id,
+          role: "EXCHANGE_PARTICIPANT",
+          cooperative_id: cooperativeId
+        });
+        if (profile === "SELLER") {
+          await assignRole({
+            user_id: created.object_id,
+            role: "NODE_BUSINESS_OPERATOR",
+            cooperative_id: null
+          });
+        }
+      }
+      return created;
+    },
+    onSuccess: async (created) => {
+      setTargetUser(created.object_id);
+      setCreatedMessage(profile === "SELLER"
+        ? "Учетная запись создана. Право продавца ожидает независимого одобрения аудитора."
+        : profile === "PARTICIPANT"
+          ? "Учетная запись участника создана. Можно войти и начать обмен."
+          : "Техническая учетная запись создана. Назначьте ей только необходимые права.");
+      setLoginValue("");
+      setTemporaryPassword("");
+      await refresh();
+    }
+  });
+  const addRole = useMutation({
+    mutationFn: () => assignRole({
+      user_id: targetUser,
+      role: targetRole,
+      cooperative_id: ["SECURITY_ADMIN", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR", "AUDITOR", "ARBITRATOR"].includes(targetRole)
+        ? null
+        : (cooperatives.data?.[0]?.id ?? null)
+    }),
+    onSuccess: refresh
+  });
   const decision = useMutation({ mutationFn: ({ id, approve }: { id: string; approve: boolean }) => decideRole(id, approve), onSuccess: refresh });
   const revoke = useMutation({ mutationFn: revokeSession, onSuccess: refresh });
-  if (users.isPending || roles.isPending || sessions.isPending) return <Loading />;
-  if (users.isError || roles.isError || sessions.isError) return <ErrorPanel error={users.error ?? roles.error ?? sessions.error} />;
+
+  if (users.isPending || roles.isPending || sessions.isPending || members.isPending || cooperatives.isPending) return <Loading />;
+  if (users.isError || roles.isError || sessions.isError || members.isError || cooperatives.isError) {
+    return <ErrorPanel error={users.error ?? roles.error ?? sessions.error ?? members.error ?? cooperatives.error} />;
+  }
+
+  const normalizedSearch = accountSearch.trim().toLocaleLowerCase();
+  const visibleUsers = (users.data ?? [])
+    .filter((item) => !normalizedSearch || item.login.toLocaleLowerCase().includes(normalizedSearch))
+    .slice(0, 25);
+  const pendingRoles = (roles.data ?? []).filter((item) => item.status === "PENDING_APPROVAL");
+  const visibleRoles = (roles.data ?? [])
+    .filter((item) => Boolean(targetUser) && item.user_id === targetUser)
+    .slice(0, 40);
+  const activeSessions = (sessions.data ?? []).filter((item) => item.status === "ACTIVE").slice(0, 20);
+  const userName = (userId: string) => users.data?.find((user) => user.id === userId)?.login ?? userId;
+
   return (
-    <div className="view-stack">
-      <header className="view-header"><div><span className="eyebrow">RBAC</span><h1>Доступ и ответственность</h1><p>Учетные записи, роли и активные сессии</p></div></header>
-      <section className="action-band"><form onSubmit={(event) => { event.preventDefault(); addUser.mutate(); }}><label>Логин<input value={loginValue} onChange={(e) => setLoginValue(e.target.value)} required /></label><label>Временный пароль<input type="password" minLength={16} value={temporaryPassword} onChange={(e) => setTemporaryPassword(e.target.value)} required /></label><button className="primary-button" type="submit"><Plus size={17} /><span>Учетная запись</span></button></form>{addUser.isError ? <p className="form-error">{errorText(addUser.error)}</p> : null}</section>
-      <section className="panel"><div className="panel-heading"><h2>Учетные записи</h2><span>{users.data?.length ?? 0}</span></div><div className="table-wrap"><table><thead><tr><th>Логин</th><th>Статус</th><th>Смена пароля</th><th>Последний вход</th></tr></thead><tbody>{users.data?.map((item) => <tr key={item.id}><td><strong>{item.login}</strong><small>{item.id}</small></td><td><Status value={item.status} /></td><td>{item.must_change_password ? "Обязательна" : "Нет"}</td><td>{formatLocalDateTime(item.last_login_at)}</td></tr>)}</tbody></table></div></section>
-      <section className="action-band"><form onSubmit={(event) => { event.preventDefault(); addRole.mutate(); }}><label>Учетная запись<select value={targetUser} onChange={(e) => setTargetUser(e.target.value)} required><option value="">Выберите</option>{users.data?.filter((item) => item.id !== principal.user_id).map((item) => <option key={item.id} value={item.id}>{item.login}</option>)}</select></label><label>Роль<select value={targetRole} onChange={(e) => setTargetRole(e.target.value as RoleCode)}>{Object.entries(roleNames).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><button className="primary-button" type="submit"><Plus size={17} /><span>Назначить</span></button></form>{addRole.isError ? <p className="form-error">{errorText(addRole.error)}</p> : null}</section>
-      <section className="panel"><div className="panel-heading"><h2>Ролевые назначения</h2><span>{roles.data?.length ?? 0}</span></div><div className="rows">{roles.data?.map((item) => <div className="data-row role-row" key={item.id}><strong>{roleNames[item.role_code]}</strong><span>{users.data?.find((user) => user.id === item.user_id)?.login ?? item.user_id}</span><Status value={item.status} />{item.status === "PENDING_APPROVAL" ? <span className="icon-actions"><button title="Одобрить" onClick={() => decision.mutate({ id: item.id, approve: true })}><Check size={16} /></button><button title="Отклонить" onClick={() => decision.mutate({ id: item.id, approve: false })}><X size={16} /></button></span> : null}</div>)}</div></section>
-      <section className="panel"><div className="panel-heading"><h2>Сессии</h2><span>{sessions.data?.length ?? 0}</span></div><div className="rows">{sessions.data?.map((item) => <div className="data-row role-row" key={item.id}><strong>{users.data?.find((user) => user.id === item.user_id)?.login ?? item.user_id}</strong><span>{formatLocalDateTime(item.last_seen_at)}</span><Status value={item.status} />{item.status === "ACTIVE" ? <button className="icon-button" title="Отозвать сессию" onClick={() => revoke.mutate(item.id)}><X size={16} /></button> : null}</div>)}</div></section>
+    <div className="view-stack access-view">
+      <header className="view-header"><div><span className="eyebrow">Доступ</span><h1>Пользователи и права</h1><p>Создайте вход для участника и выберите, что ему разрешено делать</p></div></header>
+
+      <section className="panel onboarding-panel">
+        <div className="panel-heading"><h2>Новая учетная запись</h2><span>Шаг 1 из 2</span></div>
+        <form className="onboarding-form" onSubmit={(event) => { event.preventDefault(); setCreatedMessage(""); addUser.mutate(); }}>
+          <label>Для кого<select value={memberId} onChange={(event) => setMemberId(event.target.value)} disabled={profile === "TECHNICAL"} required={profile !== "TECHNICAL"}><option value="">Выберите участника</option>{members.data?.filter((item) => item.status === "ACTIVE").map((item) => <option value={item.id} key={item.id}>{item.display_name}</option>)}</select></label>
+          <label>Что сможет делать<select value={profile} onChange={(event) => setProfile(event.target.value as "PARTICIPANT" | "SELLER" | "TECHNICAL")}><option value="PARTICIPANT">Искать и получать товары за паи</option><option value="SELLER">Также предлагать свои товары</option><option value="TECHNICAL">Техническая учетная запись без участника</option></select></label>
+          <label>Логин<input autoComplete="off" value={loginValue} onChange={(event) => setLoginValue(event.target.value)} required /></label>
+          <label>Временный пароль<input type="password" autoComplete="new-password" minLength={16} value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} required /></label>
+          <button className="primary-button" type="submit" disabled={addUser.isPending || (profile !== "TECHNICAL" && !memberId)}><Plus size={17} /><span>{addUser.isPending ? "Создаем" : "Создать вход"}</span></button>
+        </form>
+        {profile === "SELLER" ? <p className="form-note"><ShieldCheck size={16} />Право публиковать предложения включится после одобрения другим администратором.</p> : null}
+        {addUser.isError ? <p className="form-error">{errorText(addUser.error)}</p> : null}
+        {createdMessage ? <p className="form-success" role="status"><Check size={16} />{createdMessage}</p> : null}
+      </section>
+
+      {pendingRoles.length ? <section className="panel pending-access-panel"><div className="panel-heading"><h2>Ожидают независимого решения</h2><span>{pendingRoles.length}</span></div><div className="rows">{pendingRoles.map((item) => <div className="data-row role-row" key={item.id}><strong>{roleNames[item.role_code]}</strong><span>{userName(item.user_id)}</span><Status value={item.status} /><span className="icon-actions"><button title="Одобрить" onClick={() => decision.mutate({ id: item.id, approve: true })}><Check size={16} /></button><button title="Отклонить" onClick={() => decision.mutate({ id: item.id, approve: false })}><X size={16} /></button></span></div>)}</div></section> : null}
+
+      <section className="panel">
+        <div className="panel-heading access-heading"><h2>Учетные записи</h2><label>Поиск по логину<input value={accountSearch} onChange={(event) => setAccountSearch(event.target.value)} /></label><span>{visibleUsers.length} из {users.data?.length ?? 0}</span></div>
+        <div className="table-wrap"><table><thead><tr><th>Логин</th><th>Участник</th><th>Статус</th><th>Смена пароля</th><th>Последний вход</th></tr></thead><tbody>{visibleUsers.map((item) => <tr key={item.id}><td><strong>{item.login}</strong></td><td>{members.data?.find((member) => member.id === item.member_id)?.display_name ?? "Техническая"}</td><td><Status value={item.status} /></td><td>{item.must_change_password ? "При первом входе" : "Выполнена"}</td><td>{formatLocalDateTime(item.last_login_at)}</td></tr>)}</tbody></table></div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading"><h2>Дополнительные права</h2><span>Шаг 2 из 2</span></div>
+        <div className="action-band"><form onSubmit={(event) => { event.preventDefault(); addRole.mutate(); }}><label>Учетная запись<select value={targetUser} onChange={(event) => setTargetUser(event.target.value)} required><option value="">Выберите</option>{users.data?.filter((item) => item.id !== principal.user_id).map((item) => <option key={item.id} value={item.id}>{item.login}</option>)}</select></label><label>Право<select value={targetRole} onChange={(event) => setTargetRole(event.target.value as RoleCode)}>{Object.entries(roleNames).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><button className="primary-button" type="submit"><Plus size={17} /><span>Назначить</span></button></form>{addRole.isError ? <p className="form-error">{errorText(addRole.error)}</p> : null}</div>
+        {visibleRoles.length ? <div className="rows">{visibleRoles.map((item) => <div className="data-row role-row" key={item.id}><strong>{roleNames[item.role_code]}</strong><span>{userName(item.user_id)}</span><Status value={item.status} /></div>)}</div> : <Empty text="Выберите учетную запись, чтобы увидеть ее права" />}
+      </section>
+
+      <details className="panel access-details"><summary>Активные сессии ({activeSessions.length})</summary><div className="rows">{activeSessions.map((item) => <div className="data-row role-row" key={item.id}><strong>{userName(item.user_id)}</strong><span>{formatLocalDateTime(item.last_seen_at)}</span><Status value={item.status} /><button className="icon-button" title="Отозвать сессию" onClick={() => revoke.mutate(item.id)}><X size={16} /></button></div>)}</div></details>
     </div>
   );
 }
-
 function AuditView() {
   const audit = useQuery({ queryKey: ["audit"], queryFn: getAudit, refetchInterval: 30_000 });
   if (audit.isPending) return <Loading />;
@@ -301,6 +406,8 @@ function ErrorPanel({ error }: { error: unknown }) { return <div className="stat
 function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () => void }) {
   const principal = session.principal;
   const available = useMemo(() => {
+    const isEverydayParticipant = hasRole(principal, "EXCHANGE_PARTICIPANT") && !hasRole(principal, "MEMBER_REGISTRAR", "COOPERATIVE_ADMIN", "DATA_STEWARD", "RISK_ADMIN", "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_AUDITOR");
+    if (isEverydayParticipant) return ["memberHome", "discovery", "exchange"] as View[];
     const result: View[] = ["overview"];
     if (hasRole(principal, "MEMBER_REGISTRAR", "COOPERATIVE_ADMIN", "RISK_ADMIN", "DATA_STEWARD")) result.push("members");
     if (hasRole(principal, "SECURITY_ADMIN", "AUDITOR")) result.push("access");
@@ -321,6 +428,11 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
     return result;
   }, [principal]);
   const [view, setView] = useState<View>(available[0] ?? "overview");
+  const [discoverySection, setDiscoverySection] = useState<"search" | "sell" | "intents">("search");
+  const navigateParticipant = (target: "discovery" | "exchange", section?: "search" | "sell" | "intents") => {
+    if (target === "discovery" && section) setDiscoverySection(section);
+    setView(target);
+  };
   const navigationRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!window.matchMedia?.("(max-width: 760px)").matches) return;
@@ -330,6 +442,7 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
     });
   }, [view]);
   const nav = [
+    ["memberHome", "Главная", LayoutDashboard],
     ["overview", "Обзор", LayoutDashboard],
     ["members", "Участники", Users],
     ["access", "Доступ", UserCog],
@@ -348,7 +461,7 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
     ["operations", "Эксплуатация", Activity],
     ["audit", "Аудит", ClipboardList]
   ] as const;
-  return <div className="admin-shell"><aside className="admin-sidebar"><div className="brand"><img src="/mark.svg" width="36" height="36" alt="" /><div><strong>Cooperative Clearing</strong><span>Локальный узел</span></div></div><nav ref={navigationRef} aria-label="Основная навигация">{nav.filter(([key]) => available.includes(key)).map(([key, label, Icon]) => <button aria-current={view === key ? "page" : undefined} className={view === key ? "active" : ""} onClick={() => setView(key)} key={key}><Icon size={18} /><span>{label}</span></button>)}</nav><div className="operator"><ShieldCheck size={17} /><div><strong>{principal.login}</strong><span>{principal.roles.map((item) => roleNames[item.role]).join(", ")}</span></div><button title="Выйти" onClick={onLogout}><LogOut size={17} /></button></div></aside><main className="admin-main"><div className="admin-topbar"><InterfaceControls placement="topbar" /></div><Suspense fallback={<Loading />}>{view === "overview" ? <Overview /> : view === "members" ? <MembersView /> : view === "access" ? <AccessView principal={principal} /> : view === "responsibility" ? <ResponsibilityView principal={principal} /> : view === "discovery" ? <DiscoveryView principal={principal} /> : view === "exchange" ? <ExchangeView principal={principal} /> : view === "clearing" ? <ClearingView principal={principal} /> : view === "federatedClearing" ? <FederatedClearingView principal={principal} /> : view === "risk" ? <RiskView principal={principal} /> : view === "trust" ? <TrustView principal={principal} /> : view === "solidarity" ? <SolidarityView principal={principal} /> : view === "crisis" ? <CrisisView principal={principal} /> : view === "inventory" ? <InventoryView principal={principal} /> : view === "rights" ? <RightsView principal={principal} /> : view === "federation" ? <FederationView principal={principal} /> : view === "operations" ? <OperationsView /> : <AuditView />}</Suspense></main></div>;
+  return <div className="admin-shell"><aside className="admin-sidebar"><div className="brand"><img src="/mark.svg" width="36" height="36" alt="" /><div><strong>Cooperative Clearing</strong><span>Локальный узел</span></div></div><nav ref={navigationRef} aria-label="Основная навигация">{nav.filter(([key]) => available.includes(key)).map(([key, label, Icon]) => <button aria-current={view === key ? "page" : undefined} className={view === key ? "active" : ""} onClick={() => { if (key === "discovery") setDiscoverySection("search"); setView(key); }} key={key}><Icon size={18} /><span>{label}</span></button>)}</nav><div className="operator"><ShieldCheck size={17} /><div><strong>{principal.login}</strong><span>{principal.roles.map((item) => roleNames[item.role]).join(", ")}</span></div><button title="Выйти" onClick={onLogout}><LogOut size={17} /></button></div></aside><main className="admin-main"><div className="admin-topbar"><InterfaceControls placement="topbar" /></div><Suspense fallback={<Loading />}>{view === "memberHome" ? <MemberHomeView onNavigate={navigateParticipant} /> : view === "overview" ? <Overview /> : view === "members" ? <MembersView principal={principal} /> : view === "access" ? <AccessView principal={principal} /> : view === "responsibility" ? <ResponsibilityView principal={principal} /> : view === "discovery" ? <DiscoveryView principal={principal} initialSection={discoverySection} /> : view === "exchange" ? <ExchangeView principal={principal} /> : view === "clearing" ? <ClearingView principal={principal} /> : view === "federatedClearing" ? <FederatedClearingView principal={principal} /> : view === "risk" ? <RiskView principal={principal} /> : view === "trust" ? <TrustView principal={principal} /> : view === "solidarity" ? <SolidarityView principal={principal} /> : view === "crisis" ? <CrisisView principal={principal} /> : view === "inventory" ? <InventoryView principal={principal} /> : view === "rights" ? <RightsView principal={principal} /> : view === "federation" ? <FederationView principal={principal} /> : view === "operations" ? <OperationsView /> : <AuditView />}</Suspense></main></div>;
 }
 
 export default function AdminApp() {

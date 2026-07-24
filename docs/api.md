@@ -280,3 +280,20 @@ approvals, поэтому lagging participant может независимо в
 response возвращается без повторной сериализации подписанного документа.
 
 Точный lifecycle и трёхузловое доказательство: [implemented_slice_14.md](implemented_slice_14.md).
+
+## Личная адресная книга
+
+Все маршруты привязаны к `principal.member_id`; произвольный `member_id` клиент не передаёт.
+
+```text
+GET  /api/v1/participant/addresses
+POST /api/v1/participant/addresses
+PUT  /api/v1/participant/addresses/{address_id}
+POST /api/v1/participant/addresses/{address_id}/archive
+```
+
+Команды требуют `Idempotency-Key`; изменение и архивирование также требуют
+`expected_version`. Чужой адрес скрывается как `404`. В audit записываются идентификатор,
+назначение, публичный код района и версия, но не точный адрес, телефон или инструкции.
+Выбор записи в интерфейсе копирует значения в предложение или заказ, поэтому дальнейшее
+изменение адресной книги не меняет уже созданную хозяйственную запись.

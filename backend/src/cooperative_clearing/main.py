@@ -22,6 +22,7 @@ from cooperative_clearing.api.inter_node_clearing import (
 from cooperative_clearing.api.inventory import router as inventory_router
 from cooperative_clearing.api.middleware import RequestContextMiddleware
 from cooperative_clearing.api.operations import router as operations_router
+from cooperative_clearing.api.participant import router as participant_router
 from cooperative_clearing.api.peer import router as peer_router
 from cooperative_clearing.api.responsibility import journal_router
 from cooperative_clearing.api.responsibility import router as responsibility_router
@@ -83,6 +84,7 @@ def create_app(settings: Settings | None = None, *, manage_runtime: bool = True)
     app.include_router(inventory_router)
     app.include_router(operations_router)
     app.include_router(peer_router)
+    app.include_router(participant_router)
     app.include_router(rights_router)
     app.include_router(responsibility_router)
     app.include_router(responsibility_candidates_router)

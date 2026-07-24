@@ -240,6 +240,7 @@ async def test_federated_search_reservation_commit_and_compensation() -> None:
             source_mode="INDEXED",
             node_sequence=1,
         )
+        external_body["signed_at"] = (now - timedelta(minutes=5)).isoformat()
         external_body["external_node_id"] = str(peer.id)
         external_body["external_signature_base64"] = _external_offer_signature(
             body=external_body,
@@ -307,6 +308,23 @@ async def test_federated_search_reservation_commit_and_compensation() -> None:
             peer_candidate = next(
                 item for item in candidates if item["offer"]["home_node_code"] == peer.node_code
             )
+            peer_intent = client.post(
+                "/api/v1/federation/purchase-intents",
+                headers={"Idempotency-Key": f"peer-intent-{suffix}"},
+                json={
+                    "offer_record_id": peer_candidate["offer"]["record_id"],
+                    "quote_record_id": peer_candidate["quote"]["record_id"],
+                    "quantity": "10.000",
+                    "destination_region": "EAST-DISTRICT",
+                    "delivery_address_text": "12 Farm Road, Barn 2",
+                    "delivery_contact_name": "John Buyer",
+                    "delivery_contact_phone": "+1 555 010 2000",
+                    "delivery_instructions": "Call at the gate",
+                    "max_landed_cost": "60.00",
+                    "expires_at": (now + timedelta(minutes=30)).isoformat(),
+                },
+            )
+            assert peer_intent.status_code == 201, peer_intent.text
             index_rows = client.get("/api/v1/federation/catalog/indexes")
             assert index_rows.status_code == 200
             peer_sequences = [
@@ -368,6 +386,10 @@ async def test_federated_search_reservation_commit_and_compensation() -> None:
                     "quote_record_id": selected["quote"]["record_id"],
                     "quantity": "10.000",
                     "destination_region": "EAST-DISTRICT",
+                    "delivery_address_text": "12 Farm Road, Barn 2",
+                    "delivery_contact_name": "John Buyer",
+                    "delivery_contact_phone": "+1 555 010 2000",
+                    "delivery_instructions": "Call at the gate",
                     "max_landed_cost": "60.00",
                     "expires_at": (now + timedelta(minutes=30)).isoformat(),
                 },
@@ -414,6 +436,10 @@ async def test_federated_search_reservation_commit_and_compensation() -> None:
                     "quote_record_id": selected["quote"]["record_id"],
                     "quantity": "95.000",
                     "destination_region": "EAST-DISTRICT",
+                    "delivery_address_text": "12 Farm Road, Barn 2",
+                    "delivery_contact_name": "John Buyer",
+                    "delivery_contact_phone": "+1 555 010 2000",
+                    "delivery_instructions": "Call at the gate",
                     "max_landed_cost": "600.00",
                     "expires_at": (now + timedelta(minutes=30)).isoformat(),
                 },
@@ -435,6 +461,10 @@ async def test_federated_search_reservation_commit_and_compensation() -> None:
                     "quote_record_id": selected["quote"]["record_id"],
                     "quantity": "5.000",
                     "destination_region": "EAST-DISTRICT",
+                    "delivery_address_text": "12 Farm Road, Barn 2",
+                    "delivery_contact_name": "John Buyer",
+                    "delivery_contact_phone": "+1 555 010 2000",
+                    "delivery_instructions": "Call at the gate",
                     "max_landed_cost": "40.00",
                     "expires_at": (now + timedelta(minutes=30)).isoformat(),
                 },
@@ -641,6 +671,7 @@ async def test_external_reservation_is_node_coordinated_without_client_signature
             source_mode="DIRECT",
             node_sequence=1,
         )
+        external_body["signed_at"] = (now - timedelta(minutes=5)).isoformat()
         external_body["external_node_id"] = str(peer.id)
         external_body["external_signature_base64"] = _external_offer_signature(
             body=external_body,
@@ -681,6 +712,10 @@ async def test_external_reservation_is_node_coordinated_without_client_signature
                     "quote_record_id": quote_response.json()["data"]["object_id"],
                     "quantity": "10.000",
                     "destination_region": "EAST-DISTRICT",
+                    "delivery_address_text": "12 Farm Road, Barn 2",
+                    "delivery_contact_name": "John Buyer",
+                    "delivery_contact_phone": "+1 555 010 2000",
+                    "delivery_instructions": "Call at the gate",
                     "max_landed_cost": "100.00",
                     "expires_at": (now + timedelta(minutes=30)).isoformat(),
                 },
@@ -711,6 +746,9 @@ async def test_external_reservation_is_node_coordinated_without_client_signature
             assert logistics_response.status_code == 201, logistics_response.text
             intent_rows = client.get("/api/v1/federation/purchase-intents").json()["data"]
             prepared = next(row for row in intent_rows if row["id"] == intent_id)
+            assert prepared["product_code"] == external_body["product_code"]
+            assert prepared["seller_ref"] == "REMOTE-FARM"
+            assert prepared["seller_node_code"] == peer.node_code
             commit_response = client.post(
                 f"/api/v1/federation/purchase-intents/{intent_id}/commit",
                 headers={"Idempotency-Key": f"remote-commit-{suffix}"},

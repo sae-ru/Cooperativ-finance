@@ -7,6 +7,8 @@ import DiscoveryView from "./DiscoveryView";
 import i18n from "./i18n";
 import type { Principal } from "./api/admin";
 import * as discovery from "./api/discovery";
+import * as inventory from "./api/inventory";
+import * as participant from "./api/participant";
 
 vi.mock("./api/discovery", async () => {
   const actual = await vi.importActual<typeof import("./api/discovery")>("./api/discovery");
@@ -17,6 +19,17 @@ vi.mock("./api/discovery", async () => {
     ]),
   );
 });
+vi.mock("./api/inventory", () => ({ uploadEvidence: vi.fn() }));
+vi.mock("./api/participant", async () => {
+  const actual = await vi.importActual<typeof import("./api/participant")>("./api/participant");
+  return Object.fromEntries(
+    Object.entries(actual).map(([key, value]) => [
+      key,
+      typeof value === "function" ? vi.fn() : value,
+    ]),
+  );
+});
+
 
 const candidate: discovery.SearchCandidate = {
   offer: {
@@ -57,6 +70,8 @@ const candidate: discovery.SearchCandidate = {
   },
   quote: {
     record_id: "quote-record-1",
+    offer_record_id: "offer-record-1",
+    origin_region: "WEST-DISTRICT",
     quote_id: "quote-1",
     quote_version: 1,
     home_node_code: "node-local-01",
@@ -110,7 +125,10 @@ describe("DiscoveryView", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
     vi.clearAllMocks();
+    vi.mocked(inventory.uploadEvidence).mockResolvedValue("evidence-image-1");
+    vi.mocked(participant.getParticipantAddresses).mockResolvedValue([]);
     vi.mocked(discovery.getPurchaseIntents).mockResolvedValue([]);
+    vi.mocked(discovery.getMyLogisticsQuotes).mockResolvedValue([]);
     vi.mocked(discovery.getReservationReceipts).mockResolvedValue([]);
     vi.mocked(discovery.searchCatalog).mockResolvedValue({
       data: [candidate],
@@ -143,6 +161,11 @@ describe("DiscoveryView", () => {
       object_id: "offer-1",
       replayed: false,
     });
+    vi.mocked(discovery.publishLogisticsQuote).mockResolvedValue({
+      event_id: "event-quote",
+      object_id: "quote-new",
+      replayed: false,
+    });
     vi.mocked(discovery.commitPurchase).mockResolvedValue({
       event_id: "event-commit",
       object_id: "intent-commit",
@@ -163,15 +186,104 @@ describe("DiscoveryView", () => {
     expect(await screen.findByRole("heading", { name: "Cabbage", level: 3 })).toBeInTheDocument();
     expect(screen.getByText("Signed snapshot")).toBeInTheDocument();
     await user.click(screen.getByText("Share breakdown"));
-    expect(screen.getByText("transport")).toBeInTheDocument();
+    expect(screen.getByText("Transport")).toBeInTheDocument();
     expect(screen.getByText("65 shares")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Get for shares" }));
+    expect(screen.getByRole("heading", { name: "Where should it be delivered?" })).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /^Exact delivery address/ }), "12 Farm Road, Barn 2");
+    await user.type(screen.getByRole("textbox", { name: "Person receiving the cargo" }), "John Buyer");
+    await user.type(screen.getByRole("textbox", { name: "Contact phone" }), "+1 555 010 2000");
+    await user.type(screen.getByRole("textbox", { name: "Handover instructions" }), "Call at the gate");
+    await user.click(screen.getByRole("button", { name: "Continue with this address" }));
     await waitFor(() => expect(discovery.createPurchaseIntent).toHaveBeenCalledWith(
       candidate,
       "10.000",
+      {
+        address_text: "12 Farm Road, Barn 2",
+        contact_name: "John Buyer",
+        contact_phone: "+1 555 010 2000",
+        instructions: "Call at the gate",
+      },
     ));
-    expect(screen.getByRole("heading", { name: "Exchange checkout" })).toBeInTheDocument();
+  });
+
+  it("reuses a saved delivery point and copies it into the order", async () => {
+    const user = userEvent.setup();
+    const home: participant.ParticipantAddress = {
+      id: "address-home",
+      cooperative_id: "coop-1",
+      label: "Home",
+      purpose: "DELIVERY",
+      region_code: "EAST-DISTRICT",
+      address_text: "14 Home Road",
+      contact_name: "John Buyer",
+      contact_phone: "+1 555 010 2000",
+      instructions: "Call at the gate",
+      is_default_pickup: false,
+      is_default_delivery: true,
+      status: "ACTIVE",
+      created_at: "2026-07-24T10:00:00Z",
+      updated_at: "2026-07-24T10:00:00Z",
+      version: 1,
+    };
+    vi.mocked(participant.getParticipantAddresses).mockResolvedValue([home]);
+
+    renderView();
+
+    expect(await screen.findByRole("heading", { name: "Cabbage", level: 3 })).toBeInTheDocument();
+    expect(await screen.findByText("14 Home Road")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Get for shares" }));
+    expect(screen.getByRole("combobox", { name: /^Saved delivery point/ })).toHaveValue(home.id);
+    expect(screen.getByRole("textbox", { name: /^Exact delivery address/ })).toHaveValue("14 Home Road");
+    await user.click(screen.getByRole("button", { name: "Continue with this address" }));
+
+    await waitFor(() => expect(discovery.createPurchaseIntent).toHaveBeenCalledWith(
+      candidate,
+      "10.000",
+      {
+        address_text: home.address_text,
+        contact_name: home.contact_name,
+        contact_phone: home.contact_phone,
+        instructions: home.instructions,
+      },
+    ));
+  });
+
+  it("lets a logistics provider publish a delivery quote for a found offer", async () => {
+    const user = userEvent.setup();
+    vi.mocked(discovery.getMyLogisticsQuotes).mockResolvedValue([{
+      ...candidate.quote!,
+      capacity: "10.000000000000",
+    }]);
+    renderView({
+      ...principal,
+      login: "carrier",
+      member_id: "carrier-member-1",
+      roles: [{ assignment_id: "role-logistics", role: "LOGISTICS_OPERATOR", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    expect(await screen.findByRole("heading", { name: "Cabbage", level: 3 })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Quote delivery" }));
+    expect(screen.getByRole("heading", { name: "Offer delivery" })).toBeInTheDocument();
+    expect(screen.getByText("WEST-DISTRICT")).toBeInTheDocument();
+    expect(await screen.findByText("10 kg")).toBeInTheDocument();
+    const destination = screen.getByRole("textbox", { name: "Delivery district or town" });
+    await user.clear(destination);
+    await user.type(destination, "NORTH-DISTRICT");
+    await user.click(screen.getByRole("button", { name: "Publish delivery" }));
+
+    await waitFor(() => expect(discovery.publishLogisticsQuote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        offer_record_id: "offer-record-1",
+        destination_region: "NORTH-DISTRICT",
+        capacity: "10.000",
+        transport_cost: "8.00",
+        handling_cost: "1.00",
+      }),
+      "carrier",
+    ));
+    expect(screen.getByText("Delivery is published. Buyers can now see the full valuation.")).toBeInTheDocument();
   });
 
   it("publishes a simple signed offer for the responsible catalog operator", async () => {
@@ -179,11 +291,13 @@ describe("DiscoveryView", () => {
     renderView({
       ...principal,
       member_id: "seller-member-1",
-      roles: [{ assignment_id: "role-1", role: "NODE_BUSINESS_OPERATOR", cooperative_id: null }],
+      roles: [{ assignment_id: "role-1", role: "NODE_BUSINESS_OPERATOR", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
     });
 
     await user.click(screen.getByRole("tab", { name: "Offer" }));
     expect(screen.getByRole("heading", { name: "Offer goods" })).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /Exact (pickup|service) address/ }), "12 Farm Road, Barn 2");
+    await user.type(screen.getByRole("textbox", { name: "Contact phone" }), "+1 555 010 2000");
     await user.click(screen.getByRole("button", { name: "Publish offer" }));
 
     await waitFor(() => expect(discovery.publishOffer).toHaveBeenCalled());
@@ -195,6 +309,100 @@ describe("DiscoveryView", () => {
     });
     expect(screen.getByText("The offer is published and available to other nodes.")).toBeInTheDocument();
   });
+  it("finds computer repair by its human-readable preset and uses hours", async () => {
+    const user = userEvent.setup();
+    renderView();
+
+    await user.click(screen.getByRole("button", { name: "Computer repair" }));
+
+    await waitFor(() => expect(discovery.searchCatalog).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        product_code: "SERVICE.COMPUTER.REPAIR",
+        unit_code: "HOUR",
+      }),
+    ));
+    expect(screen.getByRole("combobox", { name: "Unit" })).toHaveValue("HOUR");
+  });
+  it("publishes computer repair with a stable searchable service code", async () => {
+    const user = userEvent.setup();
+    renderView({
+      ...principal,
+      member_id: "service-member-1",
+      roles: [{ assignment_id: "role-participant", role: "EXCHANGE_PARTICIPANT", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Offer" }));
+    await user.click(screen.getByRole("button", { name: /^Service$/ }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Service type" }), "SERVICE.COMPUTER.REPAIR");
+    await user.type(screen.getByRole("textbox", { name: /Exact (pickup|service) address/ }), "12 Farm Road, Barn 2");
+    await user.type(screen.getByRole("textbox", { name: "Contact phone" }), "+1 555 010 2000");
+    await user.click(screen.getByRole("button", { name: "Publish offer" }));
+
+    await waitFor(() => expect(discovery.publishOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "SERVICE",
+        product_code: "SERVICE.COMPUTER.REPAIR",
+        description: "Computer repair",
+        unit_code: "HOUR",
+      }),
+      "service-member-1",
+    ));
+  });
+  it("uploads an offer image before publishing the service", async () => {
+    const user = userEvent.setup();
+    const view = renderView({
+      ...principal,
+      member_id: "service-member-1",
+      roles: [{ assignment_id: "role-participant", role: "EXCHANGE_PARTICIPANT", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Offer" }));
+    await user.click(screen.getByRole("button", { name: /^Service$/ }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Service type" }), "SERVICE.CUSTOM");
+    await user.type(screen.getByRole("textbox", { name: "Service name" }), "Tractor repair");
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "tractor.png", { type: "image/png" });
+    const input = view.container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    await user.upload(input!, file);
+    expect(screen.getByText("tractor.png")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: /Exact (pickup|service) address/ }), "12 Farm Road, Barn 2");
+    await user.type(screen.getByRole("textbox", { name: "Contact phone" }), "+1 555 010 2000");
+    await user.click(screen.getByRole("button", { name: "Publish offer" }));
+
+    await waitFor(() => expect(inventory.uploadEvidence).toHaveBeenCalledWith(
+      "30000000-0000-0000-0000-000000000001",
+      file,
+      "OFFER_IMAGE",
+    ));
+    expect(discovery.publishOffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "SERVICE",
+        product_code: "SERVICE.TRACTOR.REPAIR",
+        image_evidence_id: "evidence-image-1",
+      }),
+      "service-member-1",
+    );
+  });
+  it("switches the participant offer form to a plain service workflow", async () => {
+    const user = userEvent.setup();
+    renderView({
+      ...principal,
+      member_id: "service-member-1",
+      roles: [{ assignment_id: "role-participant", role: "EXCHANGE_PARTICIPANT", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Offer" }));
+    await user.click(screen.getByRole("button", { name: /^Service$/ }));
+
+    expect(screen.getByRole("heading", { name: "Offer a service" })).toBeInTheDocument();
+    expect(screen.getByText("State the available capacity, deadline, and a clear service outcome.")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Service type" })).toHaveValue("SERVICE.COMPUTER.REPAIR");
+    expect(screen.getByRole("textbox", { name: "Service name" })).toHaveValue("Computer repair");
+    expect(screen.getByRole("combobox", { name: "Unit" })).toHaveValue("HOUR");
+    expect(screen.getByText("8.00 hr", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("Choose a photo")).toBeInTheDocument();
+  });
   it("keeps interrupted commit and cancellation visible and retryable", async () => {    const now = "2026-07-21T10:00:00Z";
     const baseIntent: discovery.PurchaseIntent = {
       id: "intent-commit",
@@ -205,6 +413,10 @@ describe("DiscoveryView", () => {
       quantity: "10.000",
       unit_code: "KG",
       destination_region: "EAST-DISTRICT",
+      delivery_address_text: "12 Farm Road, Barn 2",
+      delivery_contact_name: "John Buyer",
+      delivery_contact_phone: "+1 555 010 2000",
+      delivery_instructions: "Call at the gate",
       max_landed_cost: "65.00",
       landed_cost_breakdown: { landed_cost: "65.00" },
       cost_status: "CONFIRMED",

@@ -15,6 +15,7 @@ from cooperative_clearing.modules.clearing.infrastructure.models import (
     ClearingStatement,
 )
 from cooperative_clearing.modules.exchange.infrastructure.models import Obligation
+from cooperative_clearing.modules.federation.infrastructure.discovery_models import FederatedOffer
 from cooperative_clearing.modules.identity.application.bootstrap import stable_id
 from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.modules.node.application.status import GetSystemStatus
@@ -141,6 +142,16 @@ async def test_node_initialization_and_demo_seed_are_idempotent() -> None:
         after = await demo_snapshot(database, settings)
 
         async with database.session() as session:
+            local_nails = await session.scalar(
+                select(func.count())
+                .select_from(FederatedOffer)
+                .where(
+                    FederatedOffer.product_code == "NAIL.STEEL.100MM",
+                    FederatedOffer.external_node_id.is_(None),
+                    FederatedOffer.status == "ACTIVE",
+                )
+            )
+            assert local_nails == 1
             repository = NodeRepository(session)
             await repository.record_worker_heartbeat(
                 worker_name="outbox-worker",
@@ -166,7 +177,7 @@ async def test_node_initialization_and_demo_seed_are_idempotent() -> None:
     assert journal_report.checked_events > 0
     assert journal_report.last_sequence == journal_report.checked_events
     assert before == after
-    assert before[1:] == (1, 1, 1, 1, 2, 1, 2, 1)
+    assert before[1:] == (1, 2, 1, 1, 2, 1, 2, 1)
 
 
 @pytest.mark.integration

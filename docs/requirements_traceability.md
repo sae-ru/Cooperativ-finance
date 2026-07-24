@@ -7,7 +7,7 @@
 | 0-3 Назначение/границы | `README`, `legal_model` | 0 | approved scope |
 | 4 Устойчивость | `deployment`, `recovery_runbook` | 0, 11 | [backup/restore/update evidence](implemented_slice_11.md) |
 | 5 Роли | `domain_model`, `gui_architecture` | 1 | authorization matrix |
-| 6 Бизнес-процессы | `user_scenarios` | 3-7 | E2E vertical flows |
+| 6 Бизнес-процессы | `user_scenarios` | 3-7, 18 | E2E vertical flows and participant marketplace |
 | 7 Кредит/паи/помощь/репутация | профильные policies | 6, 8, 9 | property + policy tests |
 | 8 Резервы | `crisis_protocol` | 10 | [implemented Slice 10](implemented_slice_10.md) |
 | 9 Офлайн | `offline_protocol`, ADR-0005/0006 | 11 | [implemented Slice 11](implemented_slice_11.md) |
@@ -15,7 +15,7 @@
 | 11 Доверие/безопасность | `security`, `threat_model` | 1-12 | [node controls](implemented_slice_11.md), independent review |
 | 12 Объектная модель | `domain_model`, `data_model` | 1-11 | migrations/constraints |
 | 13 Архитектура | `architecture`, ADR | 0 | architecture tests |
-| 14 API/UI | `api`, `gui_architecture`, `design_system` | все | OpenAPI/E2E/a11y |
+| 14 API/UI | `api`, `gui_architecture`, `design_system` | все, 18 | OpenAPI/E2E/a11y and participant browser path |
 | 15 NFR | deployment/observability/recovery | 0, 11, 12 | restore drill, capacity and RTO/RPO |
 | 16 Тестирование | `testing_strategy` | все | release gates |
 | 17 Приёмка | `production_readiness` | 12 | evidence pack |
@@ -122,3 +122,16 @@ acceptance criteria и tests. Если строка карты меняется,
 | Repeatable concurrency | scripts/test-critical-quality.sh | 3 x 21 PostgreSQL critical tests |
 | Journal after races | coopctl verify-journal | 556 events, sequence 556, no failures |
 | Release ordering | critical-quality dependency | release job не запускается после failed gate |
+## Slice 18 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Персональная главная | `api/participant.py`, `MemberHomeView.tsx` | component test и browser desktop/mobile |
+| Паи и источник | account policy/contributions, доступный/protected/reserved расчёт | integration dashboard и demo source |
+| История участника | own offers, purchases, sales, obligations, commitments | buyer/seller/farmer integration flow |
+| Товар или услуга | participant publishing, units, evidence image | frontend tests и API integration |
+| Рынок в сделку | revision `0020`, unique purchase-intent bridge, три obligations | idempotency/unit/PostgreSQL tests |
+| Воспроизводимый учебный путь | account `farmer`, membership, role, share account, milk offer | repeated `seed-demo` and live login |
+| Физическая передача сторонами | простые действия продавца и покупателя, quantity/condition/evidence | component tests и полный PostgreSQL flow |
+| Приватность актов | party/carrier/private-admin scope для fulfillments и acceptances | unrelated-carrier integration assertion |
+| Личная адресная книга и снимки точек | migration `0022`, owner-scoped participant API, profile/market selectors | CRUD/privacy/idempotency integration, API/component tests, desktop/mobile browser |

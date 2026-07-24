@@ -166,6 +166,7 @@ async def test_peer_goods_reservation_is_capacity_safe_and_irreversible_after_co
         hashlib.sha256(b"demo-peer-node-signing-key").hexdigest()
     )
     service = PeerProtocolService(settings)
+    limit_id = None
     try:
         async with database.session() as session:
             peer = (
@@ -198,11 +199,11 @@ async def test_peer_goods_reservation_is_capacity_safe_and_irreversible_after_co
                     select(NodeBilateralLimit).where(
                         NodeBilateralLimit.node_id == peer.id,
                         NodeBilateralLimit.status == "ACTIVE",
-                        NodeBilateralLimit.capability == "TEST_EXCHANGE",
-                        NodeBilateralLimit.unit == "DEMO",
+                        NodeBilateralLimit.capability != "CLEARING",
                     )
                 )
             ).scalar_one()
+            limit_id = limit.id
             limit.capability = "CATALOG"
             limit.unit = offer.valuation_unit
             limit.max_package_value = Decimal("100000")
@@ -393,4 +394,13 @@ async def test_peer_goods_reservation_is_capacity_safe_and_irreversible_after_co
             assert row.expiry_event_id is not None
             assert exposure.reserved_amount == 0
     finally:
+        if limit_id is not None:
+            async with database.session() as session:
+                limit = await session.get(NodeBilateralLimit, limit_id)
+                if limit is not None:
+                    limit.capability = "TEST_EXCHANGE"
+                    limit.unit = "DEMO"
+                    limit.max_package_value = Decimal("100")
+                    limit.max_unsettled_obligations = Decimal("100")
+                    await session.commit()
         await database.dispose()

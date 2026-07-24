@@ -42,6 +42,30 @@ describe("administration API recovery and endpoint coverage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("shares one rotating refresh across concurrent expired requests", async () => {
+    document.cookie = "coop_csrf=shared-csrf; path=/";
+    let refreshCalls = 0;
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === "/api/v1/auth/refresh") {
+        refreshCalls += 1;
+        await Promise.resolve();
+        return response({ data: { access_token: "shared-fresh", principal: {} } });
+      }
+      const authorization = new Headers(fetchMock.mock.calls.at(-1)?.[1]?.headers).get("Authorization");
+      return authorization === "Bearer shared-fresh"
+        ? response({ data: { members: 7 } })
+        : response({ error: { code: "AUTHENTICATION_FAILED" } }, 401);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const [first, second] = await Promise.all([getOverview(), getOverview()]);
+
+    expect(first.members).toBe(7);
+    expect(second.members).toBe(7);
+    expect(refreshCalls).toBe(1);
+  });
+
   it("calls collection and command endpoints", async () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(response({ data: [] }))));
     await Promise.all([

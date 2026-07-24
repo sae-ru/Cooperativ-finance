@@ -1,4 +1,8 @@
-# Cooperative Clearing
+# Экономика без денег
+
+### Economy Without Money
+
+**Cooperative Clearing**
 
 [Русский](#русский) | [English](#english)
 
@@ -21,13 +25,28 @@
 - русский и английский интерфейс, светлую и темную темы;
 - Docker-развертывание на Linux и лицензию MIT.
 
+### Запуск одной командой
+
+Нужны только Docker Desktop на Windows либо Docker Engine с Compose на Linux.
+
+```bat
+start.bat
+```
+
+```bash
+sh ./start.sh
+```
+
+Обе команды создают конфигурацию и секреты, собирают контейнеры, применяют миграции, загружают демоданные и проверяют готовность узла. После запуска откройте `http://127.0.0.1:8080`. Демо-логины и пароли приведены в [руководстве по развёртыванию](docs/deployment.md#демонстрационные-учетные-записи).
+
+Для узла без демонстрационных данных используйте `start.bat production` или `sh ./start.sh production`; в этом режиме пароли генерируются случайно.
 ### Простой путь покупки
 
 1. Откройте **Рынок**.
 2. Выберите популярный товар или введите название.
 3. Укажите количество и место доставки.
 4. Сравните карточки по полной цене с доставкой.
-5. Нажмите **Купить** и подтвердите резервирование в разделе **Мои заказы**.
+5. Нажмите **Получить за паи** и подтвердите резервирование в разделе **Мои заказы**.
 
 ### Документация
 
@@ -63,13 +82,28 @@ A person sees a simple marketplace: choose milk, nails, cabbage, or another prod
 - Russian and English UI with light and dark themes;
 - Linux Docker deployment under the MIT license.
 
+### One-command startup
+
+The only prerequisite is Docker Desktop on Windows or Docker Engine with Compose on Linux.
+
+```bat
+start.bat
+```
+
+```bash
+sh ./start.sh
+```
+
+Both commands create configuration and secrets, build containers, apply migrations, load demo data, and verify node readiness. Then open `http://127.0.0.1:8080`. Demo credentials are listed in the [deployment guide](docs/deployment.md#demo-accounts).
+
+For a node without demo data, use `start.bat production` or `sh ./start.sh production`; this mode generates random passwords.
 ### Simple buying flow
 
 1. Open **Market**.
 2. Choose a popular product or type its name.
 3. Enter the quantity and delivery area.
 4. Compare product cards by the full delivered price.
-5. Select **Buy** and confirm reservations under **My orders**.
+5. Select **Get for shares** and confirm reservations under **My orders**.
 
 ### Documentation
 

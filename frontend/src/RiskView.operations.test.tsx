@@ -417,6 +417,6 @@ describe("RiskView operational commands", () => {
   it("renders a stable API error instead of partial risk data", async () => {
     vi.mocked(getRiskPolicies).mockRejectedValue(new AdminApiError("RISK_READ_DENIED", "request-7", 403));
     renderView(scopedPrincipal("RISK_ADMIN"));
-    expect(await screen.findByText("RISK_READ_DENIED · request-7")).toBeInTheDocument();
+    expect(await screen.findByText("You do not have permission to perform this action. Contact the cooperative administrator.")).toBeInTheDocument();
   });
 });

@@ -55,6 +55,11 @@ READ_ADMIN_ROLES = (
     }
 )
 GLOBAL_READ_ROLES = {RoleCode.AUDITOR, RoleCode.SECURITY_ADMIN}
+PRIVATE_DETAIL_ADMIN_ROLES = {
+    RoleCode.COOPERATIVE_ADMIN,
+    RoleCode.SECURITY_ADMIN,
+    RoleCode.AUDITOR,
+}
 
 
 class ObligationDraftRequest(BaseModel):
@@ -157,6 +162,7 @@ class LogisticsTransitionRequest(BaseModel):
 class DealResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
+    source_purchase_intent_id: UUID | None
     cooperative_id: UUID
     title: str
     status: str
@@ -271,6 +277,12 @@ class LogisticsOrderResponse(BaseModel):
     unit_id: UUID
     origin_text: str
     destination_text: str
+    origin_contact_name: str | None
+    origin_contact_phone: str | None
+    origin_instructions: str | None
+    destination_contact_name: str | None
+    destination_contact_phone: str | None
+    destination_instructions: str | None
     pickup_due_at: datetime
     delivery_due_at: datetime
     status: str
@@ -403,6 +415,65 @@ def _obligation_filter(principal: Principal) -> ColumnElement[bool] | None:
                 Obligation.debtor_member_id == member_id,
                 Obligation.creditor_member_id == member_id,
                 Obligation.id.in_(carrier_obligations),
+            ]
+        )
+    return or_(*conditions) if conditions else false()
+
+
+def _private_obligation_filter(principal: Principal) -> ColumnElement[bool] | None:
+    """Limit evidence-bearing fulfillment details to accountable people."""
+    _require_readable(principal)
+    if any(
+        grant.role in GLOBAL_READ_ROLES and grant.cooperative_id is None
+        for grant in principal.roles
+    ):
+        return None
+    admin_scopes = {
+        grant.cooperative_id
+        for grant in principal.roles
+        if grant.role in PRIVATE_DETAIL_ADMIN_ROLES and grant.cooperative_id is not None
+    }
+    conditions: list[ColumnElement[bool]] = []
+    if admin_scopes:
+        conditions.append(Obligation.cooperative_id.in_(admin_scopes))
+    if principal.member_id is not None:
+        member_id = principal.member_id
+        carrier_obligations = select(LogisticsOrder.obligation_id).where(
+            LogisticsOrder.carrier_member_id == member_id
+        )
+        conditions.extend(
+            [
+                Obligation.debtor_member_id == member_id,
+                Obligation.creditor_member_id == member_id,
+                Obligation.id.in_(carrier_obligations),
+            ]
+        )
+    return or_(*conditions) if conditions else false()
+
+
+def _logistics_order_filter(principal: Principal) -> ColumnElement[bool] | None:
+    """Keep exact contact points limited to parties, carrier, and accountable admins."""
+    _require_readable(principal)
+    if any(
+        grant.role in GLOBAL_READ_ROLES and grant.cooperative_id is None
+        for grant in principal.roles
+    ):
+        return None
+    admin_scopes = {
+        grant.cooperative_id
+        for grant in principal.roles
+        if grant.role in PRIVATE_DETAIL_ADMIN_ROLES and grant.cooperative_id is not None
+    }
+    conditions: list[ColumnElement[bool]] = []
+    if admin_scopes:
+        conditions.append(LogisticsOrder.cooperative_id.in_(admin_scopes))
+    if principal.member_id is not None:
+        member_id = principal.member_id
+        conditions.extend(
+            [
+                LogisticsOrder.carrier_member_id == member_id,
+                Obligation.debtor_member_id == member_id,
+                Obligation.creditor_member_id == member_id,
             ]
         )
     return or_(*conditions) if conditions else false()
@@ -545,7 +616,7 @@ async def list_fulfillments(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> Collection[FulfillmentResponse]:
-    condition = _obligation_filter(principal)
+    condition = _private_obligation_filter(principal)
     visible = select(Obligation.id).where(Obligation.id == obligation_id)
     if condition is not None:
         visible = visible.where(condition)
@@ -568,11 +639,28 @@ async def list_fulfillments(
     return Collection(data=items, request_id=get_request_id())
 
 
+@router.get("/fulfillments", response_model=Collection[FulfillmentResponse])
+async def list_visible_fulfillments(
+    principal: PrincipalDependency, database: DatabaseDependency
+) -> Collection[FulfillmentResponse]:
+    condition = _private_obligation_filter(principal)
+    statement = (
+        select(Fulfillment)
+        .join(Obligation, Obligation.id == Fulfillment.obligation_id)
+        .order_by(Fulfillment.created_at.desc(), Fulfillment.id)
+    )
+    if condition is not None:
+        statement = statement.where(condition)
+    async with database.session() as session:
+        items = list((await session.execute(statement.limit(500))).scalars())
+    return Collection(data=items, request_id=get_request_id())
+
+
 @router.get("/acceptances", response_model=Collection[AcceptanceResponse])
 async def list_acceptances(
     principal: PrincipalDependency, database: DatabaseDependency
 ) -> Collection[AcceptanceResponse]:
-    condition = _obligation_filter(principal)
+    condition = _private_obligation_filter(principal)
     statement = (
         select(AcceptanceRecord)
         .join(Fulfillment, Fulfillment.id == AcceptanceRecord.fulfillment_id)
@@ -592,7 +680,7 @@ async def list_logistics_orders(
     database: DatabaseDependency,
     status: str | None = Query(default=None, max_length=24),
 ) -> Collection[LogisticsOrderResponse]:
-    condition = _obligation_filter(principal)
+    condition = _logistics_order_filter(principal)
     statement = (
         select(LogisticsOrder)
         .join(Obligation, Obligation.id == LogisticsOrder.obligation_id)

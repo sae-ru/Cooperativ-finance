@@ -33,6 +33,7 @@ import {
   type ResponsibilityAssignment,
   type ResponsibilityProposal,
 } from "./api/responsibility";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 
 type Section = "assignments" | "journal";
@@ -46,6 +47,7 @@ const statusNames: Record<string, string> = {
 };
 
 const roleNames: Record<RoleCode, string> = {
+  EXCHANGE_PARTICIPANT: "Участник обмена",
   MEMBER_REGISTRAR: "Регистратор участников",
   COOPERATIVE_ADMIN: "Администратор кооператива",
   DATA_STEWARD: "Распорядитель данных",
@@ -86,10 +88,7 @@ function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
 }
 
 function errorText(error: unknown): string {
-  if (error instanceof AdminApiError) {
-    return `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`;
-  }
-  return "Операция не выполнена";
+  return userErrorMessage(error);
 }
 
 function shortId(value: string | null): string {

@@ -68,7 +68,7 @@ cat > "$destination/manifest.json" <<EOF
   "repeat_count": $repeats,
   "duration_seconds": $duration_seconds,
   "previous_schema": "0017_peer_reservations",
-  "current_schema": "0018_inter_node_clearing",
+  "current_schema": "0021_logistics_contacts",
   "openapi_baseline": "0.1.0"
 }
 EOF

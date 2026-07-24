@@ -51,12 +51,16 @@ export function createTranslator(
   };
 }
 
-function translateTree(root: ParentNode, translator: (value: string) => string): void {
+function isUserData(element: Element | null): boolean {
+  return element?.closest("[data-i18n-ignore]") !== null;
+}
+
+export function translateTree(root: ParentNode, translator: (value: string) => string): void {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let textNode = walker.nextNode();
   while (textNode) {
     const parent = textNode.parentElement;
-    if (parent && !skippedElements.has(parent.tagName)) {
+    if (parent && !skippedElements.has(parent.tagName) && !isUserData(parent)) {
       const original = textNode.nodeValue ?? "";
       const core = original.trim();
       if (core) {
@@ -71,6 +75,7 @@ function translateTree(root: ParentNode, translator: (value: string) => string):
     ? [root, ...root.querySelectorAll("*")]
     : [...root.querySelectorAll("*")];
   for (const element of elements) {
+    if (isUserData(element)) continue;
     for (const name of translatedAttributes) {
       const original = element.getAttribute(name);
       if (!original) continue;

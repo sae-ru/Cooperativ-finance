@@ -36,6 +36,8 @@ NODE_PAYLOAD = (
     "LICENSE",
     "README.md",
     "compose.yaml",
+    "start.bat",
+    "start.sh",
     "backend/openapi.json",
     "frontend/openapi.json",
     "infra/contracts/openapi-0.1.0.json",

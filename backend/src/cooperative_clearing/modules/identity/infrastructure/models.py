@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -157,11 +158,68 @@ class UserAccount(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
 
+class ParticipantAddress(Base):
+    __tablename__ = "participant_addresses"
+    __table_args__ = (
+        CheckConstraint(
+            "purpose IN ('PICKUP','DELIVERY','BOTH')", name="purpose_allowed"
+        ),
+        CheckConstraint("status IN ('ACTIVE','ARCHIVED')", name="status_allowed"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("ix_participant_addresses_member_status", "member_id", "status"),
+        Index(
+            "uq_participant_addresses_active_label",
+            "member_id",
+            "cooperative_id",
+            text("lower(label)"),
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.members.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    label: Mapped[str] = mapped_column(String(80), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    region_code: Mapped[str] = mapped_column(String(63), nullable=False)
+    address_text: Mapped[str] = mapped_column(String(500), nullable=False)
+    contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    contact_phone: Mapped[str] = mapped_column(String(80), nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text())
+    is_default_pickup: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("false")
+    )
+    is_default_delivery: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("false")
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'ACTIVE'")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
 class RoleAssignment(Base):
     __tablename__ = "role_assignments"
     __table_args__ = (
         CheckConstraint(
-            "role_code IN ('MEMBER_REGISTRAR','COOPERATIVE_ADMIN','DATA_STEWARD',"
+            "role_code IN ('EXCHANGE_PARTICIPANT','MEMBER_REGISTRAR',"
+            "'COOPERATIVE_ADMIN','DATA_STEWARD',"
             "'WAREHOUSE_CUSTODIAN','INVENTORY_CONTROLLER','LOGISTICS_OPERATOR',"
             "'RIGHTS_OPERATOR','RISK_ADMIN','CLEARING_OPERATOR','CLEARING_CONTROLLER',"
             "'CLEARING_FINALIZER','SOLIDARITY_OPERATOR','SOLIDARITY_CONTROLLER','CRISIS_OPERATOR','CRISIS_CONTROLLER','SECURITY_ADMIN','NODE_REGISTRAR','NODE_TECHNICAL_CUSTODIAN','NODE_SECURITY_ADMIN','NODE_BUSINESS_OPERATOR','NODE_AUDITOR','AUDITOR','ARBITRATOR')",

@@ -42,6 +42,7 @@ import {
   type FederatedClearingCycle,
 } from "./api/federatedClearing";
 import { useSystemStatus } from "./features/system/use-system-status";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./federated-clearing.css";
 
@@ -88,10 +89,8 @@ function hasRole(principal: Principal, ...roles: RoleCode[]) {
   return principal.roles.some((grant) => roles.includes(grant.role));
 }
 
-function errorText(error: unknown) {
-  return error instanceof AdminApiError
-    ? `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`
-    : "Операция не выполнена";
+function errorText(error: unknown): string {
+  return userErrorMessage(error);
 }
 
 function Status({ value }: { value: string }) {

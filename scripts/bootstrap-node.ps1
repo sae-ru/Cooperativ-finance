@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch] $DemoCredentials
+)
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -26,13 +28,27 @@ function New-HexSecret([string] $Path, [int] $Bytes) {
     [IO.File]::WriteAllText($Path, $value + "`n", $utf8)
 }
 
+function New-InitialPassword([string] $Path, [string] $DemoValue) {
+    if (Test-Path -LiteralPath $Path) {
+        if ((Get-Item -LiteralPath $Path).Length -gt 0) {
+            return
+        }
+    }
+    if ($DemoCredentials) {
+        [IO.File]::WriteAllText($Path, $DemoValue + "`n", $utf8)
+    }
+    else {
+        New-HexSecret $Path 32
+    }
+}
+
 New-HexSecret (Join-Path $secrets "postgres_migrator_password") 32
 New-HexSecret (Join-Path $secrets "postgres_app_password") 32
 New-HexSecret (Join-Path $secrets "node_signing_seed") 32
 New-HexSecret (Join-Path $secrets "blob_encryption_key") 32
-New-HexSecret (Join-Path $secrets "bootstrap_registrar_password") 32
-New-HexSecret (Join-Path $secrets "bootstrap_security_password") 32
-New-HexSecret (Join-Path $secrets "bootstrap_auditor_password") 32
+New-InitialPassword (Join-Path $secrets "bootstrap_registrar_password") "CoopDemo-Registrar-2026!"
+New-InitialPassword (Join-Path $secrets "bootstrap_security_password") "CoopDemo-Security-2026!"
+New-InitialPassword (Join-Path $secrets "bootstrap_auditor_password") "CoopDemo-Auditor-2026!"
 
 $environmentFile = Join-Path $root ".env"
 if (-not (Test-Path -LiteralPath $environmentFile)) {

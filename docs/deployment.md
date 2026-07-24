@@ -23,17 +23,61 @@ bundle и backup.
 
 PostgreSQL и зашифрованный blob store являются обязательными частями хозяйственного состояния Slice 3. Метаданные и связи находятся в БД, содержимое доказательств находится в именованном `blob-data` volume. Согласованные backup/restore drill и контролируемые update/rollback реализованы операторскими scripts вне Compose. TLS lifecycle, непрерывный WAL archive и выпуск подписанного offline release bundle остаются обязательными задачами до pilot.
 
-## Реализованный первый запуск
+## Первый запуск одной командой
 
-Сначала создаются файловые секреты и несекретный `.env`, затем Compose сам выполняет зависимости `postgres -> migrate -> init-node -> bootstrap-identity -> api/worker -> gateway`.
+Сначала создаются файловые секреты и несекретный `.env`, затем Compose сам выполняет зависимости `postgres -> migrate -> init-node -> bootstrap-identity -> seed-demo -> api/worker -> gateway` и проверяет готовность.
 
-```bash
-sh ./scripts/bootstrap-node.sh
-docker compose up -d --build
-sh ./scripts/verify-stack.sh
+Windows, из проводника или `cmd.exe`:
+
+```bat
+start.bat
 ```
 
-На Windows для локальной разработки используются одноимённые `.ps1` scripts. `seed-demo` запускается только при активном профиле `demo`; защищённые environments отвергают демоданные при загрузке конфигурации.
+Linux:
+
+```bash
+sh ./start.sh
+```
+
+Повторный запуск безопасен: существующие данные и изменённые пользователями пароли не перезаписываются. Адрес интерфейса по умолчанию: `http://127.0.0.1:8080`.
+
+Режим без демоданных и известных начальных паролей:
+
+```bat
+start.bat production
+```
+
+```bash
+sh ./start.sh production
+```
+
+В production-режиме начальные пароли генерируются случайно и сохраняются в `secrets/bootstrap_*_password`. `seed-demo` не запускается; защищённые environments дополнительно отвергают демоданные при загрузке конфигурации.
+
+## Демонстрационные учетные записи
+
+Эти данные действуют только для новой установки, впервые запущенной обычной командой `start.bat` или `sh ./start.sh`.
+
+| Назначение | Логин | Начальный пароль |
+|---|---|---|
+| Регистрация участников | `registrar` | `CoopDemo-Registrar-2026!` |
+| Учетные записи и права | `security` | `CoopDemo-Security-2026!` |
+| Независимое одобрение | `auditor` | `CoopDemo-Auditor-2026!` |
+| Обычный пайщик для проверки рынка | `farmer` | `CoopDemo-Farmer-2026!` |
+
+Операторские учётные записи при первом входе требуют заменить начальный пароль. После замены пароль из таблицы больше не действует и повторный запуск его не восстанавливает. Файлы `secrets/bootstrap_*_password` также содержат только первоначальные значения, а не новый пароль пользователя. Учётная запись `farmer` создаётся только при включённых демоданных, сразу открывает пользовательский кабинет и не требует смены пароля, чтобы учебный путь можно было повторять.
+
+### Demo accounts
+
+These credentials apply only to a fresh installation first started with `start.bat` or `sh ./start.sh`.
+
+| Purpose | Login | Initial password |
+|---|---|---|
+| Member registration | `registrar` | `CoopDemo-Registrar-2026!` |
+| Accounts and permissions | `security` | `CoopDemo-Security-2026!` |
+| Independent approval | `auditor` | `CoopDemo-Auditor-2026!` |
+| Ordinary member for market verification | `farmer` | `CoopDemo-Farmer-2026!` |
+
+Operator accounts require a password change on first sign-in. Once changed, the password in this table no longer works and restarting the stack does not restore it. The `farmer` account exists only with demo data enabled, opens the member workspace immediately, and deliberately keeps its reusable training password.
 
 ## Каталоги host
 
@@ -123,11 +167,12 @@ payload, event hashes, срок действия ключей и Ed25519 signatu
 цепочки блокирует дальнейшие критические операции по runbook; автоматическое
 исправление или удаление событий запрещено.
 
-Текущая schema head: `0018_inter_node_clearing`. Revisions
-`0015_federated_discovery`, `0016_peer_protocol`, `0017_peer_reservations` и
-`0018_inter_node_clearing`
-защищают подписанные offers/indexes/quotes, peer exchanges, purchase evidence и
-home-node holds и межузловой clearing evidence. Downgrade непустого federation-контура запрещён. Revision
+Текущая schema head: `0022_participant_addresses`. Revisions
+`0015_federated_discovery`, `0016_peer_protocol`, `0017_peer_reservations`,
+`0019_exchange_participant`, `0020_purchase_deal_bridge`, `0021_logistics_contacts` и `0022_participant_addresses`
+защищают подписанные offers/indexes/quotes, peer exchanges, purchase evidence,
+home-node holds, межузловой clearing evidence и однозначную связь подтверждённой
+покупки с локальной сделкой, приватные снимки точек сделки и версионируемую личную адресную книгу участника. Downgrade непустого federation-контура запрещён. Revision
 `0013_offline_nodes` отдельно защищает node contracts, epochs, packages,
 incidents, key rotations и назначения federation-ролей; ограничения
 `0012_crisis_reserves` и предыдущих срезов сохраняются. Проверка выполняется

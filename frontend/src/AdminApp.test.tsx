@@ -18,6 +18,8 @@ vi.mock("./api/admin", async () => {
   );
 });
 vi.mock("./features/system/use-system-status", () => ({ useSystemStatus: vi.fn() }));
+vi.mock("./DiscoveryView", () => ({ default: () => <h1>Что вам нужно?</h1> }));
+vi.mock("./MemberHomeView", () => ({ default: () => <h1>Мой кабинет</h1> }));
 
 const systemStatus = {
   status: "OPERATIONAL",
@@ -103,7 +105,7 @@ describe("AdminApp", () => {
     vi.mocked(admin.getMembers).mockResolvedValue([{
       id: "40000000-0000-0000-0000-000000000001",
       display_name: "Анна Петрова",
-      status: "APPLICANT",
+      status: "ACTIVE",
       created_at: "2026-07-20T10:00:00Z",
       updated_at: "2026-07-20T10:00:00Z",
       version: 1
@@ -251,8 +253,17 @@ describe("AdminApp", () => {
     await user.click(await screen.findByRole("button", { name: "Доступ" }));
     await user.type(await screen.findByLabelText("Логин"), "new-operator");
     await user.type(screen.getByLabelText("Временный пароль"), "temporary-password-value");
-    await user.click(screen.getByRole("button", { name: "Учетная запись" }));
-    await waitFor(() => expect(admin.createUser).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: "Создать вход" }));
+    await waitFor(() => expect(admin.createUser).toHaveBeenCalledWith({
+      login: "new-operator",
+      temporary_password: "temporary-password-value",
+      member_id: "40000000-0000-0000-0000-000000000001"
+    }));
+    expect(admin.assignRole).toHaveBeenCalledWith({
+      user_id: "2",
+      role: "EXCHANGE_PARTICIPANT",
+      cooperative_id: "30000000-0000-0000-0000-000000000001"
+    });
     await user.selectOptions(screen.getByRole("combobox", { name: "Учетная запись" }), "10000000-0000-0000-0000-000000000002");
     await user.click(screen.getByRole("button", { name: "Назначить" }));
     await user.click(screen.getByTitle("Одобрить"));
@@ -264,7 +275,37 @@ describe("AdminApp", () => {
     expect(await screen.findByText("AUTH_LOGIN")).toBeInTheDocument();
   });
 
+  it("opens a basic member directly in the personal workspace", async () => {
+    vi.mocked(admin.restoreSession).mockResolvedValue({
+      ...securitySession,
+      principal: {
+        ...securitySession.principal,
+        login: "farmer",
+        member_id: "40000000-0000-0000-0000-000000000001",
+        roles: [{
+          assignment_id: "20000000-0000-0000-0000-000000000010",
+          role: "EXCHANGE_PARTICIPANT",
+          cooperative_id: "30000000-0000-0000-0000-000000000001"
+        }]
+      }
+    });
+    renderApp();
+    expect(await screen.findByRole("heading", { name: "Мой кабинет" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Главная" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Рынок" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Сделки" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Обзор" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Доступ" })).not.toBeInTheDocument();
+  });
   it("creates members, transitions status, and registers membership", async () => {
+    vi.mocked(admin.getMembers).mockResolvedValue([{
+      id: "40000000-0000-0000-0000-000000000001",
+      display_name: "Анна Петрова",
+      status: "APPLICANT",
+      created_at: "2026-07-20T10:00:00Z",
+      updated_at: "2026-07-20T10:00:00Z",
+      version: 1
+    }]);
     vi.mocked(admin.restoreSession).mockResolvedValue(registrarSession);
     const user = userEvent.setup();
     renderApp();
@@ -274,9 +315,9 @@ describe("AdminApp", () => {
     await user.selectOptions(screen.getByLabelText("Новый статус Анна Петрова"), "PENDING_VERIFICATION");
     await user.selectOptions(screen.getByLabelText("Участник"), "40000000-0000-0000-0000-000000000001");
     await user.type(screen.getByLabelText("Номер пая"), "D-1000");
-    await user.click(screen.getByRole("button", { name: "Членство" }));
+    await user.click(screen.getByRole("button", { name: "Оформить членство" }));
     await waitFor(() => expect(admin.createMember).toHaveBeenCalled());
     expect(admin.transitionMember).toHaveBeenCalled();
-    expect(admin.createMembership).toHaveBeenCalled();
+    expect(admin.createMembership).toHaveBeenCalledWith({ cooperative_id: "30000000-0000-0000-0000-000000000001", member_id: "40000000-0000-0000-0000-000000000001", member_number: "D-1000" });
   });
 });

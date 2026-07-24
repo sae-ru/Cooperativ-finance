@@ -8,8 +8,8 @@ from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Header, Query
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Header, Query, Response
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,9 @@ from cooperative_clearing.api.dependencies import (
 )
 from cooperative_clearing.api.identity_schemas import CommandEnvelope
 from cooperative_clearing.api.identity_schemas import CommandResult as ApiCommandResult
+from cooperative_clearing.modules.exchange.application.federated_bridge import (
+    FederatedPurchaseBridge,
+)
 from cooperative_clearing.modules.federation.application.common import FederationCommandResult
 from cooperative_clearing.modules.federation.application.discovery import (
     ArtifactVerification,
@@ -44,6 +47,9 @@ from cooperative_clearing.modules.federation.infrastructure.discovery_models imp
     ReservationReceipt,
 )
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
+from cooperative_clearing.modules.inventory.application.evidence import EvidenceService
+from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob
+from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
 
@@ -69,6 +75,10 @@ class OfferPublishRequest(BaseModel):
     divisible: bool = True
     origin_region: str = Field(min_length=1, max_length=200)
     origin_precision: str = Field(pattern=r"^(EXACT|DISTRICT|REGION)$")
+    pickup_address_text: str | None = Field(default=None, min_length=5, max_length=500)
+    pickup_contact_name: str | None = Field(default=None, min_length=2, max_length=200)
+    pickup_contact_phone: str | None = Field(default=None, min_length=5, max_length=80)
+    pickup_instructions: str | None = Field(default=None, max_length=2000)
     availability_from: AwareDatetime
     availability_until: AwareDatetime
     fulfillment_deadline: AwareDatetime
@@ -85,6 +95,14 @@ class OfferPublishRequest(BaseModel):
     signed_at: AwareDatetime
     valid_until: AwareDatetime
     external_signature_base64: str | None = Field(default=None, min_length=80, max_length=200)
+
+    @model_validator(mode="after")
+    def require_private_pickup_for_participant_offer(self) -> "OfferPublishRequest":
+        if self.price_policy_version == "MARKET-UI-V2" and not all(
+            (self.pickup_address_text, self.pickup_contact_name, self.pickup_contact_phone)
+        ):
+            raise ValueError("pickup address and contact are required")
+        return self
 
 
 class OfferIndexPublishRequest(BaseModel):
@@ -154,6 +172,10 @@ class PurchaseIntentCreateRequest(BaseModel):
     quote_record_id: UUID
     quantity: Decimal = Field(gt=0, max_digits=38, decimal_places=12)
     destination_region: str = Field(min_length=1, max_length=200)
+    delivery_address_text: str = Field(min_length=5, max_length=500)
+    delivery_contact_name: str = Field(min_length=2, max_length=200)
+    delivery_contact_phone: str = Field(min_length=5, max_length=80)
+    delivery_instructions: str | None = Field(default=None, max_length=2000)
     max_landed_cost: Decimal = Field(ge=0, max_digits=38, decimal_places=12)
     expires_at: AwareDatetime
 
@@ -214,6 +236,8 @@ class OfferView(BaseModel):
 
 class QuoteView(BaseModel):
     record_id: UUID
+    offer_record_id: UUID
+    origin_region: str
     quote_id: UUID
     quote_version: int
     home_node_code: str
@@ -379,6 +403,8 @@ def _offer_view(offer: FederatedOffer) -> OfferView:
 def _quote_view(quote: LogisticsQuote) -> QuoteView:
     return QuoteView(
         record_id=quote.id,
+        offer_record_id=quote.offer_record_id,
+        origin_region=quote.origin_region,
         quote_id=quote.quote_id,
         quote_version=quote.quote_version,
         home_node_code=quote.home_node_code,
@@ -446,7 +472,7 @@ def _index_view(snapshot: OfferIndexSnapshot) -> dict[str, Any]:
     }
 
 
-def _intent_view(intent: PurchaseIntent) -> dict[str, Any]:
+def _intent_view(intent: PurchaseIntent, offer: FederatedOffer | None = None) -> dict[str, Any]:
     return {
         "id": intent.id,
         "buyer_node_code": intent.buyer_node_code,
@@ -456,6 +482,10 @@ def _intent_view(intent: PurchaseIntent) -> dict[str, Any]:
         "quantity": intent.quantity,
         "unit_code": intent.unit_code,
         "destination_region": intent.destination_region,
+        "delivery_address_text": intent.delivery_address_text,
+        "delivery_contact_name": intent.delivery_contact_name,
+        "delivery_contact_phone": intent.delivery_contact_phone,
+        "delivery_instructions": intent.delivery_instructions,
         "max_landed_cost": intent.max_landed_cost,
         "landed_cost_breakdown": intent.landed_cost_breakdown,
         "cost_status": intent.cost_status,
@@ -475,6 +505,10 @@ def _intent_view(intent: PurchaseIntent) -> dict[str, Any]:
         "committed_at": intent.committed_at,
         "closed_at": intent.closed_at,
         "version": intent.version,
+        "product_code": offer.product_code if offer is not None else None,
+        "product_description": offer.description if offer is not None else None,
+        "seller_ref": offer.seller_ref if offer is not None else None,
+        "seller_node_code": offer.home_node_code if offer is not None else None,
     }
 
 
@@ -565,6 +599,61 @@ async def list_offer_indexes(
     )
 
 
+@router.get("/offers/mine", response_model=ObjectCollection)
+async def list_my_offers(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> ObjectCollection:
+    _member_access(principal)
+    async with database.session() as session:
+        offers = list(
+            (
+                await session.execute(
+                    select(FederatedOffer)
+                    .where(FederatedOffer.publisher_member_id == principal.member_id)
+                    .order_by(FederatedOffer.created_at.desc(), FederatedOffer.id)
+                    .limit(limit)
+                )
+            ).scalars()
+        )
+    return ObjectCollection(
+        data=[_offer_view(offer).model_dump() for offer in offers],
+        request_id=get_request_id(),
+    )
+
+
+@router.get("/catalog/offers/{record_id}/image")
+async def offer_image(
+    record_id: UUID,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> Response:
+    _member_access(principal)
+    async with database.session() as session:
+        offer = await session.get(FederatedOffer, record_id)
+        if offer is None:
+            raise federation_error("OFFER_NOT_FOUND", 404)
+        raw_evidence_id = offer.handling_requirements.get("image_evidence_id")
+        try:
+            evidence_id = UUID(str(raw_evidence_id))
+        except (TypeError, ValueError) as exc:
+            raise federation_error("OFFER_IMAGE_NOT_FOUND", 404) from exc
+        evidence = await session.get(EvidenceBlob, evidence_id)
+        if evidence is None or evidence.kind != "OFFER_IMAGE" or evidence.status != "READY":
+            raise federation_error("OFFER_IMAGE_NOT_FOUND", 404)
+        content = EvidenceService(settings).read_content(evidence)
+    return Response(
+        content=content,
+        media_type=evidence.mime_type,
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.post("/offers/revoke", response_model=CommandEnvelope, status_code=201)
 async def revoke_offer(
     payload: OfferRevokeRequest,
@@ -603,6 +692,32 @@ async def issue_logistics_quote(
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),
         ),
+    )
+
+
+@router.get("/logistics/quotes/mine", response_model=ObjectCollection)
+async def list_my_logistics_quotes(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> ObjectCollection:
+    _member_access(principal)
+    allowed = {RoleCode.LOGISTICS_OPERATOR, RoleCode.NODE_BUSINESS_OPERATOR}
+    if not any(grant.role in allowed for grant in principal.roles):
+        raise federation_error("LOGISTICS_QUOTE_ROLE_REQUIRED", 403)
+    async with database.session() as session:
+        rows = list(
+            (
+                await session.execute(
+                    select(LogisticsQuote)
+                    .join(SignedEvent, SignedEvent.event_id == LogisticsQuote.issued_event_id)
+                    .where(SignedEvent.actor_person_id == principal.member_id)
+                    .order_by(LogisticsQuote.signed_at.desc())
+                )
+            ).scalars()
+        )
+    return ObjectCollection(
+        data=[_quote_view(row).model_dump(mode="json") for row in rows],
+        request_id=get_request_id(),
     )
 
 
@@ -876,16 +991,56 @@ async def commit_purchase(
         except DomainError:
             await session.commit()
             raise
-    return await _commit(
-        database,
-        lambda session: service.commit(
+
+    async def finalize(session: AsyncSession) -> FederationCommandResult:
+        result = await service.commit(
             session,
             principal=principal,
             intent_id=intent_id,
             **payload.model_dump(),
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),
+        )
+        await FederatedPurchaseBridge(settings).materialize(
+            session,
+            principal=principal,
+            intent_id=intent_id,
+            request_id=_request_uuid(),
+        )
+        return result
+
+    return await _commit(database, finalize)
+
+
+@router.post(
+    "/purchase-intents/{intent_id}/materialize-deal",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def materialize_purchase_deal(
+    intent_id: UUID,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> CommandEnvelope:
+    _member_access(principal)
+    async with database.session() as session:
+        result = await FederatedPurchaseBridge(settings).materialize(
+            session,
+            principal=principal,
+            intent_id=intent_id,
+            request_id=_request_uuid(),
+        )
+        if result is None:
+            raise federation_error("REMOTE_PURCHASE_DEAL_NOT_LOCAL", 409)
+        await session.commit()
+    return CommandEnvelope(
+        data=ApiCommandResult(
+            event_id=result.event_id,
+            object_id=result.deal_id,
+            replayed=result.replayed,
         ),
+        request_id=get_request_id(),
     )
 
 
@@ -963,13 +1118,19 @@ async def list_purchase_intents(
     limit: int = Query(default=100, ge=1, le=500),
 ) -> ObjectCollection:
     _member_access(principal)
-    statement = select(PurchaseIntent).order_by(PurchaseIntent.created_at.desc()).limit(limit)
+    statement = (
+        select(PurchaseIntent, FederatedOffer)
+        .join(FederatedOffer, FederatedOffer.id == PurchaseIntent.offer_record_id)
+        .order_by(PurchaseIntent.created_at.desc())
+        .limit(limit)
+    )
     if not principal.has_role(AUDIT_ROLES):
         statement = statement.where(PurchaseIntent.buyer_member_id == principal.member_id)
     async with database.session() as session:
-        intents = list((await session.execute(statement)).scalars())
+        rows = (await session.execute(statement)).all()
     return ObjectCollection(
-        data=[_intent_view(intent) for intent in intents], request_id=get_request_id()
+        data=[_intent_view(intent, offer) for intent, offer in rows],
+        request_id=get_request_id(),
     )
 
 

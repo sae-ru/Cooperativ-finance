@@ -1,4 +1,5 @@
 export type RoleCode =
+  | "EXCHANGE_PARTICIPANT"
   | "MEMBER_REGISTRAR"
   | "COOPERATIVE_ADMIN"
   | "DATA_STEWARD"
@@ -133,6 +134,7 @@ export class AdminApiError extends Error {
 }
 
 let accessToken: string | null = null;
+let refreshPromise: Promise<AuthSession | null> | null = null;
 
 function cookie(name: string): string | null {
   const prefix = `${encodeURIComponent(name)}=`;
@@ -151,7 +153,7 @@ async function parseError(response: Response): Promise<AdminApiError> {
   );
 }
 
-async function refreshAccess(): Promise<AuthSession | null> {
+async function performRefresh(): Promise<AuthSession | null> {
   const csrf = cookie("coop_csrf");
   if (!csrf) return null;
   const response = await fetch("/api/v1/auth/refresh", {
@@ -166,6 +168,16 @@ async function refreshAccess(): Promise<AuthSession | null> {
   const envelope = (await response.json()) as { data: AuthSession };
   accessToken = envelope.data.access_token;
   return envelope.data;
+}
+
+async function refreshAccess(): Promise<AuthSession | null> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = performRefresh();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
 }
 
 async function authorizedFetch(

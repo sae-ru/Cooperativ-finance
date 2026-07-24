@@ -34,6 +34,13 @@ EVIDENCE_ROLES = {
     RoleCode.AUDITOR,
 }
 SOLIDARITY_EVIDENCE_KIND = "SOLIDARITY_AID"
+OFFER_IMAGE_EVIDENCE_KIND = "OFFER_IMAGE"
+PARTICIPANT_EVIDENCE_KINDS = {
+    SOLIDARITY_EVIDENCE_KIND,
+    OFFER_IMAGE_EVIDENCE_KIND,
+    "FULFILLMENT_ACT",
+    "ACCEPTANCE_ACT",
+}
 ALLOWED_MIME_TYPES = {
     "application/pdf",
     "image/jpeg",
@@ -44,8 +51,8 @@ ALLOWED_MIME_TYPES = {
 
 
 def evidence_roles(kind: str) -> set[RoleCode]:
-    """Allow a cooperative participant to attest their own solidarity action."""
-    if kind.strip().upper() == SOLIDARITY_EVIDENCE_KIND:
+    """Allow participants to upload evidence for their own bounded actions."""
+    if kind.strip().upper() in PARTICIPANT_EVIDENCE_KINDS:
         return set(RoleCode)
     return EVIDENCE_ROLES
 

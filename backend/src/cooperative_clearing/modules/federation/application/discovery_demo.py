@@ -88,6 +88,20 @@ DEMO_OFFERS = (
         transport_cost=Decimal("24.00"),
     ),
     DemoOffer(
+        key="nails-local",
+        product_code="NAIL.STEEL.100MM",
+        description="Galvanized steel nails, 100 millimetres",
+        seller_ref="LOCAL-HARDWARE-01",
+        quantity=Decimal("5000"),
+        minimum_batch=Decimal("100"),
+        unit_code="PCS",
+        unit_scale=0,
+        unit_price=Decimal("0.10"),
+        external=False,
+        node_sequence=3,
+        transport_cost=Decimal("12.00"),
+    ),
+    DemoOffer(
         key="milk-local",
         product_code="MILK.UHT.3_2",
         description="Long-life milk, 3.2 percent fat",
@@ -101,16 +115,24 @@ DEMO_OFFERS = (
         node_sequence=2,
         transport_cost=Decimal("14.00"),
     ),
+    DemoOffer(
+        key="farmer-milk-local",
+        product_code="MILK.UHT.3_2",
+        description="Farm milk offered by the ordinary demo member",
+        seller_ref="D-0007",
+        quantity=Decimal("100.000"),
+        minimum_batch=Decimal("1.000"),
+        unit_code="L",
+        unit_scale=3,
+        unit_price=Decimal("1.90"),
+        external=False,
+        node_sequence=4,
+        transport_cost=Decimal("10.00"),
+    ),
 )
 
 
 async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None:
-    marker_id = stable_id("federated-offer", "demo-cabbage-local")
-    marker = await session.scalar(
-        select(FederatedOffer.id).where(FederatedOffer.offer_id == marker_id).limit(1)
-    )
-    if marker is not None:
-        return
 
     peer = (
         await session.execute(
@@ -118,6 +140,7 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
         )
     ).scalar_one()
     principal = _operator_principal()
+    logistics_principal = _logistics_principal(settings)
     peer_signer = NodeSigner.from_seed_hex(
         hashlib.sha256(b"demo-peer-node-signing-key").hexdigest()
     )
@@ -125,9 +148,24 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
     now = datetime.now(UTC).replace(microsecond=0)
     valid_until = now + timedelta(days=7)
     published: list[tuple[DemoOffer, FederatedOffer]] = []
+    external_changed = False
 
     for spec in DEMO_OFFERS:
         offer_id = stable_id("federated-offer", f"demo-{spec.key}")
+        existing = await session.scalar(
+            select(FederatedOffer)
+            .where(FederatedOffer.offer_id == offer_id)
+            .order_by(FederatedOffer.offer_version.desc())
+            .limit(1)
+        )
+        if existing is not None:
+            if not spec.external and existing.pickup_address_text is None:
+                existing.pickup_address_text = "Demo Farm, 12 Field Road, loading gate"
+                existing.pickup_contact_name = "Demo Seller"
+                existing.pickup_contact_phone = "+1 555 010 1000"
+                existing.pickup_instructions = "Call 30 minutes before pickup"
+            published.append((spec, existing))
+            continue
         external_node_id = peer.id if spec.external else None
         signature = (
             peer_signer.sign(
@@ -145,9 +183,10 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
             if spec.external
             else None
         )
+        publisher = _farmer_principal(settings) if spec.key == "farmer-milk-local" else principal
         result = await service.publish_offer(
             session,
-            principal=principal,
+            principal=publisher,
             offer_id=offer_id,
             offer_version=1,
             external_node_id=external_node_id,
@@ -164,6 +203,12 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
             divisible=True,
             origin_region="WEST-DISTRICT" if spec.external else "LOCAL-DISTRICT",
             origin_precision="REGION",
+            pickup_address_text=(
+                None if spec.external else "Demo Farm, 12 Field Road, loading gate"
+            ),
+            pickup_contact_name=None if spec.external else "Demo Seller",
+            pickup_contact_phone=None if spec.external else "+1 555 010 1000",
+            pickup_instructions=None if spec.external else "Call 30 minutes before pickup",
             availability_from=now,
             availability_until=now + timedelta(days=5),
             fulfillment_deadline=now + timedelta(days=6),
@@ -188,10 +233,11 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
         if row is None:
             raise RuntimeError("demo federated offer was not persisted")
         published.append((spec, row))
+        external_changed = external_changed or spec.external
 
         await service.issue_logistics_quote(
             session,
-            principal=principal,
+            principal=logistics_principal,
             quote_id=stable_id("logistics-quote", f"demo-{spec.key}"),
             quote_version=1,
             offer_record_id=row.id,
@@ -224,6 +270,9 @@ async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None
             idempotency_key=f"demo-discovery-quote-{spec.key}-v1",
             request_id=None,
         )
+
+    if not external_changed:
+        return
 
     external_hashes = sorted(row.payload_hash for spec, row in published if spec.external)
     latest_index_sequence = await session.scalar(
@@ -301,6 +350,24 @@ def _offer_payload(
     )
 
 
+def _farmer_principal(settings: Settings) -> Principal:
+    cooperative_id = stable_id("cooperative", settings.node_code)
+    return Principal(
+        user_id=stable_id("demo-user", "farmer"),
+        session_id=stable_id("demo-session", "farmer:federated-discovery"),
+        login="farmer",
+        member_id=stable_id("member", "demo-member-ivan"),
+        must_change_password=False,
+        roles=(
+            RoleGrant(
+                stable_id("demo-role", "farmer:EXCHANGE_PARTICIPANT"),
+                RoleCode.EXCHANGE_PARTICIPANT,
+                cooperative_id,
+            ),
+        ),
+    )
+
+
 def _operator_principal() -> Principal:
     return Principal(
         user_id=stable_id("bootstrap-user", "registrar"),
@@ -313,6 +380,24 @@ def _operator_principal() -> Principal:
                 stable_id("bootstrap-role", "registrar:NODE_BUSINESS_OPERATOR"),
                 RoleCode.NODE_BUSINESS_OPERATOR,
                 None,
+            ),
+        ),
+    )
+
+
+def _logistics_principal(settings: Settings) -> Principal:
+    cooperative_id = stable_id("cooperative", settings.node_code)
+    return Principal(
+        user_id=stable_id("bootstrap-user", "security"),
+        session_id=stable_id("demo-session", "security:federated-logistics"),
+        login="security",
+        member_id=stable_id("member", "demo-member-elena"),
+        must_change_password=False,
+        roles=(
+            RoleGrant(
+                stable_id("demo-role", "security:LOGISTICS_OPERATOR"),
+                RoleCode.LOGISTICS_OPERATOR,
+                cooperative_id,
             ),
         ),
     )

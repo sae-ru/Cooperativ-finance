@@ -11,9 +11,11 @@ import {
   Send,
   TimerOff,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { AdminApiError, getCooperatives, type Principal, type RoleCode } from "./api/admin";
 import {
@@ -25,6 +27,7 @@ import {
   getDisputes,
   getFulfillments,
   getLogisticsOrders,
+  getVisibleFulfillments,
   getObligations,
   markOverdue,
   openDispute,
@@ -39,7 +42,11 @@ import {
   type Obligation,
   type ObligationDraft,
 } from "./api/exchange";
+import { getPurchaseIntents, type PurchaseIntent } from "./api/discovery";
+import { getParticipantDashboard, type ParticipantObligation } from "./api/participant";
 import { getInventoryMembers, getUnits, uploadEvidence } from "./api/inventory";
+import "./i18n";
+import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./exchange.css";
 
@@ -71,10 +78,7 @@ function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
 }
 
 function errorText(error: unknown): string {
-  if (error instanceof AdminApiError) {
-    return `${error.code}${error.requestId ? ` · ${error.requestId}` : ""}`;
-  }
-  return "Операция не выполнена";
+  return userErrorMessage(error);
 }
 
 function statusKind(value: string): "good" | "warn" | "bad" {
@@ -89,6 +93,14 @@ function Status({ value }: { value: string }) {
 
 function shortId(value: string): string {
   return value.slice(0, 8);
+}
+
+function formatQuantity(value: string): string {
+  const number = Number(value);
+  const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
+  return Number.isFinite(number)
+    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(number)
+    : value;
 }
 
 function localInputDate(value: Date): string {
@@ -148,7 +160,238 @@ function termsDrafts(detail: DealDetail): DraftInput[] {
   });
 }
 
+function isEverydayParticipant(principal: Principal): boolean {
+  return hasRole(principal, "EXCHANGE_PARTICIPANT") && !hasRole(
+    principal,
+    "MEMBER_REGISTRAR",
+    "COOPERATIVE_ADMIN",
+    "DATA_STEWARD",
+    "RISK_ADMIN",
+    "SECURITY_ADMIN",
+    "AUDITOR",
+    "NODE_REGISTRAR",
+    "NODE_TECHNICAL_CUSTODIAN",
+    "NODE_SECURITY_ADMIN",
+    "NODE_AUDITOR",
+  );
+}
+
+function participantRemaining(obligation: ParticipantObligation): string {
+  const remaining = Number(obligation.quantity_total)
+    - Number(obligation.quantity_submitted)
+    - Number(obligation.quantity_fulfilled)
+    - Number(obligation.quantity_cleared);
+  return Number.isFinite(remaining) ? String(Math.max(0, remaining)) : obligation.quantity_total;
+}
+
+type ParticipantDeliveryContact = {
+  address: string | null;
+  name: string | null;
+  phone: string | null;
+  instructions: string | null;
+};
+
+function participantDeliveryContact(
+  obligation: ParticipantObligation,
+  intents: PurchaseIntent[],
+  sales: Awaited<ReturnType<typeof getParticipantDashboard>>["sales"],
+): ParticipantDeliveryContact | null {
+  const source = sales.find((item) => item.id === obligation.source_purchase_intent_id)
+    ?? intents.find((item) => item.id === obligation.source_purchase_intent_id);
+  return source ? {
+    address: source.delivery_address_text,
+    name: source.delivery_contact_name,
+    phone: source.delivery_contact_phone,
+    instructions: source.delivery_instructions,
+  } : null;
+}
+
+function ParticipantFulfillmentCard({
+  obligation,
+  fulfillments,
+  orders,
+  contact,
+  onDone,
+}: {
+  obligation: ParticipantObligation;
+  fulfillments: Fulfillment[];
+  orders: Awaited<ReturnType<typeof getLogisticsOrders>>;
+  contact: ParticipantDeliveryContact | null;
+  onDone: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const pending = fulfillments.find(
+    (item) => item.obligation_id === obligation.id && item.status === "SUBMITTED",
+  );
+  const linkedOrders = orders.filter((item) => item.obligation_id === obligation.id);
+  const deliveredOrder = linkedOrders.find((item) => item.status === "DELIVERED");
+  const route = deliveredOrder ?? linkedOrders[0];
+  const [evidence, setEvidence] = useState<File | null>(null);
+  const [acceptedQuantity, setAcceptedQuantity] = useState(pending?.quantity ?? "");
+  const [condition, setCondition] = useState("ACCEPTED_AS_AGREED");
+  const [notes, setNotes] = useState(t("participantFulfillment.receiptNotesDefault"));
+  useEffect(() => {
+    setAcceptedQuantity(pending?.quantity ?? "");
+  }, [pending?.id, pending?.quantity]);
+
+  const seller = obligation.direction === "OWE";
+  const service = obligation.subject_type === "SERVICE";
+  const operable = ["ACTIVE", "PARTIALLY_FULFILLED", "OVERDUE"].includes(obligation.status);
+  const waitingForDelivery = linkedOrders.length > 0 && !deliveredOrder;
+  const quantity = participantRemaining(obligation);
+  const location = route?.destination_text
+    ?? contact?.address
+    ?? obligation.fulfillment_place;
+  const destinationContact = [
+    route?.destination_contact_name ?? contact?.name,
+    route?.destination_contact_phone ?? contact?.phone,
+  ].filter(Boolean).join(" · ");
+  const destinationInstructions = route?.destination_instructions ?? contact?.instructions;
+  const originContact = [
+    route?.origin_contact_name,
+    route?.origin_contact_phone,
+  ].filter(Boolean).join(" · ");
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (!evidence) throw new Error("evidence");
+      const evidenceId = await uploadEvidence(obligation.cooperative_id, evidence, "FULFILLMENT_ACT");
+      return submitFulfillment(obligation, {
+        quantity,
+        quality_claim: t(service
+          ? "participantFulfillment.serviceQualityClaim"
+          : "participantFulfillment.sellerQualityClaim"),
+        location_text: location,
+        performed_at: new Date().toISOString(),
+        logistics_order_id: deliveredOrder?.id ?? null,
+        evidence_ids: [evidenceId],
+      });
+    },
+    onSuccess: async () => {
+      setEvidence(null);
+      await onDone();
+    },
+  });
+  const accept = useMutation({
+    mutationFn: async () => {
+      if (!pending || !evidence) throw new Error("evidence");
+      const evidenceId = await uploadEvidence(obligation.cooperative_id, evidence, "ACCEPTANCE_ACT");
+      return acceptFulfillment(obligation, pending, {
+        accepted_quantity: acceptedQuantity,
+        quality_status: condition,
+        notes,
+        evidence_ids: [evidenceId],
+      });
+    },
+    onSuccess: async () => {
+      setEvidence(null);
+      await onDone();
+    },
+  });
+  const mutationError = submit.error ?? accept.error;
+
+  return <article className="participant-fulfillment-card">
+    <header><div><span>{t(seller ? "participantFulfillment.youProvide" : "participantFulfillment.youReceive")}</span><h3>{obligation.description}</h3></div><span className={`status ${["FULFILLED", "CLOSED"].includes(obligation.status) ? "good" : "warn"}`}>{t(`member.responsibility.status.${obligation.status}`, { defaultValue: obligation.status })}</span></header>
+    <dl className="participant-route-details">
+      <div><dt>{t("participantFulfillment.quantity")}</dt><dd>{quantity} {obligation.unit_symbol}</dd></div>
+      {route ? <div className="span-two"><dt>{t("participantFulfillment.pickupPoint")}</dt><dd><strong>{route.origin_text}</strong>{originContact ? <small>{originContact}</small> : null}{route.origin_instructions ? <small>{route.origin_instructions}</small> : null}</dd></div> : null}
+      <div className={route || destinationContact || destinationInstructions ? "span-two" : undefined}><dt>{t(route ? "participantFulfillment.deliveryPoint" : "participantFulfillment.place")}</dt><dd><strong>{location}</strong>{destinationContact ? <small>{destinationContact}</small> : null}{destinationInstructions ? <small>{destinationInstructions}</small> : null}</dd></div>
+    </dl>
+    {["FULFILLED", "CLOSED"].includes(obligation.status) ? <div className="participant-fulfillment-message good"><CheckCheck size={18} /><span>{t("participantFulfillment.completed")}</span></div> : seller && pending ? <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForBuyer")}</span></div> : seller && waitingForDelivery ? <div className="participant-fulfillment-message"><Route size={18} /><span>{t("participantFulfillment.waitingForDelivery")}</span></div> : seller && operable ? <form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}>
+      <p>{t(service ? "participantFulfillment.serviceHint" : "participantFulfillment.sellerHint")}</p>
+      <label className="participant-proof-upload"><Upload size={17} /><span>{evidence?.name ?? t("participantFulfillment.addHandoverProof")}</span><input aria-label={t("participantFulfillment.addHandoverProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} /></label>
+      <button className="primary-button" disabled={!evidence || submit.isPending}><PackageCheck size={17} />{t(service ? "participantFulfillment.confirmService" : "participantFulfillment.confirmHandover")}</button>
+    </form> : !seller && pending && operable ? <form onSubmit={(event) => { event.preventDefault(); accept.mutate(); }}>
+      <p>{t("participantFulfillment.buyerHint", { quantity: pending.quantity, unit: obligation.unit_symbol })}</p>
+      <label><span>{t("participantFulfillment.acceptedQuantity")}</span><input inputMode="decimal" value={acceptedQuantity} onChange={(event) => setAcceptedQuantity(event.target.value)} required /></label>
+      <label><span>{t("participantFulfillment.condition")}</span><select value={condition} onChange={(event) => { const next = event.target.value; setCondition(next); if (next === "REJECTED") setAcceptedQuantity("0"); else if (next === "ACCEPTED_AS_AGREED") setAcceptedQuantity(pending.quantity); }}><option value="ACCEPTED_AS_AGREED">{t("participantFulfillment.conditionGood")}</option><option value="SHORTAGE_OR_DAMAGE">{t("participantFulfillment.conditionIssue")}</option><option value="REJECTED">{t("participantFulfillment.conditionReject")}</option></select></label>
+      <label className="span-two"><span>{t("participantFulfillment.notes")}</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} required minLength={2} /></label>
+      <label className="participant-proof-upload span-two"><Upload size={17} /><span>{evidence?.name ?? t("participantFulfillment.addReceiptProof")}</span><input aria-label={t("participantFulfillment.addReceiptProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} /></label>
+      <button className="primary-button" disabled={!evidence || accept.isPending}><CheckCheck size={17} />{t("participantFulfillment.confirmReceipt")}</button>
+    </form> : <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForSeller")}</span></div>}
+    {mutationError ? <p className="form-error">{errorText(mutationError)}</p> : null}
+  </article>;
+}
+
+function ParticipantExchangeView() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const intents = useQuery({ queryKey: ["purchase-intents"], queryFn: getPurchaseIntents });
+  const dashboard = useQuery({ queryKey: ["participant-dashboard"], queryFn: getParticipantDashboard });
+  const fulfillments = useQuery({ queryKey: ["exchange-visible-fulfillments"], queryFn: getVisibleFulfillments });
+  const logistics = useQuery({ queryKey: ["exchange-logistics"], queryFn: getLogisticsOrders });
+  const queries = [intents, dashboard, fulfillments, logistics];
+  if (queries.some((query) => query.isPending)) {
+    return <div className="view-stack"><div className="state"><RefreshCw className="spin" size={24} />{t("common.loading")}</div></div>;
+  }
+  const failed = queries.find((query) => query.isError);
+  if (failed) {
+    return <div className="view-stack"><div className="state error">{errorText(failed.error)}</div></div>;
+  }
+
+  const rows = intents.data ?? [];
+  const physicalObligations = (dashboard.data?.obligations ?? []).filter(
+    (item) => ["PRODUCT", "SERVICE"].includes(item.subject_type),
+  );
+  const completed = physicalObligations.filter((item) => ["FULFILLED", "CLOSED"].includes(item.status)).length;
+  const active = physicalObligations.filter((item) => ["ACTIVE", "PARTIALLY_FULFILLED", "OVERDUE"].includes(item.status)).length;
+  const cancelled = rows.filter((item) => ["CANCELLED", "COMPENSATED", "EXPIRED"].includes(item.status)).length;
+  const productKeys: Record<string, string> = {
+    "CABBAGE.WHITE": "market.cabbage",
+    "NAIL.STEEL.100MM": "market.nails",
+    "MILK.UHT.3_2": "market.milk",
+  };
+  const amount = (value: string, unit: string) => {
+    const number = Number(value);
+    const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
+    const formatted = Number.isFinite(number)
+      ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(number)
+      : value;
+    return `${formatted} ${unit === "COOP" ? t("market.sharesUnit") : unit}`;
+  };
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["participant-dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["exchange-visible-fulfillments"] }),
+      queryClient.invalidateQueries({ queryKey: ["exchange-logistics"] }),
+      queryClient.invalidateQueries({ queryKey: ["exchange-obligations"] }),
+    ]);
+  };
+
+  return <div className="view-stack exchange-view participant-exchange-view">
+    <header className="view-header"><div><span className="eyebrow">{t("participantDeals.eyebrow")}</span><h1>{t("participantDeals.title")}</h1><p>{t("participantDeals.subtitle")}</p></div></header>
+    <section className="metric-grid participant-exchange-metrics">
+      <article className="metric"><CheckCheck size={19} /><span>{t("participantDeals.completed")}</span><strong>{completed}</strong></article>
+      <article className="metric"><RefreshCw size={19} /><span>{t("participantDeals.active")}</span><strong>{active}</strong></article>
+      <article className="metric"><TimerOff size={19} /><span>{t("participantDeals.cancelled")}</span><strong>{cancelled}</strong></article>
+    </section>
+    <section className="participant-fulfillment-section" aria-labelledby="participant-fulfillment-title">
+      <div className="results-heading"><div><h2 id="participant-fulfillment-title">{t("participantFulfillment.title")}</h2><p>{t("participantFulfillment.subtitle")}</p></div><span>{physicalObligations.length}</span></div>
+      {!physicalObligations.length ? <div className="state"><Handshake size={22} /><span>{t("participantFulfillment.empty")}</span></div> : <div className="participant-fulfillment-grid">{physicalObligations.map((obligation) => <ParticipantFulfillmentCard key={obligation.id} obligation={obligation} fulfillments={fulfillments.data ?? []} orders={logistics.data ?? []} contact={participantDeliveryContact(obligation, rows, dashboard.data?.sales ?? [])} onDone={refresh} />)}</div>}
+    </section>
+    <section className="participant-exchange-list" aria-label={t("participantDeals.listTitle")}>
+      <div className="results-heading"><div><h2>{t("participantDeals.listTitle")}</h2></div><span>{rows.length}</span></div>
+      {!rows.length ? <div className="state"><Handshake size={22} /><span>{t("participantDeals.empty")}</span></div> : rows.map((intent: PurchaseIntent) => {
+        const productKey = intent.product_code ? productKeys[intent.product_code] : undefined;
+        const productName = productKey ? t(productKey) : intent.product_code ?? t("market.goods");
+        const breakdown = intent.landed_cost_breakdown as { landed_cost?: string };
+        const kind = intent.status === "COMMITTED" ? "good" : ["CANCELLED", "COMPENSATED", "EXPIRED"].includes(intent.status) ? "bad" : "warn";
+        return <article className="participant-exchange-row" key={intent.id}>
+          <div className="participant-exchange-product"><PackageCheck size={24} /><div><span>{t("participantDeals.receiving")}</span><strong>{productName}</strong><small>{amount(intent.quantity, intent.unit_code)} · {intent.delivery_address_text ?? intent.destination_region}</small></div></div>
+          <div><span>{t("participantDeals.seller")}</span><strong>{intent.seller_ref ?? intent.seller_node_code ?? "—"}</strong><small>{intent.seller_node_code ?? intent.buyer_node_code}</small></div>
+          <div><span>{t("participantDeals.total")}</span><strong>{amount(breakdown.landed_cost ?? intent.max_landed_cost, "COOP")}</strong><small>{formatLocalDateTime(intent.committed_at ?? intent.created_at)}</small></div>
+          <span className={`status ${kind}`}>{t(`market.intent.${intent.status}`)}</span>
+        </article>;
+      })}
+    </section>
+  </div>;
+}
 export default function ExchangeView({ principal }: { principal: Principal }) {
+  return isEverydayParticipant(principal)
+    ? <ParticipantExchangeView />
+    : <OperatorExchangeView principal={principal} />;
+}
+
+function OperatorExchangeView({ principal }: { principal: Principal }) {
   const queryClient = useQueryClient();
   const [section, setSection] = useState<Section>("deals");
   const [selectedDealId, setSelectedDealId] = useState("");
@@ -268,12 +511,23 @@ function ExecutionPanel({ principal, obligations, members, units, logistics, onD
 }
 
 function LogisticsPanel({ principal, obligations, orders, members, units, canAdmin, canLogistics, onDone }: { principal: Principal; obligations: Obligation[]; orders: Awaited<ReturnType<typeof getLogisticsOrders>>; members: Array<{ member_id: string; display_name: string }>; units: Array<{ id: string; symbol: string }>; canAdmin: boolean; canLogistics: boolean; onDone: () => Promise<void> }) {
+  const { t } = useTranslation();
   const [obligationId, setObligationId] = useState(""); const [carrier, setCarrier] = useState(""); const [quantity, setQuantity] = useState(""); const [origin, setOrigin] = useState(""); const [destination, setDestination] = useState(""); const [pickup, setPickup] = useState(""); const [delivery, setDelivery] = useState(""); const [files, setFiles] = useState<Record<string, File | null>>({});
   const selected = obligations.find((item) => item.id === obligationId);
   const offer = useMutation({ mutationFn: () => { if (!selected) throw new Error("selection"); return createLogisticsOrder(selected, { carrier_member_id: carrier, quantity, origin_text: origin, destination_text: destination, pickup_due_at: new Date(pickup).toISOString(), delivery_due_at: new Date(delivery).toISOString() }); }, onSuccess: onDone });
-  const transition = useMutation({ mutationFn: async ({ order, action }: { order: (typeof orders)[number]; action: "accept" | "pickup" | "deliver" }) => { const file = files[order.id]; const evidenceIds = action === "accept" ? [] : file ? [await uploadEvidence(order.cooperative_id, file, `LOGISTICS_${action.toUpperCase()}_ACT`)] : []; return transitionLogisticsOrder(order, action, evidenceIds); }, onSuccess: onDone });
+  const transition = useMutation({
+    mutationFn: async ({ order, action }: { order: (typeof orders)[number]; action: "accept" | "pickup" | "deliver" }) => {
+      const file = files[order.id];
+      const evidenceIds = action === "accept" ? [] : file ? [await uploadEvidence(order.cooperative_id, file, `LOGISTICS_${action.toUpperCase()}_ACT`)] : [];
+      return transitionLogisticsOrder(order, action, evidenceIds);
+    },
+    onSuccess: async (_result, { order }) => {
+      setFiles((value) => ({ ...value, [order.id]: null }));
+      await onDone();
+    },
+  });
   const nextAction = (status: string) => status === "OFFERED" ? "accept" : status === "ACCEPTED" ? "pickup" : status === "IN_TRANSIT" ? "deliver" : null;
-  return <>{canAdmin ? <section className="panel exchange-command"><div className="panel-heading"><h2>Предложить перевозку</h2><Route size={18} /></div><form onSubmit={(event) => { event.preventDefault(); offer.mutate(); }}><label className="span-two">Обязательство<select value={obligationId} onChange={(event) => setObligationId(event.target.value)} required><option value="">Выберите</option>{obligations.filter((item) => !["FULFILLED", "DISPUTED", "DEFAULTED"].includes(item.status)).map((item) => <option value={item.id} key={item.id}>{shortId(item.id)} · {item.description}</option>)}</select></label><label>Перевозчик<select value={carrier} onChange={(event) => setCarrier(event.target.value)} required><option value="">Выберите</option>{members.map((item) => <option value={item.member_id} key={item.member_id}>{item.display_name}</option>)}</select></label><label>Количество<input value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label><label>Откуда<input value={origin} onChange={(event) => setOrigin(event.target.value)} required /></label><label>Куда<input value={destination} onChange={(event) => setDestination(event.target.value)} required /></label><label>Забрать до<input type="datetime-local" value={pickup} onChange={(event) => setPickup(event.target.value)} required /></label><label>Доставить до<input type="datetime-local" value={delivery} onChange={(event) => setDelivery(event.target.value)} required /></label><button className="primary-button" disabled={offer.isPending}><Send size={16} />Предложить</button></form>{offer.isError ? <p className="form-error panel-error">{errorText(offer.error)}</p> : null}</section> : null}<section className="panel"><div className="panel-heading"><h2>Заказы логистики</h2><span>{orders.length}</span></div><div className="table-wrap"><table className="logistics-table"><thead><tr><th>Статус</th><th>Маршрут</th><th>Перевозчик</th><th>Количество</th><th>Срок</th><th>Действие</th></tr></thead><tbody>{orders.map((order) => { const action = nextAction(order.status); const own = principal.member_id === order.carrier_member_id && canLogistics; return <tr key={order.id}><td><Status value={order.status} /></td><td><strong>{order.origin_text} → {order.destination_text}</strong><small>{shortId(order.id)}</small></td><td>{members.find((item) => item.member_id === order.carrier_member_id)?.display_name ?? shortId(order.carrier_member_id)}</td><td>{order.quantity} {units.find((item) => item.id === order.unit_id)?.symbol}</td><td>{formatLocalDateTime(order.delivery_due_at)}</td><td>{own && action ? <div className="logistics-action">{action !== "accept" ? <input aria-label={`Акт ${shortId(order.id)}`} type="file" onChange={(event) => setFiles((value) => ({ ...value, [order.id]: event.target.files?.[0] ?? null }))} /> : null}<button className="compact-command" disabled={transition.isPending || (action !== "accept" && !files[order.id])} onClick={() => transition.mutate({ order, action })}>{action === "accept" ? "Принять" : action === "pickup" ? "Забрать" : "Доставить"}</button></div> : "—"}</td></tr>; })}</tbody></table></div>{transition.isError ? <p className="form-error panel-error">{errorText(transition.error)}</p> : null}</section></>;
+  return <>{canAdmin ? <section className="panel exchange-command"><div className="panel-heading"><h2>Предложить перевозку</h2><Route size={18} /></div><form onSubmit={(event) => { event.preventDefault(); offer.mutate(); }}><label className="span-two">Обязательство<select value={obligationId} onChange={(event) => setObligationId(event.target.value)} required><option value="">Выберите</option>{obligations.filter((item) => !["FULFILLED", "DISPUTED", "DEFAULTED"].includes(item.status)).map((item) => <option value={item.id} key={item.id}>{shortId(item.id)} · {item.description}</option>)}</select></label><label>Перевозчик<select value={carrier} onChange={(event) => setCarrier(event.target.value)} required><option value="">Выберите</option>{members.map((item) => <option value={item.member_id} key={item.member_id}>{item.display_name}</option>)}</select></label><label>Количество<input value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label><label>Откуда<input value={origin} onChange={(event) => setOrigin(event.target.value)} required /></label><label>Куда<input value={destination} onChange={(event) => setDestination(event.target.value)} required /></label><label>Забрать до<input type="datetime-local" value={pickup} onChange={(event) => setPickup(event.target.value)} required /></label><label>Доставить до<input type="datetime-local" value={delivery} onChange={(event) => setDelivery(event.target.value)} required /></label><button className="primary-button" disabled={offer.isPending}><Send size={16} />Предложить</button></form>{offer.isError ? <p className="form-error panel-error">{errorText(offer.error)}</p> : null}</section> : null}<section className="panel"><div className="panel-heading"><h2>Заказы логистики</h2><span>{orders.length}</span></div><div className="table-wrap"><table className="logistics-table"><thead><tr><th>{t("logistics.status")}</th><th>{t("logistics.route")}</th><th>{t("logistics.carrier")}</th><th>{t("logistics.quantity")}</th><th>{t("logistics.due")}</th><th>{t("logistics.action")}</th></tr></thead><tbody>{orders.map((order) => { const action = nextAction(order.status); const own = principal.member_id === order.carrier_member_id && canLogistics; const proofLabel = action === "pickup" ? t("logistics.uploadPickupProof") : t("logistics.uploadDeliveryProof"); return <tr key={order.id}><td data-label={t("logistics.status")}><Status value={order.status} /></td><td data-label={t("logistics.route")}><div className="logistics-route-cell"><div><span>{t("logistics.pickupPoint")}</span><strong data-i18n-ignore="true">{order.origin_text}</strong>{order.origin_contact_name || order.origin_contact_phone ? <small data-i18n-ignore="true">{[order.origin_contact_name, order.origin_contact_phone].filter(Boolean).join(" · ")}</small> : null}{order.origin_instructions ? <small data-i18n-ignore="true">{order.origin_instructions}</small> : null}</div><div><span>{t("logistics.deliveryPoint")}</span><strong data-i18n-ignore="true">{order.destination_text}</strong>{order.destination_contact_name || order.destination_contact_phone ? <small data-i18n-ignore="true">{[order.destination_contact_name, order.destination_contact_phone].filter(Boolean).join(" · ")}</small> : null}{order.destination_instructions ? <small data-i18n-ignore="true">{order.destination_instructions}</small> : null}</div><code>{shortId(order.id)}</code></div></td><td data-i18n-ignore="true" data-label={t("logistics.carrier")}>{members.find((item) => item.member_id === order.carrier_member_id)?.display_name ?? shortId(order.carrier_member_id)}</td><td data-label={t("logistics.quantity")}>{formatQuantity(order.quantity)} {units.find((item) => item.id === order.unit_id)?.symbol}</td><td data-label={t("logistics.due")}>{formatLocalDateTime(order.delivery_due_at)}</td><td data-label={t("logistics.action")}>{own && action ? <div className="logistics-action">{action !== "accept" ? <label className="logistics-proof-upload"><Upload size={15} /><span>{files[order.id]?.name ?? proofLabel}</span><input key={`${order.id}:${action}`} aria-label={proofLabel} type="file" onChange={(event) => setFiles((value) => ({ ...value, [order.id]: event.target.files?.[0] ?? null }))} /></label> : null}<button className="compact-command" disabled={transition.isPending || (action !== "accept" && !files[order.id])} onClick={() => transition.mutate({ order, action })}>{action === "accept" ? t("logistics.acceptOrder") : action === "pickup" ? t("logistics.confirmPickup") : t("logistics.reportDelivery")}</button>{action === "deliver" ? <small>{t("logistics.deliveryReportHint")}</small> : null}</div> : "—"}</td></tr>; })}</tbody></table></div>{transition.isError ? <p className="form-error panel-error">{errorText(transition.error)}</p> : null}</section></>;
 }
 
 function DisputePanel({

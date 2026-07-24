@@ -1204,7 +1204,7 @@ class ExchangeService:
         terms_payload: dict[str, object],
         actor: object,
         confirmed_event_id: UUID,
-    ) -> None:
+    ) -> tuple[Obligation, ...]:
         from cooperative_clearing.modules.journal.application.service import ActorClaim
 
         if not isinstance(actor, ActorClaim):
@@ -1212,6 +1212,7 @@ class ExchangeService:
         rows = terms_payload["obligations"]
         if not isinstance(rows, list):
             raise exchange_error("DEAL_TERMS_INVALID", 500)
+        created: list[Obligation] = []
         for raw in rows:
             if not isinstance(raw, dict):
                 raise exchange_error("DEAL_TERMS_INVALID", 500)
@@ -1232,39 +1233,40 @@ class ExchangeService:
                     **raw,
                 },
             )
-            session.add(
-                Obligation(
-                    id=obligation_id,
-                    deal_id=deal.id,
-                    cooperative_id=deal.cooperative_id,
-                    sequence_no=int(raw["sequence_no"]),
-                    terms_version=deal.terms_version,
-                    debtor_member_id=UUID(str(raw["debtor_member_id"])),
-                    creditor_member_id=UUID(str(raw["creditor_member_id"])),
-                    subject_type=str(raw["subject_type"]),
-                    subject_id=UUID(str(raw["subject_id"])) if raw["subject_id"] else None,
-                    description=str(raw["description"]),
-                    quality_criteria=str(raw["quality_criteria"]),
-                    fulfillment_place=str(raw["fulfillment_place"]),
-                    due_at=datetime.fromisoformat(str(raw["due_at"])),
-                    unit_id=UUID(str(raw["unit_id"])),
-                    quantity_total=Decimal(str(raw["quantity"])),
-                    quantity_submitted=Decimal(0),
-                    quantity_fulfilled=Decimal(0),
-                    quantity_cleared=Decimal(0),
-                    clearing_allowed=bool(raw.get("clearing_allowed", False)),
-                    partial_allowed=bool(raw["partial_allowed"]),
-                    evidence_required=bool(raw["evidence_required"]),
-                    confirmation_method=str(raw["confirmation_method"]),
-                    substitute_policy=str(raw["substitute_policy"]),
-                    valuation_source=str(raw["valuation_source"]),
-                    liquidity_class=str(raw["liquidity_class"]),
-                    status=ObligationStatus.ACTIVE.value,
-                    created_event_id=event.event_id,
-                    last_event_id=event.event_id,
-                    version=1,
-                )
+            obligation = Obligation(
+                id=obligation_id,
+                deal_id=deal.id,
+                cooperative_id=deal.cooperative_id,
+                sequence_no=int(raw["sequence_no"]),
+                terms_version=deal.terms_version,
+                debtor_member_id=UUID(str(raw["debtor_member_id"])),
+                creditor_member_id=UUID(str(raw["creditor_member_id"])),
+                subject_type=str(raw["subject_type"]),
+                subject_id=UUID(str(raw["subject_id"])) if raw["subject_id"] else None,
+                description=str(raw["description"]),
+                quality_criteria=str(raw["quality_criteria"]),
+                fulfillment_place=str(raw["fulfillment_place"]),
+                due_at=datetime.fromisoformat(str(raw["due_at"])),
+                unit_id=UUID(str(raw["unit_id"])),
+                quantity_total=Decimal(str(raw["quantity"])),
+                quantity_submitted=Decimal(0),
+                quantity_fulfilled=Decimal(0),
+                quantity_cleared=Decimal(0),
+                clearing_allowed=bool(raw.get("clearing_allowed", False)),
+                partial_allowed=bool(raw["partial_allowed"]),
+                evidence_required=bool(raw["evidence_required"]),
+                confirmation_method=str(raw["confirmation_method"]),
+                substitute_policy=str(raw["substitute_policy"]),
+                valuation_source=str(raw["valuation_source"]),
+                liquidity_class=str(raw["liquidity_class"]),
+                status=ObligationStatus.ACTIVE.value,
+                created_event_id=event.event_id,
+                last_event_id=event.event_id,
+                version=1,
             )
+            session.add(obligation)
+            created.append(obligation)
+        return tuple(created)
 
     async def _refresh_deal_status(self, session: AsyncSession, deal_id: UUID) -> None:
         deal = await session.get(Deal, deal_id, with_for_update=True)
