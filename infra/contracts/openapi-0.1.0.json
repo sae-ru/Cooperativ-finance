@@ -2605,6 +2605,48 @@
         "title": "Collection[ReviewResponse]",
         "type": "object"
       },
+      "Collection_ScanResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ScanResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Collection[ScanResponse]",
+        "type": "object"
+      },
+      "Collection_SignalResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SignalResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Collection[SignalResponse]",
+        "type": "object"
+      },
       "Collection_SolidarityContributionResponse_": {
         "properties": {
           "data": {
@@ -4984,6 +5026,47 @@
           "expected_version"
         ],
         "title": "DealReviseRequest",
+        "type": "object"
+      },
+      "DecisionRequest": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "CLEARED",
+              "CONFIRMED"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "rationale": {
+            "maxLength": 8000,
+            "minLength": 2,
+            "title": "Rationale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "rationale",
+          "evidence_ids",
+          "expected_version"
+        ],
+        "title": "DecisionRequest",
         "type": "object"
       },
       "DeliveryAttestorKind": {
@@ -10580,21 +10663,56 @@
         "title": "OverdueScanRequest",
         "type": "object"
       },
-      "OverviewEnvelope": {
+      "OverviewResponse": {
         "properties": {
-          "data": {
-            "$ref": "#/components/schemas/AdminOverviewResponse"
+          "active_hold_count": {
+            "title": "Active Hold Count",
+            "type": "integer"
           },
-          "request_id": {
-            "title": "Request Id",
-            "type": "string"
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Severity",
+            "type": "object"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Status",
+            "type": "object"
+          },
+          "cooperative_count": {
+            "title": "Cooperative Count",
+            "type": "integer"
+          },
+          "latest_scan_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Scan At"
+          },
+          "signal_count": {
+            "title": "Signal Count",
+            "type": "integer"
           }
         },
         "required": [
-          "data",
-          "request_id"
+          "cooperative_count",
+          "signal_count",
+          "active_hold_count",
+          "by_status",
+          "by_severity",
+          "latest_scan_at"
         ],
-        "title": "OverviewEnvelope",
+        "title": "OverviewResponse",
         "type": "object"
       },
       "PackageApplyRequest": {
@@ -10744,6 +10862,310 @@
           "rationale"
         ],
         "title": "PaperFormVoidRequest",
+        "type": "object"
+      },
+      "ParticipantAddressArchiveRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "ParticipantAddressArchiveRequest",
+        "type": "object"
+      },
+      "ParticipantAddressCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantAddressResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ParticipantAddressCollection",
+        "type": "object"
+      },
+      "ParticipantAddressResponse": {
+        "properties": {
+          "address_text": {
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "title": "Region Code",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone",
+          "instructions",
+          "is_default_pickup",
+          "is_default_delivery",
+          "status",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "ParticipantAddressResponse",
+        "type": "object"
+      },
+      "ParticipantAddressUpdateRequest": {
+        "properties": {
+          "address_text": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "maxLength": 80,
+            "minLength": 5,
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "default": false,
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "default": false,
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$",
+            "title": "Region Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone",
+          "expected_version"
+        ],
+        "title": "ParticipantAddressUpdateRequest",
+        "type": "object"
+      },
+      "ParticipantAddressWriteRequest": {
+        "properties": {
+          "address_text": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Address Text",
+            "type": "string"
+          },
+          "contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Contact Name",
+            "type": "string"
+          },
+          "contact_phone": {
+            "maxLength": 80,
+            "minLength": 5,
+            "title": "Contact Phone",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
+          },
+          "is_default_delivery": {
+            "default": false,
+            "title": "Is Default Delivery",
+            "type": "boolean"
+          },
+          "is_default_pickup": {
+            "default": false,
+            "title": "Is Default Pickup",
+            "type": "boolean"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Label",
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "PICKUP",
+              "DELIVERY",
+              "BOTH"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "region_code": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,62}$",
+            "title": "Region Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "label",
+          "purpose",
+          "region_code",
+          "address_text",
+          "contact_name",
+          "contact_phone"
+        ],
+        "title": "ParticipantAddressWriteRequest",
         "type": "object"
       },
       "ParticipantEnvelope": {
@@ -14247,6 +14669,20 @@
         "title": "ResponsibleRole",
         "type": "string"
       },
+      "ReviewRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "ReviewRequest",
+        "type": "object"
+      },
       "ReviewResponse": {
         "properties": {
           "created_at": {
@@ -14723,6 +15159,92 @@
         "title": "SanctionProposeRequest",
         "type": "object"
       },
+      "ScanRequest": {
+        "properties": {
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "lookback_hours": {
+            "default": 168,
+            "maximum": 2160.0,
+            "minimum": 1.0,
+            "title": "Lookback Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cooperative_id"
+        ],
+        "title": "ScanRequest",
+        "type": "object"
+      },
+      "ScanResponse": {
+        "properties": {
+          "algorithm_version": {
+            "title": "Algorithm Version",
+            "type": "string"
+          },
+          "completed_event_id": {
+            "format": "uuid",
+            "title": "Completed Event Id",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finding_count": {
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "initiated_by_member_id": {
+            "format": "uuid",
+            "title": "Initiated By Member Id",
+            "type": "string"
+          },
+          "input_cutoff": {
+            "format": "date-time",
+            "title": "Input Cutoff",
+            "type": "string"
+          },
+          "lookback_hours": {
+            "title": "Lookback Hours",
+            "type": "integer"
+          },
+          "result_summary": {
+            "additionalProperties": true,
+            "title": "Result Summary",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "algorithm_version",
+          "lookback_hours",
+          "input_cutoff",
+          "finding_count",
+          "result_summary",
+          "initiated_by_member_id",
+          "completed_event_id",
+          "created_at"
+        ],
+        "title": "ScanResponse",
+        "type": "object"
+      },
       "SearchCandidateView": {
         "properties": {
           "cost_status": {
@@ -15144,6 +15666,195 @@
         ],
         "title": "ShareContour",
         "type": "string"
+      },
+      "SignalResponse": {
+        "properties": {
+          "automation_action": {
+            "title": "Automation Action",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decision_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Event Id"
+          },
+          "decision_rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Rationale"
+          },
+          "detected_by_member_id": {
+            "format": "uuid",
+            "title": "Detected By Member Id",
+            "type": "string"
+          },
+          "detected_event_id": {
+            "format": "uuid",
+            "title": "Detected Event Id",
+            "type": "string"
+          },
+          "first_seen_at": {
+            "format": "date-time",
+            "title": "First Seen At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "observed_data": {
+            "additionalProperties": true,
+            "title": "Observed Data",
+            "type": "object"
+          },
+          "occurrence_count": {
+            "title": "Occurrence Count",
+            "type": "integer"
+          },
+          "reason_key": {
+            "title": "Reason Key",
+            "type": "string"
+          },
+          "review_started_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Started Event Id"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewer_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Member Id"
+          },
+          "rule_code": {
+            "title": "Rule Code",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "integer"
+          },
+          "scan_id": {
+            "format": "uuid",
+            "title": "Scan Id",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject_id": {
+            "format": "uuid",
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "threshold_data": {
+            "additionalProperties": true,
+            "title": "Threshold Data",
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "scan_id",
+          "rule_code",
+          "rule_version",
+          "subject_type",
+          "subject_id",
+          "severity",
+          "automation_action",
+          "status",
+          "reason_key",
+          "observed_data",
+          "threshold_data",
+          "occurrence_count",
+          "first_seen_at",
+          "last_seen_at",
+          "detected_by_member_id",
+          "detected_event_id",
+          "reviewer_member_id",
+          "review_started_event_id",
+          "decision_event_id",
+          "decision_rationale",
+          "created_at",
+          "updated_at",
+          "reviewed_at",
+          "version"
+        ],
+        "title": "SignalResponse",
+        "type": "object"
       },
       "SignedEventCollection": {
         "properties": {
@@ -17831,6 +18542,23 @@
         "title": "WorkerSummary",
         "type": "object"
       },
+      "cooperative_clearing__api__antifraud__OverviewEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OverviewResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "OverviewEnvelope",
+        "type": "object"
+      },
       "cooperative_clearing__api__clearing__Collection_DisputeResponse_": {
         "properties": {
           "data": {
@@ -19211,6 +19939,23 @@
           "request_id"
         ],
         "title": "CommandEnvelope",
+        "type": "object"
+      },
+      "cooperative_clearing__api__identity_schemas__OverviewEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AdminOverviewResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "OverviewEnvelope",
         "type": "object"
       },
       "cooperative_clearing__api__inter_node_clearing__CommandEnvelope": {
@@ -20595,7 +21340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OverviewEnvelope"
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__OverviewEnvelope"
                 }
               }
             },
@@ -21009,6 +21754,424 @@
         "summary": "Create User",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/antifraud/overview": {
+      "get": {
+        "operationId": "overview_api_v1_antifraud_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cooperative_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cooperative Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__antifraud__OverviewEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Overview",
+        "tags": [
+          "anti-fraud"
+        ]
+      }
+    },
+    "/api/v1/antifraud/scans": {
+      "get": {
+        "operationId": "list_scans_api_v1_antifraud_scans_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cooperative_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cooperative Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_ScanResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Scans",
+        "tags": [
+          "anti-fraud"
+        ]
+      },
+      "post": {
+        "operationId": "run_scan_api_v1_antifraud_scans_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Run Scan",
+        "tags": [
+          "anti-fraud"
+        ]
+      }
+    },
+    "/api/v1/antifraud/signals": {
+      "get": {
+        "operationId": "list_signals_api_v1_antifraud_signals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cooperative_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cooperative Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_SignalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Signals",
+        "tags": [
+          "anti-fraud"
+        ]
+      }
+    },
+    "/api/v1/antifraud/signals/{signal_id}/decision": {
+      "post": {
+        "operationId": "decide_signal_api_v1_antifraud_signals__signal_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Signal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Signal",
+        "tags": [
+          "anti-fraud"
+        ]
+      }
+    },
+    "/api/v1/antifraud/signals/{signal_id}/review": {
+      "post": {
+        "operationId": "begin_review_api_v1_antifraud_signals__signal_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "signal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Signal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Begin Review",
+        "tags": [
+          "anti-fraud"
         ]
       }
     },
@@ -31206,6 +32369,249 @@
         "summary": "Operational Snapshot",
         "tags": [
           "operations"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses": {
+      "get": {
+        "operationId": "list_participant_addresses_api_v1_participant_addresses_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantAddressCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Participant Addresses",
+        "tags": [
+          "participant"
+        ]
+      },
+      "post": {
+        "operationId": "create_participant_address_api_v1_participant_addresses_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Participant Address",
+        "tags": [
+          "participant"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses/{address_id}": {
+      "put": {
+        "operationId": "update_participant_address_api_v1_participant_addresses__address_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Participant Address",
+        "tags": [
+          "participant"
+        ]
+      }
+    },
+    "/api/v1/participant/addresses/{address_id}/archive": {
+      "post": {
+        "operationId": "archive_participant_address_api_v1_participant_addresses__address_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantAddressArchiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Archive Participant Address",
+        "tags": [
+          "participant"
         ]
       }
     },

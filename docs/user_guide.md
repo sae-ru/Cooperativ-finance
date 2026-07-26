@@ -105,6 +105,17 @@
 
 Подробности: [административная консоль](admin_console.md).
 
+### Проверка аномалий для риск-менеджера и аудитора
+
+1. Под ролью `RISK_ADMIN` откройте **Проверка аномалий**, выберите кооператив и период, затем нажмите **Запустить проверку**.
+2. Откройте сигнал и прочитайте отдельно **Что обнаружено** и **С каким порогом сравнили**. Сигнал не означает, что нарушение доказано.
+3. Человек, запустивший проверку, передаёт сигнал другому сотруднику с ролью `AUDITOR`.
+4. Аудитор нажимает **Взять на проверку**, проверяет первичные документы и загружает файл-доказательство.
+5. Аудитор пишет понятное обоснование и выбирает **Снять удержание** либо **Подтвердить риск**. Решение без доказательства не сохраняется.
+
+Пока сигнал `HOLD` открыт, связанная автоматическая операция недоступна. Не
+обходите удержание новым аккаунтом или другим экраном: исправьте исходные данные
+или передайте спор в установленную процедуру.
 ### Простые правила безопасности работы
 
 - не передавайте пароль другому человеку;
@@ -240,6 +251,17 @@ An account with the `SECURITY_ADMIN` role manages access under **Access**:
 
 See the [administrative console guide](admin_console.md) for details.
 
+### Anomaly review for the risk manager and auditor
+
+1. As `RISK_ADMIN`, open **Anomaly review**, select the cooperative and period, then select **Run review**.
+2. Open a signal and read **What was observed** separately from **Compared threshold**. A signal is not proof of wrongdoing.
+3. The person who ran the scan hands the signal to another person with the `AUDITOR` role.
+4. The auditor selects **Start review**, checks primary records, and uploads an evidence file.
+5. The auditor writes a clear rationale and selects **Release hold** or **Confirm risk**. A decision without evidence is rejected.
+
+While a `HOLD` signal is active, its related automatic operation remains
+unavailable. Do not bypass the hold through another account or screen; correct
+the source facts or use the established dispute procedure.
 ### Simple operating rules
 
 - never share a password;

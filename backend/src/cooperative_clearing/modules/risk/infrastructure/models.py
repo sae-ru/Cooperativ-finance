@@ -468,3 +468,161 @@ class LiabilityCase(Base):
     )
     assessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class AntifraudScan(Base):
+    __tablename__ = "antifraud_scans"
+    __table_args__ = (
+        CheckConstraint("lookback_hours BETWEEN 1 AND 2160", name="lookback_bounded"),
+        CheckConstraint("finding_count >= 0", name="finding_count_nonnegative"),
+        Index("ix_antifraud_scans_cooperative_created", "cooperative_id", "created_at"),
+        {"schema": "risk"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    algorithm_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    lookback_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    input_cutoff: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finding_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    result_summary: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    initiated_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    initiated_by_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    initiated_role_assignment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    completed_event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class AntifraudSignal(Base):
+    __tablename__ = "antifraud_signals"
+    __table_args__ = (
+        CheckConstraint("rule_version >= 1 AND version >= 1", name="versions_positive"),
+        CheckConstraint("occurrence_count >= 1", name="occurrence_count_positive"),
+        CheckConstraint(
+            "subject_type IN ('MEMBER','OFFER','LOGISTICS_QUOTE','PURCHASE_INTENT',"
+            "'SHARE_ACCOUNT','EXPOSURE_COMMITMENT')",
+            name="subject_type_allowed",
+        ),
+        CheckConstraint(
+            "severity IN ('LOW','MEDIUM','HIGH','CRITICAL')", name="severity_allowed"
+        ),
+        CheckConstraint("automation_action IN ('WARN','HOLD')", name="action_allowed"),
+        CheckConstraint(
+            "status IN ('OPEN','IN_REVIEW','CLEARED','CONFIRMED')", name="status_allowed"
+        ),
+        CheckConstraint("dedupe_key ~ '^sha256:[0-9a-f]{64}$'", name="dedupe_key_sha256"),
+        CheckConstraint("last_seen_at >= first_seen_at", name="seen_period_valid"),
+        CheckConstraint(
+            "reviewer_member_id IS NULL OR reviewer_member_id <> detected_by_member_id",
+            name="reviewer_independent",
+        ),
+        CheckConstraint(
+            "(status = 'OPEN' AND reviewer_user_id IS NULL AND reviewer_member_id IS NULL "
+            "AND reviewer_role_assignment_id IS NULL AND review_started_event_id IS NULL "
+            "AND decision_event_id IS NULL) OR "
+            "(status = 'IN_REVIEW' AND reviewer_user_id IS NOT NULL "
+            "AND reviewer_member_id IS NOT NULL AND reviewer_role_assignment_id IS NOT NULL "
+            "AND review_started_event_id IS NOT NULL AND decision_event_id IS NULL) OR "
+            "(status IN ('CLEARED','CONFIRMED') AND reviewer_user_id IS NOT NULL "
+            "AND reviewer_member_id IS NOT NULL AND reviewer_role_assignment_id IS NOT NULL "
+            "AND review_started_event_id IS NOT NULL AND decision_event_id IS NOT NULL "
+            "AND decision_rationale IS NOT NULL AND reviewed_at IS NOT NULL)",
+            name="review_lifecycle_consistent",
+        ),
+        Index(
+            "uq_antifraud_signals_active_subject",
+            "cooperative_id",
+            "rule_code",
+            "subject_type",
+            "subject_id",
+            unique=True,
+            postgresql_where=text("status IN ('OPEN','IN_REVIEW','CONFIRMED')"),
+        ),
+        Index(
+            "ix_antifraud_signals_cooperative_status",
+            "cooperative_id",
+            "status",
+            "severity",
+            "last_seen_at",
+        ),
+        Index("ix_antifraud_signals_subject", "subject_type", "subject_id"),
+        {"schema": "risk"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    scan_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("risk.antifraud_scans.id", ondelete="RESTRICT")
+    )
+    rule_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    subject_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    automation_action: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    observed_data: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    threshold_data: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(71), nullable=False)
+    occurrence_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    detected_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    detected_by_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    detected_role_assignment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    detected_event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    reviewer_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    reviewer_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    reviewer_role_assignment_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    review_started_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    decision_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    decision_rationale: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))

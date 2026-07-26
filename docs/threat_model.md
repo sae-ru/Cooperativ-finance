@@ -213,3 +213,28 @@ external signature; partial commit/cancel recovery; expiry и release exposure.
 Обязательные abuse tests: altered canonical response, чужой signer, missing или
 extra required hashes, expired prepare, changed obligation version, insufficient
 limit, duplicate apply, conflicting certificate и release после finality.
+## Дополнение Slice 19: проверка аномалий
+
+| Угроза | Реализованный контроль | Остаточный риск |
+|---|---|---|
+| алгоритм автоматически обвиняет участника | только `WARN`/`HOLD`, `automatic_decisions=0`, решение человеком с evidence | внешнее давление считать сигнал доказанной виной |
+| детектор снимает собственное удержание | разные member ids, DB CHECK, role/scope check и signed actors | скрытая связь между разными людьми |
+| оператор меняет причину после обнаружения | immutable facts/thresholds/rule/subject trigger и journal event | DB superuser и захват signing key |
+| ложное снятие удержания | только назначенный reviewer, READY evidence, rationale и optimistic version | сговор аудитора с участником |
+| обход удержания через другой endpoint | общий enforcement для offer, quote, purchase intent и share exposure | новый хозяйственный endpoint не подключил enforcement |
+| повторный запуск заваливает очередь дублями | partial unique active signal и recurrence counter | разные правила описывают один реальный эпизод |
+| ложное срабатывание медианного правила | минимум три сопоставимых записи и показ факта/порога | малый или скоординированно искажённый рынок |
+| глобальная node role создаёт запись вне cooperative scope | обязательный persisted `cooperative_id`, fail-closed выбор членства и owner-scoped checks каждого связанного объекта | ошибочное администрирование членств |
+| signal API раскрывает чужой кооператив | cooperative role scope и scoped predicates | неверно назначенная глобальная роль |
+| антифрод превращается в скрытый social score | нет агрегированного персонального балла, reputation event или автоматической санкции | ручное внесистемное ранжирование |
+
+Обязательные abuse tests: изменение immutable основания прямым SQL; детектор с
+ролью аудитора начинает собственное рассмотрение; пользователь повторяет
+заблокированную команду через соседний API; решение без READY evidence; stale
+`expected_version`; повторный scan одного active signal; роль из другого
+кооператива читает очередь.
+
+Текущая версия не выявляет все связанные аккаунты и организованный сговор.
+Расширение правил требует versioned policy, достаточного набора качественных
+данных, измерения ложных срабатываний и отдельного privacy review; добавлять
+необъяснимую итоговую «карму риска» запрещено.

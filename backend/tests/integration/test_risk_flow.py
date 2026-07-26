@@ -42,7 +42,7 @@ async def grant_role(
     people: dict[str, Principal],
     name: str,
     role: RoleCode,
-    cooperative_id: UUID,
+    cooperative_id: UUID | None,
 ) -> None:
     assignment_id = uuid4()
     async with database.session() as session:

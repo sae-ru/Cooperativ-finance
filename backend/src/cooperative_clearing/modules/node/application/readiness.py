@@ -10,7 +10,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import validate_node_signing_seed
 from cooperative_clearing.shared.infrastructure.database import Database
 
-EXPECTED_SCHEMA_REVISION = "0022_participant_addresses"
+EXPECTED_SCHEMA_REVISION = "0024_marketplace_scope"
 
 
 @dataclass(frozen=True, slots=True)

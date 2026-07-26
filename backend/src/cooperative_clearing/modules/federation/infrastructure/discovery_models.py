@@ -50,11 +50,22 @@ class FederatedOffer(Base):
         CheckConstraint("payload_hash ~ '^sha256:[0-9a-f]{64}$'", name="payload_hash_sha256"),
         UniqueConstraint("offer_id", "offer_version", name="uq_federated_offer_version"),
         Index("ix_federated_offers_product_status", "product_code", "status", "valid_until"),
+        Index(
+            "ix_federated_offers_cooperative_product_status",
+            "cooperative_id",
+            "product_code",
+            "status",
+        ),
         Index("ix_federated_offers_home_sequence", "home_node_code", "node_sequence"),
         {"schema": "federation"},
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     offer_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     offer_version: Mapped[int] = mapped_column(Integer, nullable=False)
     external_node_id: Mapped[UUID | None] = mapped_column(
@@ -169,11 +180,22 @@ class LogisticsQuote(Base):
         CheckConstraint("route_request_hash ~ '^sha256:[0-9a-f]{64}$'", name="route_hash_sha256"),
         CheckConstraint("payload_hash ~ '^sha256:[0-9a-f]{64}$'", name="payload_hash_sha256"),
         UniqueConstraint("quote_id", "quote_version", name="uq_logistics_quote_version"),
+        Index(
+            "ix_logistics_quotes_cooperative_status",
+            "cooperative_id",
+            "status",
+            "valid_until",
+        ),
         Index("ix_logistics_quotes_offer_status", "offer_record_id", "status", "valid_until"),
         {"schema": "federation"},
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     quote_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     quote_version: Mapped[int] = mapped_column(Integer, nullable=False)
     offer_record_id: Mapped[UUID] = mapped_column(
@@ -240,10 +262,21 @@ class PurchaseIntent(Base):
             name="commit_request_hash_sha256",
         ),
         Index("ix_purchase_intents_buyer_status", "buyer_member_id", "status", "created_at"),
+        Index(
+            "ix_purchase_intents_cooperative_buyer_status",
+            "cooperative_id",
+            "buyer_member_id",
+            "status",
+        ),
         {"schema": "federation"},
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     buyer_node_code: Mapped[str] = mapped_column(String(63), nullable=False)
     buyer_user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")

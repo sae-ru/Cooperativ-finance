@@ -1,0 +1,137 @@
+.antifraud-view { gap: 12px; }
+
+.antifraud-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 15px;
+  color: #584710;
+  background: #fff8df;
+  border-block: 1px solid #e6d698;
+}
+.antifraud-notice svg { flex: none; margin-top: 1px; }
+.antifraud-notice div { display: grid; gap: 3px; }
+.antifraud-notice strong { font-size: 13px; }
+.antifraud-notice span { color: #6e5b1a; font-size: 12px; line-height: 1.45; }
+
+.antifraud-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.antifraud-controls { display: grid; gap: 8px; }
+.antifraud-filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+  align-items: end;
+  gap: 9px;
+}
+.antifraud-filter-row label { display: grid; gap: 5px; min-width: 0; }
+.antifraud-filter-row .primary-button { min-height: 38px; }
+.antifraud-controls > small { color: var(--muted); }
+
+.antifraud-table td:first-child { min-width: 230px; }
+.antifraud-table td:nth-child(2) { min-width: 130px; }
+.antifraud-table td:nth-child(6) { white-space: nowrap; }
+.antifraud-table td strong,
+.antifraud-table td small { display: block; }
+.antifraud-table td small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+
+.antifraud-mobile-list { display: none; }
+.antifraud-detail-body { display: grid; gap: 15px; padding: 15px; }
+.antifraud-detail-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.antifraud-detail-summary > small {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.antifraud-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.antifraud-facts div { min-width: 0; padding: 10px 12px; background: var(--surface); }
+.antifraud-facts dt { color: var(--muted); font-size: 10px; }
+.antifraud-facts dd {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.antifraud-rationale { padding-left: 12px; border-left: 3px solid var(--muted); }
+.antifraud-rationale strong { font-size: 11px; }
+.antifraud-rationale p { margin: 5px 0 0; line-height: 1.5; }
+
+.antifraud-review-start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 13px 15px;
+  background: var(--canvas);
+  border-top: 1px solid var(--line);
+}
+.antifraud-review-start p { margin: 0; color: var(--muted); font-size: 12px; }
+.antifraud-decision-form {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) minmax(220px, 1fr);
+  gap: 12px;
+  padding: 15px;
+  border-top: 1px solid var(--line);
+}
+.antifraud-decision-form label { display: grid; align-content: start; gap: 5px; }
+.antifraud-decision-form textarea { min-height: 86px; resize: vertical; }
+.antifraud-decision-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.danger-command { background: #9d352f; border-color: #9d352f; }
+.danger-command:hover { background: #862c27; }
+
+html[data-theme="dark"] .antifraud-notice {
+  color: #f2dea0;
+  background: #302b1b;
+  border-color: #5f5431;
+}
+html[data-theme="dark"] .antifraud-notice span { color: #d4c48f; }
+
+@media (max-width: 1050px) {
+  .antifraud-filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .antifraud-filter-row .primary-button { justify-self: start; }
+  .antifraud-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .antifraud-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .antifraud-filter-row { grid-template-columns: 1fr; }
+  .antifraud-filter-row .primary-button { width: 100%; }
+  .antifraud-table-wrap { display: none; }
+  .antifraud-mobile-list { display: grid; }
+  .antifraud-mobile-list article {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .antifraud-mobile-list article > div {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 9px;
+  }
+  .antifraud-mobile-list article > span,
+  .antifraud-mobile-list article > small { color: var(--muted); }
+  .antifraud-mobile-list .compact-command { justify-self: start; }
+  .antifraud-facts { grid-template-columns: 1fr; }
+  .antifraud-detail-summary > small { width: 100%; margin-left: 0; }
+  .antifraud-review-start { align-items: stretch; flex-direction: column; }
+  .antifraud-decision-form { grid-template-columns: 1fr; }
+  .antifraud-decision-actions { display: grid; }
+}

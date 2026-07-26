@@ -135,3 +135,17 @@ acceptance criteria и tests. Если строка карты меняется,
 | Физическая передача сторонами | простые действия продавца и покупателя, quantity/condition/evidence | component tests и полный PostgreSQL flow |
 | Приватность актов | party/carrier/private-admin scope для fulfillments и acceptances | unrelated-carrier integration assertion |
 | Личная адресная книга и снимки точек | migration `0022`, owner-scoped participant API, profile/market selectors | CRUD/privacy/idempotency integration, API/component tests, desktop/mobile browser |
+## Slice 19 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Объяснимый сигнал, не обвинение | versioned rule, observed facts, thresholds, `automatic_decisions=0` | unit/integration и RU/EN component tests |
+| Аномалии предложения и логистики | median price, republication burst, route unit-cost rules | deterministic rule tests и demo milk signal |
+| Фиктивный спрос | cancelled/compensated/expired intent burst | PostgreSQL rule scan |
+| Риски поручительства и обеспечения | reciprocal guarantee и collateral concentration | domain query и enforcement integration |
+| Ограничение автоматической операции | общий fail-closed enforcement в federation/risk commands | blocked publish и release after review integration |
+| Независимая ручная проверка | `RISK_ADMIN` detector, отдельный `AUDITOR`, READY evidence | same-member rejection и evidence decision test |
+| Неизменяемость основания | revision `0023`, immutable facts/thresholds trigger, signed events | direct SQL update rejection |
+| Нет обхода через global node role | revision `0024`, обязательный cooperative owner в offer/quote/intent и fail-closed context resolution | populated migration invariants и global-role HOLD integration |
+| Операторское рабочее место | overview, filters, fact/threshold explanation, decision form | API/component/build и browser acceptance |
+| Полный перечень раздела 24.5 | шесть правил реализованы; оставшиеся классы явно учтены как gap | [границы Slice 19](implemented_slice_19.md#проверка-и-границы) |

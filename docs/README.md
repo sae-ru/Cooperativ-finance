@@ -91,6 +91,7 @@
 - [Реализованный Slice 16](implemented_slice_16.md)
 - [Реализованный Slice 17](implemented_slice_17.md)
 - [Реализованный Slice 18: кабинет пайщика и сквозной обмен](implemented_slice_18.md)
+- [Реализованный Slice 19: объяснимая проверка аномалий](implemented_slice_19.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

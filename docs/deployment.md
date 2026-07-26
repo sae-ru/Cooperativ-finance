@@ -167,21 +167,30 @@ payload, event hashes, срок действия ключей и Ed25519 signatu
 цепочки блокирует дальнейшие критические операции по runbook; автоматическое
 исправление или удаление событий запрещено.
 
-Текущая schema head: `0022_participant_addresses`. Revisions
+Текущая schema head: `0024_marketplace_scope`. Revisions
 `0015_federated_discovery`, `0016_peer_protocol`, `0017_peer_reservations`,
-`0019_exchange_participant`, `0020_purchase_deal_bridge`, `0021_logistics_contacts` и `0022_participant_addresses`
-защищают подписанные offers/indexes/quotes, peer exchanges, purchase evidence,
-home-node holds, межузловой clearing evidence и однозначную связь подтверждённой
-покупки с локальной сделкой, приватные снимки точек сделки и версионируемую личную адресную книгу участника. Downgrade непустого federation-контура запрещён. Revision
+`0018_inter_node_clearing`, `0019_exchange_participant`,
+`0020_purchase_deal_bridge`, `0021_logistics_contacts`,
+`0022_participant_addresses`, `0023_antifraud_controls` и
+`0024_marketplace_scope` защищают подписанные offers/indexes/quotes, peer
+exchanges, home-node holds, межузловой clearing, связь подтверждённого обмена с
+локальной сделкой, приватные снимки адресов и личную адресную книгу,
+неизменяемые основания проверки аномалий и явную принадлежность рыночных
+записей кооперативу.
+
+Revision `0024_marketplace_scope` backfill сначала использует организацию
+подписавшей роли, затем единственное активное членство участника и только затем
+кооператив локального node code. Остаток без однозначного владельца останавливает
+upgrade. После миграции оператор обязан проверить отсутствие `NULL` в
+`federated_offers.cooperative_id`, `logistics_quotes.cooperative_id` и
+`purchase_intents.cooperative_id`.
+
+Downgrade непустого federation или antifraud-контура запрещён. Revision
 `0013_offline_nodes` отдельно защищает node contracts, epochs, packages,
 incidents, key rotations и назначения federation-ролей; ограничения
-`0012_crisis_reserves` и предыдущих срезов сохраняются. Проверка выполняется
-внутри транзакции
-Alembic до удаления данных. Ограничения предыдущих срезов сохраняются. Перед
-обновлением и после восстановления оператор дополнительно проверяет active/due
-mandates, открытые allocations/forms, reserve snapshot age, дела, апелляции и
-неизменность signed journal.
-
+`0012_crisis_reserves` и предыдущих срезов сохраняются. Перед обновлением и
+после восстановления оператор проверяет journal, открытые antifraud holds,
+active/due mandates, allocations/forms, reserve snapshot age, дела и апелляции.
 ## Реализованные операции Slice 11
 
 Перед backup API и worker должны быть запущены. Скрипт проверяет signed journal,

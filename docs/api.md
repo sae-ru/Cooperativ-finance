@@ -297,3 +297,26 @@ POST /api/v1/participant/addresses/{address_id}/archive
 назначение, публичный код района и версия, но не точный адрес, телефон или инструкции.
 Выбор записи в интерфейсе копирует значения в предложение или заказ, поэтому дальнейшее
 изменение адресной книги не меняет уже созданную хозяйственную запись.
+## Проверка аномалий Slice 19
+
+Scoped API опубликован под `/api/v1/antifraud`:
+
+```text
+GET  /api/v1/antifraud/overview
+GET  /api/v1/antifraud/scans
+GET  /api/v1/antifraud/signals
+POST /api/v1/antifraud/scans
+POST /api/v1/antifraud/signals/{signal_id}/review
+POST /api/v1/antifraud/signals/{signal_id}/decision
+```
+
+Чтение разрешено `RISK_ADMIN`, `AUDITOR` и `SECURITY_ADMIN` в пределах их
+cooperative scope. Запуск требует `RISK_ADMIN`; рассмотрение и решение требуют
+`AUDITOR`. Все команды требуют `Idempotency-Key`, а переход сигнала также
+проверяет `expected_version`. Решение принимает только `CLEARED` или
+`CONFIRMED`, непустое обоснование и список READY evidence.
+
+Ответ не содержит обвинения или итогового social score. Он возвращает версию
+алгоритма и правила, тип и UUID объекта, тяжесть, действие, статус, число
+наблюдений, локализуемую причину, наблюдавшиеся факты и пороги. Детали и
+границы: [implemented_slice_19.md](implemented_slice_19.md).

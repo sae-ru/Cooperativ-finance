@@ -21,6 +21,9 @@ from cooperative_clearing.modules.inventory.domain.types import decimal_text
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
+from cooperative_clearing.modules.risk.application.antifraud_enforcement import (
+    require_antifraud_action_allowed,
+)
 from cooperative_clearing.modules.risk.application.common import (
     RiskCommandResult,
     begin_risk_command,
@@ -31,6 +34,7 @@ from cooperative_clearing.modules.risk.application.common import (
 from cooperative_clearing.modules.risk.domain.types import (
     AccountAmounts,
     AccountStatus,
+    AntifraudSubjectType,
     CommitmentStatus,
     CommitmentType,
     ExposurePreview,
@@ -762,6 +766,17 @@ class RiskService:
         )
         if replay is not None:
             return replay
+        antifraud_subjects = [
+            (AntifraudSubjectType.MEMBER, account.member_id),
+            (AntifraudSubjectType.SHARE_ACCOUNT, account.id),
+        ]
+        if debtor_member_id is not None:
+            antifraud_subjects.append((AntifraudSubjectType.MEMBER, debtor_member_id))
+        await require_antifraud_action_allowed(
+            session,
+            cooperative_id=account.cooperative_id,
+            subjects=antifraud_subjects,
+        )
         await self._validate_commitment_parties(
             session,
             account,
@@ -887,6 +902,20 @@ class RiskService:
         )
         if replay is not None:
             return replay
+        antifraud_subjects = [
+            (AntifraudSubjectType.MEMBER, commitment.owner_member_id),
+            (AntifraudSubjectType.SHARE_ACCOUNT, commitment.account_id),
+            (AntifraudSubjectType.EXPOSURE_COMMITMENT, commitment.id),
+        ]
+        if commitment.debtor_member_id is not None:
+            antifraud_subjects.append(
+                (AntifraudSubjectType.MEMBER, commitment.debtor_member_id)
+            )
+        await require_antifraud_action_allowed(
+            session,
+            cooperative_id=commitment.cooperative_id,
+            subjects=antifraud_subjects,
+        )
         self._version(commitment.version, expected_version)
         if commitment.status != CommitmentStatus.PROPOSED.value:
             raise risk_error("COMMITMENT_NOT_PROPOSED", 409)

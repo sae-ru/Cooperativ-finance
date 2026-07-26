@@ -213,6 +213,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/antifraud/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_antifraud_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/antifraud/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scans */
+        get: operations["list_scans_api_v1_antifraud_scans_get"];
+        put?: never;
+        /** Run Scan */
+        post: operations["run_scan_api_v1_antifraud_scans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/antifraud/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Signals */
+        get: operations["list_signals_api_v1_antifraud_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/antifraud/signals/{signal_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Signal */
+        post: operations["decide_signal_api_v1_antifraud_signals__signal_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/antifraud/signals/{signal_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Begin Review */
+        post: operations["begin_review_api_v1_antifraud_signals__signal_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/change-password": {
         parameters: {
             query?: never;
@@ -5519,6 +5605,20 @@ export interface components {
             /** Request Id */
             request_id: string;
         };
+        /** Collection[ScanResponse] */
+        Collection_ScanResponse_: {
+            /** Data */
+            data: components["schemas"]["ScanResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** Collection[SignalResponse] */
+        Collection_SignalResponse_: {
+            /** Data */
+            data: components["schemas"]["SignalResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
         /** Collection[SolidarityContributionResponse] */
         Collection_SolidarityContributionResponse_: {
             /** Data */
@@ -6471,6 +6571,20 @@ export interface components {
             obligations: components["schemas"]["ObligationDraftRequest"][];
             /** Title */
             title: string;
+        };
+        /** DecisionRequest */
+        DecisionRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "CLEARED" | "CONFIRMED";
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Expected Version */
+            expected_version: number;
+            /** Rationale */
+            rationale: string;
         };
         /**
          * DeliveryAttestorKind
@@ -8735,11 +8849,24 @@ export interface components {
              */
             cooperative_id: string;
         };
-        /** OverviewEnvelope */
-        OverviewEnvelope: {
-            data: components["schemas"]["AdminOverviewResponse"];
-            /** Request Id */
-            request_id: string;
+        /** OverviewResponse */
+        OverviewResponse: {
+            /** Active Hold Count */
+            active_hold_count: number;
+            /** By Severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            /** By Status */
+            by_status: {
+                [key: string]: number;
+            };
+            /** Cooperative Count */
+            cooperative_count: number;
+            /** Latest Scan At */
+            latest_scan_at: string | null;
+            /** Signal Count */
+            signal_count: number;
         };
         /** PackageApplyRequest */
         PackageApplyRequest: {
@@ -10442,6 +10569,11 @@ export interface components {
          * @enum {string}
          */
         ResponsibleRole: "OWNER_SIGNATORY" | "TECHNICAL_CUSTODIAN" | "SECURITY_ADMINISTRATOR" | "BUSINESS_OPERATOR" | "NODE_AUDITOR" | "SPONSOR_APPROVER";
+        /** ReviewRequest */
+        ReviewRequest: {
+            /** Expected Version */
+            expected_version: number;
+        };
         /** ReviewResponse */
         ReviewResponse: {
             /**
@@ -10619,6 +10751,62 @@ export interface components {
              */
             starts_at: string;
         };
+        /** ScanRequest */
+        ScanRequest: {
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Lookback Hours
+             * @default 168
+             */
+            lookback_hours: number;
+        };
+        /** ScanResponse */
+        ScanResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            /**
+             * Completed Event Id
+             * Format: uuid
+             */
+            completed_event_id: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finding Count */
+            finding_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Initiated By Member Id
+             * Format: uuid
+             */
+            initiated_by_member_id: string;
+            /**
+             * Input Cutoff
+             * Format: date-time
+             */
+            input_cutoff: string;
+            /** Lookback Hours */
+            lookback_hours: number;
+            /** Result Summary */
+            result_summary: {
+                [key: string]: unknown;
+            };
+        };
         /** SearchCandidateView */
         SearchCandidateView: {
             /** Cost Status */
@@ -10772,6 +10960,95 @@ export interface components {
          * @enum {string}
          */
         ShareContour: "PRIMARY" | "GUARANTEE" | "ROLE" | "INFRASTRUCTURE" | "SOLIDARITY";
+        /** SignalResponse */
+        SignalResponse: {
+            /** Automation Action */
+            automation_action: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decision Event Id */
+            decision_event_id: string | null;
+            /** Decision Rationale */
+            decision_rationale: string | null;
+            /**
+             * Detected By Member Id
+             * Format: uuid
+             */
+            detected_by_member_id: string;
+            /**
+             * Detected Event Id
+             * Format: uuid
+             */
+            detected_event_id: string;
+            /**
+             * First Seen At
+             * Format: date-time
+             */
+            first_seen_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /** Observed Data */
+            observed_data: {
+                [key: string]: unknown;
+            };
+            /** Occurrence Count */
+            occurrence_count: number;
+            /** Reason Key */
+            reason_key: string;
+            /** Review Started Event Id */
+            review_started_event_id: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewer Member Id */
+            reviewer_member_id: string | null;
+            /** Rule Code */
+            rule_code: string;
+            /** Rule Version */
+            rule_version: number;
+            /**
+             * Scan Id
+             * Format: uuid
+             */
+            scan_id: string;
+            /** Severity */
+            severity: string;
+            /** Status */
+            status: string;
+            /**
+             * Subject Id
+             * Format: uuid
+             */
+            subject_id: string;
+            /** Subject Type */
+            subject_type: string;
+            /** Threshold Data */
+            threshold_data: {
+                [key: string]: unknown;
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
         /** SignedEventCollection */
         SignedEventCollection: {
             /** Data */
@@ -11976,6 +12253,12 @@ export interface components {
              */
             status: "STARTING" | "RUNNING" | "STALE";
         };
+        /** OverviewEnvelope */
+        cooperative_clearing__api__antifraud__OverviewEnvelope: {
+            data: components["schemas"]["OverviewResponse"];
+            /** Request Id */
+            request_id: string;
+        };
         /** Collection[DisputeResponse] */
         cooperative_clearing__api__clearing__Collection_DisputeResponse_: {
             /** Data */
@@ -12542,6 +12825,12 @@ export interface components {
         /** CommandEnvelope */
         cooperative_clearing__api__identity_schemas__CommandEnvelope: {
             data: components["schemas"]["CommandResult"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** OverviewEnvelope */
+        cooperative_clearing__api__identity_schemas__OverviewEnvelope: {
+            data: components["schemas"]["AdminOverviewResponse"];
             /** Request Id */
             request_id: string;
         };
@@ -13209,7 +13498,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OverviewEnvelope"];
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__OverviewEnvelope"];
                 };
             };
         };
@@ -13432,6 +13721,212 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_v1_antifraud_overview_get: {
+        parameters: {
+            query?: {
+                cooperative_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__antifraud__OverviewEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scans_api_v1_antifraud_scans_get: {
+        parameters: {
+            query?: {
+                cooperative_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_ScanResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_scan_api_v1_antifraud_scans_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_signals_api_v1_antifraud_signals_get: {
+        parameters: {
+            query?: {
+                cooperative_id?: string | null;
+                status?: string | null;
+                severity?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_SignalResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_signal_api_v1_antifraud_signals__signal_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                signal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    begin_review_api_v1_antifraud_signals__signal_id__review_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                signal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewRequest"];
             };
         };
         responses: {

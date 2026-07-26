@@ -47,7 +47,9 @@ from cooperative_clearing.modules.federation.infrastructure.reservation_models i
 )
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.modules.identity.infrastructure.models import (
+    Cooperative,
     Member,
+    Membership,
     RoleAssignment,
     UserAccount,
 )
@@ -62,11 +64,16 @@ from cooperative_clearing.modules.journal.domain.crypto import (
     utc_timestamp,
     verify_signature,
 )
+from cooperative_clearing.modules.risk.application.antifraud_enforcement import (
+    require_antifraud_action_allowed,
+)
+from cooperative_clearing.modules.risk.domain.types import AntifraudSubjectType
 from cooperative_clearing.shared.core.config import Environment, Settings
 from cooperative_clearing.shared.domain.errors import DomainError
 
 OFFER_PUBLISH_ROLES = {RoleCode.EXCHANGE_PARTICIPANT, RoleCode.NODE_BUSINESS_OPERATOR}
 QUOTE_PUBLISH_ROLES = {RoleCode.LOGISTICS_OPERATOR, RoleCode.NODE_BUSINESS_OPERATOR}
+PURCHASE_CREATE_ROLES = {RoleCode.EXCHANGE_PARTICIPANT, RoleCode.NODE_BUSINESS_OPERATOR}
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +170,7 @@ class DiscoveryService:
             if trusted_import
             else await federation_actor(session, principal, OFFER_PUBLISH_ROLES)
         )
+        cooperative_id = await self._cooperative_id_for_actor(session, actor)
         quantity = exact_discovery_amount(quantity_available)
         minimum = exact_discovery_amount(minimum_batch)
         price = exact_discovery_amount(unit_price, allow_zero=True)
@@ -254,12 +262,25 @@ class DiscoveryService:
             signed_at=signed_at,
             valid_until=valid_until,
         )
-        command_payload = {**payload, "payload_hash": payload_hash(payload)}
+        command_payload = {
+            **payload,
+            "cooperative_id": str(cooperative_id),
+            "payload_hash": payload_hash(payload),
+        }
         record, replay = await begin_federation_command(
             session, principal, "FEDERATION_PUBLISH_OFFER", idempotency_key, command_payload
         )
         if replay is not None:
             return replay
+        if not trusted_import:
+            await require_antifraud_action_allowed(
+                session,
+                cooperative_id=cooperative_id,
+                subjects=(
+                    (AntifraudSubjectType.MEMBER, actor.person_id),
+                    (AntifraudSubjectType.OFFER, offer_id),
+                ),
+            )
         previous = (
             await session.execute(
                 select(FederatedOffer)
@@ -269,7 +290,8 @@ class DiscoveryService:
             )
         ).scalar_one_or_none()
         if previous is not None and (
-            previous.home_node_code != home_node_code
+            previous.cooperative_id != cooperative_id
+            or previous.home_node_code != home_node_code
             or offer_version != previous.offer_version + 1
             or node_sequence <= previous.node_sequence
         ):
@@ -288,6 +310,7 @@ class DiscoveryService:
         )
         offer_row = FederatedOffer(
             id=row_id,
+            cooperative_id=cooperative_id,
             offer_id=offer_id,
             offer_version=offer_version,
             external_node_id=external_node_id,
@@ -442,6 +465,7 @@ class DiscoveryService:
         session.add(
             LogisticsQuote(
                 id=row_id,
+                cooperative_id=offer.cooperative_id,
                 quote_id=quote_id,
                 quote_version=1,
                 offer_record_id=offer.id,
@@ -738,6 +762,7 @@ class DiscoveryService:
             if trusted_import
             else await federation_actor(session, principal, QUOTE_PUBLISH_ROLES)
         )
+        cooperative_id = await self._cooperative_id_for_actor(session, actor)
         offer = await session.get(FederatedOffer, offer_record_id)
         if offer is None:
             raise federation_error("OFFER_NOT_FOUND", 404)
@@ -802,7 +827,11 @@ class DiscoveryService:
             external_signature=external_signature,
         )
         payload = build(home_node_code)
-        command_payload = {**payload, "payload_hash": payload_hash(payload)}
+        command_payload = {
+            **payload,
+            "cooperative_id": str(cooperative_id),
+            "payload_hash": payload_hash(payload),
+        }
         record, replay = await begin_federation_command(
             session,
             principal,
@@ -812,6 +841,20 @@ class DiscoveryService:
         )
         if replay is not None:
             return replay
+        if not trusted_import:
+            await require_antifraud_action_allowed(
+                session,
+                cooperative_id=cooperative_id,
+                subjects=(
+                    (AntifraudSubjectType.MEMBER, actor.person_id),
+                    (AntifraudSubjectType.LOGISTICS_QUOTE, quote_id),
+                ),
+            )
+            await require_antifraud_action_allowed(
+                session,
+                cooperative_id=offer.cooperative_id,
+                subjects=((AntifraudSubjectType.OFFER, offer.offer_id),),
+            )
         previous = (
             await session.execute(
                 select(LogisticsQuote)
@@ -821,7 +864,11 @@ class DiscoveryService:
             )
         ).scalar_one_or_none()
         if (previous is None and quote_version != 1) or (
-            previous is not None and quote_version != previous.quote_version + 1
+            previous is not None
+            and (
+                previous.cooperative_id != cooperative_id
+                or quote_version != previous.quote_version + 1
+            )
         ):
             raise federation_error("LOGISTICS_QUOTE_VERSION_CONFLICT")
         row_id = uuid4()
@@ -837,6 +884,7 @@ class DiscoveryService:
         session.add(
             LogisticsQuote(
                 id=row_id,
+                cooperative_id=cooperative_id,
                 quote_id=quote_id,
                 quote_version=quote_version,
                 offer_record_id=offer.id,
@@ -1149,11 +1197,13 @@ class DiscoveryService:
         idempotency_key: str,
         request_id: UUID | None,
     ) -> FederationCommandResult:
-        actor = await self._member_actor(session, principal)
+        actor = await federation_actor(session, principal, PURCHASE_CREATE_ROLES)
+        cooperative_id = await self._cooperative_id_for_actor(session, actor)
         offer = await session.get(FederatedOffer, offer_record_id)
         quote = await session.get(LogisticsQuote, quote_record_id)
         if offer is None or quote is None or quote.offer_record_id != offer.id:
             raise federation_error("PURCHASE_SELECTION_INVALID", 404)
+
         offer_maximum_age_seconds = min(
             604_800,
             max(1, int((offer.valid_until - offer.signed_at).total_seconds())),
@@ -1197,6 +1247,7 @@ class DiscoveryService:
             "components": {key: self._decimal(value) for key, value in cost.components.items()},
         }
         summary = {
+            "cooperative_id": str(cooperative_id),
             "offer_id": str(offer.offer_id),
             "offer_version": offer.offer_version,
             "quote_id": str(quote.quote_id),
@@ -1239,6 +1290,21 @@ class DiscoveryService:
         )
         if replay is not None:
             return replay
+        await require_antifraud_action_allowed(
+            session,
+            cooperative_id=cooperative_id,
+            subjects=((AntifraudSubjectType.MEMBER, actor.person_id),),
+        )
+        await require_antifraud_action_allowed(
+            session,
+            cooperative_id=offer.cooperative_id,
+            subjects=((AntifraudSubjectType.OFFER, offer.offer_id),),
+        )
+        await require_antifraud_action_allowed(
+            session,
+            cooperative_id=quote.cooperative_id,
+            subjects=((AntifraudSubjectType.LOGISTICS_QUOTE, quote.quote_id),),
+        )
         intent_id = uuid4()
         event = await self.journal.append(
             session,
@@ -1252,6 +1318,7 @@ class DiscoveryService:
         session.add(
             PurchaseIntent(
                 id=intent_id,
+                cooperative_id=cooperative_id,
                 buyer_node_code=self.settings.node_code,
                 buyer_user_id=principal.user_id,
                 buyer_member_id=actor.person_id,
@@ -2237,6 +2304,47 @@ class DiscoveryService:
         except DomainError:
             return False, None
         return certificate.fingerprint == fingerprint, certificate.public_key
+
+    async def _cooperative_id_for_actor(
+        self,
+        session: AsyncSession,
+        actor: ActorClaim,
+    ) -> UUID:
+        if actor.organization_id is not None:
+            cooperative_id = await session.scalar(
+                select(Cooperative.id).where(
+                    Cooperative.id == actor.organization_id,
+                    Cooperative.status == "ACTIVE",
+                )
+            )
+            if cooperative_id is None:
+                raise federation_error("COOPERATIVE_CONTEXT_REQUIRED", 403)
+            return cooperative_id
+
+        memberships: list[tuple[UUID, str]] = list(
+            (
+                await session.execute(
+                    select(Cooperative.id, Cooperative.code)
+                    .join(Membership, Membership.cooperative_id == Cooperative.id)
+                    .where(
+                        Membership.member_id == actor.person_id,
+                        Membership.status == "ACTIVE",
+                        Cooperative.status == "ACTIVE",
+                    )
+                    .order_by(Cooperative.id)
+                )
+            ).tuples()
+        )
+        if len(memberships) == 1:
+            return memberships[0][0]
+        local_matches = [
+            cooperative_id
+            for cooperative_id, code in memberships
+            if code == self.settings.node_code
+        ]
+        if len(local_matches) == 1:
+            return local_matches[0]
+        raise federation_error("COOPERATIVE_CONTEXT_REQUIRED", 403)
 
     async def _member_actor(self, session: AsyncSession, principal: Principal) -> ActorClaim:
         if principal.member_id is None:

@@ -8,6 +8,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from cooperative_clearing import __version__
 from cooperative_clearing.api.admin import router as admin_router
+from cooperative_clearing.api.antifraud import router as antifraud_router
 from cooperative_clearing.api.auth import router as auth_router
 from cooperative_clearing.api.clearing import router as clearing_router
 from cooperative_clearing.api.crisis import router as crisis_router
@@ -75,6 +76,7 @@ def create_app(settings: Settings | None = None, *, manage_runtime: bool = True)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(antifraud_router)
     app.include_router(clearing_router)
     app.include_router(crisis_router)
     app.include_router(discovery_router)

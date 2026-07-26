@@ -100,6 +100,11 @@
 | `shares.exposure_released` | commitment, reason, evidence |
 | `liability.case_opened` | case, incident, facts, causal graph, evidence |
 | `liability.assessment_recorded` | case, fault class, loss, coverage, appeal, evidence |
+| `risk.antifraud_signal_detected` | scan, rule/version, subject, severity, action, observed facts, thresholds |
+| `risk.antifraud_signal_reobserved` | signal, scan, subject, occurrence count, observed time |
+| `risk.antifraud_scan_completed` | cooperative, algorithm, cutoff/lookback, counts, automatic decisions |
+| `risk.antifraud_review_started` | signal, reviewer role, exact version, subject |
+| `risk.antifraud_signal_decided` | signal, CLEARED/CONFIRMED, rationale, evidence, automation release |
 | `responsibility.assignment_started` | person, role, subject, scope, exposure |
 | `responsibility.custody_offered` | subject, from, to |
 | `responsibility.custody_accepted` | subject, from, to, evidence |

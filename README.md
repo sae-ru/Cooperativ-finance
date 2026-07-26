@@ -21,6 +21,7 @@
 - ограниченную ответственность паями только по заранее принятому риску;
 - отдельный контур добровольной помощи без долга и покупки репутации;
 - роли, права, независимые проверки, споры и апелляции;
+- объяснимые сигналы аномалий с временным удержанием и независимым решением;
 - подписанные события, доказательства и восстановление после разрыва связи;
 - русский и английский интерфейс, светлую и темную темы;
 - Docker-развертывание на Linux и лицензию MIT.
@@ -78,6 +79,7 @@ A person sees a simple marketplace: choose milk, nails, cabbage, or another prod
 - share-backed liability limited to risks accepted in advance;
 - a separate voluntary aid circuit that creates neither debt nor reputation;
 - roles, permissions, independent checks, disputes, and appeals;
+- explainable anomaly signals with temporary holds and independent decisions;
 - signed events, evidence, and recovery after connectivity loss;
 - Russian and English UI with light and dark themes;
 - Linux Docker deployment under the MIT license.

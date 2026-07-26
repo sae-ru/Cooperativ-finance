@@ -24,6 +24,10 @@
 - [x] Crisis mandate имеет dual control, mandatory review, expiry, maximum end и safe state ([evidence](implemented_slice_10.md)).
 - [x] Rationing сохраняет protected minimum, exact stock bound и не создаёт debt/reputation ([evidence](implemented_slice_10.md)).
 - [x] Paper forms имеют unique serial/checksum/expiry, independent record и reconciliation ([evidence](implemented_slice_10.md)).
+- [x] Anti-fraud signal сохраняет объяснимые факты/пороги, не принимает автоматическое обвинение и требует независимый evidence-backed review ([evidence](implemented_slice_19.md)).
+- [x] Active anti-fraud HOLD исполняется в offer/quote/purchase/share-exposure командах и снимается только после `CLEARED` ([evidence](implemented_slice_19.md)).
+- [x] Marketplace offer/quote/purchase имеют явного cooperative owner, включая команды global node roles ([evidence](implemented_slice_19.md)).
+- [ ] Все классы злоупотреблений раздела 24.5 имеют versioned rule, dataset и проверенную частоту ложных срабатываний.
 - [ ] Admin console разделяет User, Member, Membership, Organization и Node.
 - [ ] Клиринговый cycle проходит freeze/preview/dispute/finalize/reconcile.
 - [ ] Clearing proof и participant statements воспроизводимы.
@@ -164,3 +168,17 @@ identity state. После исправления найденной завис�
 фактический previous production release, длительная flaky history, target host,
 manual accessibility и внешние security/legal/pilot evidence остаются
 открытыми.
+## Текущее доказательство Slice 19
+
+Объяснимые anomaly signals, независимый evidence-backed review и active HOLD
+проверены на PostgreSQL. Marketplace records имеют явного cooperative owner;
+межкооперативная offer/quote/intent цепочка допустима, но каждый объект
+проверяется в собственном scope. Populated migration cycle завершён без `NULL`
+и orphan references. Ruff, strict mypy, 174 backend tests, отдельный
+трёхузловой acceptance, 144 frontend tests, production build, OpenAPI
+compatibility и живой RU/EN desktop/mobile light/dark browser smoke зелёные.
+Подробности: [implemented_slice_19.md](implemented_slice_19.md).
+
+Это закрывает только реализованные инженерные контроли. Полный набор правил
+раздела 24.5, policy calibration на реальных данных, privacy/security/legal
+review, manual accessibility matrix и пилотные решения остаются открытыми.

@@ -55,6 +55,7 @@ from cooperative_clearing.modules.responsibility.application.demo import (
     seed_demo_responsibility,
 )
 from cooperative_clearing.modules.rights.application.demo import seed_demo_rights
+from cooperative_clearing.modules.risk.application.antifraud_demo import seed_demo_antifraud
 from cooperative_clearing.modules.risk.application.demo import seed_demo_risk
 from cooperative_clearing.modules.solidarity.application.demo import seed_demo_solidarity
 from cooperative_clearing.modules.trust.application.demo import seed_demo_trust
@@ -130,6 +131,7 @@ async def seed_demo(settings: Settings) -> None:
             await seed_demo_federation(session, settings)
             await seed_demo_inter_node_clearing(session, settings)
             await seed_demo_discovery(session, settings)
+            await seed_demo_antifraud(session, settings)
             await session.commit()
     finally:
         await database.dispose()

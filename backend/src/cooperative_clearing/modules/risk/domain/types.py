@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
+from uuid import UUID
 
 from cooperative_clearing.shared.domain.errors import DomainError
 
@@ -67,6 +68,54 @@ class FaultClass(StrEnum):
     INTENT = "INTENT"
     COLLUSION = "COLLUSION"
 
+
+class AntifraudSubjectType(StrEnum):
+    MEMBER = "MEMBER"
+    OFFER = "OFFER"
+    LOGISTICS_QUOTE = "LOGISTICS_QUOTE"
+    PURCHASE_INTENT = "PURCHASE_INTENT"
+    SHARE_ACCOUNT = "SHARE_ACCOUNT"
+    EXPOSURE_COMMITMENT = "EXPOSURE_COMMITMENT"
+
+
+class AntifraudSeverity(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class AntifraudAction(StrEnum):
+    WARN = "WARN"
+    HOLD = "HOLD"
+
+
+class AntifraudSignalStatus(StrEnum):
+    OPEN = "OPEN"
+    IN_REVIEW = "IN_REVIEW"
+    CLEARED = "CLEARED"
+    CONFIRMED = "CONFIRMED"
+
+
+class AntifraudRuleCode(StrEnum):
+    OFFER_PRICE_OUTLIER = "OFFER_PRICE_OUTLIER"
+    OFFER_REPUBLICATION_BURST = "OFFER_REPUBLICATION_BURST"
+    LOGISTICS_PRICE_OUTLIER = "LOGISTICS_PRICE_OUTLIER"
+    PURCHASE_CANCELLATION_BURST = "PURCHASE_CANCELLATION_BURST"
+    CIRCULAR_GUARANTEE = "CIRCULAR_GUARANTEE"
+    COLLATERAL_CONCENTRATION = "COLLATERAL_CONCENTRATION"
+
+
+@dataclass(frozen=True, slots=True)
+class AntifraudFinding:
+    rule_code: AntifraudRuleCode
+    subject_type: AntifraudSubjectType
+    subject_id: UUID
+    severity: AntifraudSeverity
+    automation_action: AntifraudAction
+    reason_key: str
+    observed_data: dict[str, object]
+    threshold_data: dict[str, object]
 
 EXPOSED_CONTOURS: dict[CommitmentType, frozenset[ShareContour]] = {
     CommitmentType.DIRECT_OBLIGATION: frozenset({ShareContour.GUARANTEE}),

@@ -129,7 +129,20 @@ DEMO_OFFERS = (
         node_sequence=4,
         transport_cost=Decimal("10.00"),
     ),
-)
+    DemoOffer(
+        key="milk-price-review",
+        product_code="MILK.UHT.3_2",
+        description="Milk listing intentionally awaiting an independent demo price review",
+        seller_ref="LOCAL-DAIRY-REVIEW",
+        quantity=Decimal("80.000"),
+        minimum_batch=Decimal("4.000"),
+        unit_code="L",
+        unit_scale=3,
+        unit_price=Decimal("9.50"),
+        external=False,
+        node_sequence=5,
+        transport_cost=Decimal("11.00"),
+    ),)
 
 
 async def seed_demo_discovery(session: AsyncSession, settings: Settings) -> None:

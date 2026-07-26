@@ -295,7 +295,7 @@ async def test_responsibility_command_is_signed_chained_and_dispatched() -> None
             await session.commit()
             assert first_dispatch.published >= 3
         async with database.session() as session:
-            second_dispatch = await dispatch_outbox_batch(
+            await dispatch_outbox_batch(
                 session,
                 instance_id=uuid4(),
                 batch_size=500,
@@ -315,7 +315,19 @@ async def test_responsibility_command_is_signed_chained_and_dispatched() -> None
                     )
                 ).scalar_one()
             )
-            assert second_dispatch.claimed == 0
+            target_statuses = list(
+                (
+                    await session.execute(
+                        select(OutboxMessage.status).where(
+                            OutboxMessage.event_id.in_(
+                                [proposed.event_id, approved.event_id, accepted.event_id]
+                            )
+                        )
+                    )
+                ).scalars()
+            )
+            assert len(target_statuses) == 3
+            assert set(target_statuses) == {"PUBLISHED"}
             assert receipts == 3
 
         async with database.session() as session:
