@@ -458,3 +458,23 @@ html[data-theme="dark"] .receipt-act {
   .access-heading h2 { flex-basis: 100%; }
   .access-heading label { grid-template-columns: minmax(0, 1fr); width: 100%; }
 }
+/* Separate administrative registries keep identity objects and lifecycles explicit. */
+.admin-directory .view-header { align-items: flex-start; }
+.registry-command form { grid-template-columns: repeat(3, minmax(150px, 1fr)) auto; }
+.registry-progress { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; color: var(--forest); font-size: 11px; font-weight: 700; background: #e9f3ee; border: 1px solid #bdd5c8; }
+.admin-directory td small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.admin-directory .panel-heading .compact-command { margin-left: auto; }
+
+@media (max-width: 1100px) {
+  .registry-command form { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .admin-directory .view-header { gap: 10px; }
+  .admin-directory .section-tabs { width: 100%; overflow-x: auto; }
+  .admin-directory .section-tabs button { width: 40px; flex: 0 0 40px; }
+  .registry-command form { grid-template-columns: 1fr; }
+  .registry-command .primary-button { width: 100%; }
+}
+
+html[data-theme="dark"] .registry-progress { color: #b9ebd0; background: #17382c; border-color: #356b55; }

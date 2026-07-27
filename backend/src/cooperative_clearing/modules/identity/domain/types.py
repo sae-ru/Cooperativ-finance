@@ -107,6 +107,29 @@ MEMBER_TRANSITIONS: dict[MemberStatus, frozenset[MemberStatus]] = {
     MemberStatus.EXITED: frozenset(),
 }
 
+COOPERATIVE_TRANSITIONS: dict[CooperativeStatus, frozenset[CooperativeStatus]] = {
+    CooperativeStatus.ACTIVE: frozenset({CooperativeStatus.SUSPENDED}),
+    CooperativeStatus.SUSPENDED: frozenset({CooperativeStatus.ACTIVE}),
+}
+
+MEMBERSHIP_TRANSITIONS: dict[MembershipStatus, frozenset[MembershipStatus]] = {
+    MembershipStatus.PENDING: frozenset(
+        {MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.ENDED}
+    ),
+    MembershipStatus.ACTIVE: frozenset(
+        {MembershipStatus.SUSPENDED, MembershipStatus.ENDED}
+    ),
+    MembershipStatus.SUSPENDED: frozenset(
+        {MembershipStatus.ACTIVE, MembershipStatus.ENDED}
+    ),
+    MembershipStatus.ENDED: frozenset(),
+}
+
+USER_TRANSITIONS: dict[UserStatus, frozenset[UserStatus]] = {
+    UserStatus.ACTIVE: frozenset({UserStatus.DISABLED}),
+    UserStatus.DISABLED: frozenset({UserStatus.ACTIVE}),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class RoleGrant:
@@ -208,6 +231,40 @@ def ensure_member_transition(current: MemberStatus, target: MemberStatus) -> Non
         raise DomainError(
             code="MEMBER_STATUS_TRANSITION_INVALID",
             message_key="errors.identity.member_status_transition_invalid",
+            parameters={"current": current.value, "target": target.value},
+            status_code=409,
+        )
+
+
+def ensure_cooperative_transition(
+    current: CooperativeStatus, target: CooperativeStatus
+) -> None:
+    if target not in COOPERATIVE_TRANSITIONS[current]:
+        raise DomainError(
+            code="COOPERATIVE_STATUS_TRANSITION_INVALID",
+            message_key="errors.identity.cooperative_status_transition_invalid",
+            parameters={"current": current.value, "target": target.value},
+            status_code=409,
+        )
+
+
+def ensure_membership_transition(
+    current: MembershipStatus, target: MembershipStatus
+) -> None:
+    if target not in MEMBERSHIP_TRANSITIONS[current]:
+        raise DomainError(
+            code="MEMBERSHIP_STATUS_TRANSITION_INVALID",
+            message_key="errors.identity.membership_status_transition_invalid",
+            parameters={"current": current.value, "target": target.value},
+            status_code=409,
+        )
+
+
+def ensure_user_transition(current: UserStatus, target: UserStatus) -> None:
+    if target not in USER_TRANSITIONS[current]:
+        raise DomainError(
+            code="USER_STATUS_TRANSITION_INVALID",
+            message_key="errors.identity.user_status_transition_invalid",
             parameters={"current": current.value, "target": target.value},
             status_code=409,
         )

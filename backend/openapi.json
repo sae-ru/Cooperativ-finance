@@ -4662,6 +4662,11 @@
           "status": {
             "$ref": "#/components/schemas/CooperativeStatus"
           },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -4673,6 +4678,7 @@
           "name",
           "status",
           "created_at",
+          "updated_at",
           "version"
         ],
         "title": "CooperativeResponse",
@@ -4685,6 +4691,31 @@
         ],
         "title": "CooperativeStatus",
         "type": "string"
+      },
+      "CooperativeTransitionRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "target_status": {
+            "$ref": "#/components/schemas/CooperativeStatus"
+          }
+        },
+        "required": [
+          "target_status",
+          "reason_code",
+          "expected_version"
+        ],
+        "title": "CooperativeTransitionRequest",
+        "type": "object"
       },
       "CostStatus": {
         "enum": [
@@ -9044,6 +9075,18 @@
       },
       "MemberCreateRequest": {
         "properties": {
+          "cooperative_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooperative Id"
+          },
           "display_name": {
             "maxLength": 200,
             "minLength": 2,
@@ -9098,6 +9141,18 @@
             "title": "Id",
             "type": "string"
           },
+          "registered_by_cooperative_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered By Cooperative Id"
+          },
           "status": {
             "$ref": "#/components/schemas/MemberStatus"
           },
@@ -9114,6 +9169,7 @@
         "required": [
           "id",
           "display_name",
+          "registered_by_cooperative_id",
           "status",
           "created_at",
           "updated_at",
@@ -9215,6 +9271,23 @@
             "title": "Cooperative Id",
             "type": "string"
           },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -9244,6 +9317,11 @@
           "status": {
             "$ref": "#/components/schemas/MembershipStatus"
           },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -9256,6 +9334,9 @@
           "member_number",
           "status",
           "joined_at",
+          "ended_at",
+          "created_at",
+          "updated_at",
           "version"
         ],
         "title": "MembershipResponse",
@@ -9270,6 +9351,31 @@
         ],
         "title": "MembershipStatus",
         "type": "string"
+      },
+      "MembershipTransitionRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "target_status": {
+            "$ref": "#/components/schemas/MembershipStatus"
+          }
+        },
+        "required": [
+          "target_status",
+          "reason_code",
+          "expected_version"
+        ],
+        "title": "MembershipTransitionRequest",
+        "type": "object"
       },
       "NeedCategory": {
         "enum": [
@@ -19075,6 +19181,31 @@
         "title": "UserStatus",
         "type": "string"
       },
+      "UserTransitionRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "target_status": {
+            "$ref": "#/components/schemas/UserStatus"
+          }
+        },
+        "required": [
+          "target_status",
+          "reason_code",
+          "expected_version"
+        ],
+        "title": "UserTransitionRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -22226,6 +22357,75 @@
         ]
       }
     },
+    "/api/v1/admin/cooperatives/{cooperative_id}/transitions": {
+      "post": {
+        "operationId": "transition_cooperative_api_v1_admin_cooperatives__cooperative_id__transitions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cooperative_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cooperative Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CooperativeTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Transition Cooperative",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
     "/api/v1/admin/members": {
       "get": {
         "operationId": "list_members_api_v1_admin_members_get",
@@ -22497,6 +22697,75 @@
           }
         ],
         "summary": "Create Membership",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/memberships/{membership_id}/transitions": {
+      "post": {
+        "operationId": "transition_membership_api_v1_admin_memberships__membership_id__transitions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MembershipTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Transition Membership",
         "tags": [
           "administration"
         ]
@@ -22922,6 +23191,75 @@
           }
         ],
         "summary": "Create User",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/transitions": {
+      "post": {
+        "operationId": "transition_user_api_v1_admin_users__user_id__transitions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Transition User",
         "tags": [
           "administration"
         ]

@@ -126,6 +126,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/cooperatives/{cooperative_id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition Cooperative */
+        post: operations["transition_cooperative_api_v1_admin_cooperatives__cooperative_id__transitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/members": {
         parameters: {
             query?: never;
@@ -173,6 +190,23 @@ export interface paths {
         put?: never;
         /** Create Membership */
         post: operations["create_membership_api_v1_admin_memberships_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/memberships/{membership_id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition Membership */
+        post: operations["transition_membership_api_v1_admin_memberships__membership_id__transitions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -294,6 +328,23 @@ export interface paths {
         put?: never;
         /** Create User */
         post: operations["create_user_api_v1_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transition User */
+        post: operations["transition_user_api_v1_admin_users__user_id__transitions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6577,6 +6628,11 @@ export interface components {
             /** Name */
             name: string;
             status: components["schemas"]["CooperativeStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
             /** Version */
             version: number;
         };
@@ -6585,6 +6641,14 @@ export interface components {
          * @enum {string}
          */
         CooperativeStatus: "ACTIVE" | "SUSPENDED";
+        /** CooperativeTransitionRequest */
+        CooperativeTransitionRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+            target_status: components["schemas"]["CooperativeStatus"];
+        };
         /**
          * CostStatus
          * @enum {string}
@@ -8385,6 +8449,8 @@ export interface components {
         };
         /** MemberCreateRequest */
         MemberCreateRequest: {
+            /** Cooperative Id */
+            cooperative_id?: string | null;
             /** Display Name */
             display_name: string;
             /** Identifier Type */
@@ -8406,6 +8472,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Registered By Cooperative Id */
+            registered_by_cooperative_id: string | null;
             status: components["schemas"]["MemberStatus"];
             /**
              * Updated At
@@ -8458,6 +8526,13 @@ export interface components {
              */
             cooperative_id: string;
             /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /**
              * Id
              * Format: uuid
              */
@@ -8472,6 +8547,11 @@ export interface components {
             /** Member Number */
             member_number: string;
             status: components["schemas"]["MembershipStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
             /** Version */
             version: number;
         };
@@ -8480,6 +8560,14 @@ export interface components {
          * @enum {string}
          */
         MembershipStatus: "PENDING" | "ACTIVE" | "SUSPENDED" | "ENDED";
+        /** MembershipTransitionRequest */
+        MembershipTransitionRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+            target_status: components["schemas"]["MembershipStatus"];
+        };
         /**
          * NeedCategory
          * @enum {string}
@@ -12633,6 +12721,14 @@ export interface components {
          * @enum {string}
          */
         UserStatus: "ACTIVE" | "DISABLED";
+        /** UserTransitionRequest */
+        UserTransitionRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+            target_status: components["schemas"]["UserStatus"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -14039,6 +14135,43 @@ export interface operations {
             };
         };
     };
+    transition_cooperative_api_v1_admin_cooperatives__cooperative_id__transitions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                cooperative_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CooperativeTransitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_members_api_v1_admin_members_get: {
         parameters: {
             query?: {
@@ -14175,6 +14308,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MembershipCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_membership_api_v1_admin_memberships__membership_id__transitions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                membership_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipTransitionRequest"];
             };
         };
         responses: {
@@ -14436,6 +14606,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transition_user_api_v1_admin_users__user_id__transitions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTransitionRequest"];
             };
         };
         responses: {

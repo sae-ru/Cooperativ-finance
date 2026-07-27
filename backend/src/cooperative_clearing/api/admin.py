@@ -5,8 +5,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import false, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.sql.elements import ColumnElement
 
 from cooperative_clearing.api.auth import _request_uuid
 from cooperative_clearing.api.dependencies import (
@@ -24,10 +25,12 @@ from cooperative_clearing.api.identity_schemas import (
     CommandEnvelope,
     CooperativeCreateRequest,
     CooperativeResponse,
+    CooperativeTransitionRequest,
     MemberCreateRequest,
     MemberResponse,
     MembershipCreateRequest,
     MembershipResponse,
+    MembershipTransitionRequest,
     MemberTransitionRequest,
     OverviewEnvelope,
     RoleApprovalRequest,
@@ -37,6 +40,7 @@ from cooperative_clearing.api.identity_schemas import (
     SessionAdminResponse,
     UserCreateRequest,
     UserResponse,
+    UserTransitionRequest,
 )
 from cooperative_clearing.api.identity_schemas import (
     CommandResult as ApiCommandResult,
@@ -55,6 +59,7 @@ from cooperative_clearing.modules.identity.application.security import (
     require_step_up,
 )
 from cooperative_clearing.modules.identity.domain.types import (
+    Principal,
     RoleCode,
     RoleGrantSource,
     require_permanent_role,
@@ -86,6 +91,69 @@ ADMIN_READ_ROLES = {
     RoleCode.RIGHTS_OPERATOR,
     RoleCode.AUDITOR,
 }
+
+
+def _cooperative_read_scope(principal: Principal) -> set[UUID] | None:
+    grants = [grant for grant in principal.roles if grant.role in ADMIN_READ_ROLES]
+    if any(grant.cooperative_id is None for grant in grants):
+        return None
+    return {grant.cooperative_id for grant in grants if grant.cooperative_id is not None}
+
+
+def _member_scope_condition(cooperative_ids: set[UUID]) -> ColumnElement[bool]:
+    if not cooperative_ids:
+        return false()
+    membership_members = select(Membership.member_id).where(
+        Membership.cooperative_id.in_(cooperative_ids)
+    )
+    return or_(
+        Member.registered_by_cooperative_id.in_(cooperative_ids),
+        Member.id.in_(membership_members),
+    )
+
+
+def _require_global_role(
+    principal: Principal,
+    allowed: set[RoleCode],
+    *,
+    permanent: bool = False,
+) -> None:
+    if permanent:
+        require_permanent_role(principal, allowed)
+        authorized = any(
+            grant.source is RoleGrantSource.ASSIGNMENT
+            and grant.role in allowed
+            and grant.cooperative_id is None
+            for grant in principal.roles
+        )
+        code = "PERMANENT_ROLE_REQUIRED"
+        message_key = "errors.auth.permanent_role_required"
+    else:
+        require_role(principal, allowed)
+        authorized = any(
+            grant.role in allowed and grant.cooperative_id is None
+            for grant in principal.roles
+        )
+        code = "AUTHORIZATION_DENIED"
+        message_key = "errors.auth.authorization_denied"
+    if not authorized:
+        raise DomainError(code=code, message_key=message_key, status_code=403)
+
+
+def _require_member_role(
+    principal: Principal,
+    member: Member,
+    allowed: set[RoleCode],
+    *,
+    permanent: bool = False,
+) -> None:
+    cooperative_id = member.registered_by_cooperative_id
+    if cooperative_id is None:
+        _require_global_role(principal, allowed, permanent=permanent)
+    elif permanent:
+        require_permanent_role(principal, allowed, cooperative_id)
+    else:
+        require_role(principal, allowed, cooperative_id)
 
 
 class CooperativeCollection(BaseModel):
@@ -152,7 +220,7 @@ async def overview(
 ) -> OverviewEnvelope:
     require_role(principal, ADMIN_READ_ROLES)
     async with database.session() as session:
-        data = await admin_overview(session)
+        data = await admin_overview(session, _cooperative_read_scope(principal))
     return OverviewEnvelope(data=AdminOverviewResponse(**data), request_id=get_request_id())
 
 
@@ -162,15 +230,8 @@ async def list_cooperatives(
 ) -> CooperativeCollection:
     require_role(principal, ADMIN_READ_ROLES)
     statement = select(Cooperative).order_by(Cooperative.name)
-    has_global_scope = any(
-        grant.role in ADMIN_READ_ROLES and grant.cooperative_id is None for grant in principal.roles
-    )
-    if not has_global_scope:
-        cooperative_ids = {
-            grant.cooperative_id
-            for grant in principal.roles
-            if grant.role in ADMIN_READ_ROLES and grant.cooperative_id is not None
-        }
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
         statement = statement.where(Cooperative.id.in_(cooperative_ids))
     async with database.session() as session:
         result = await session.execute(statement)
@@ -185,7 +246,7 @@ async def create_cooperative(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.NODE_REGISTRAR, RoleCode.SECURITY_ADMIN})
+    _require_global_role(principal, {RoleCode.NODE_REGISTRAR, RoleCode.SECURITY_ADMIN})
     async with database.session() as session:
         await require_step_up(
             session,
@@ -210,6 +271,44 @@ async def create_cooperative(
     return _command(result)
 
 
+@router.post(
+    "/cooperatives/{cooperative_id}/transitions",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def transition_cooperative(
+    cooperative_id: UUID,
+    payload: CooperativeTransitionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_permanent_role(
+        principal,
+        {RoleCode.NODE_REGISTRAR, RoleCode.SECURITY_ADMIN},
+        cooperative_id,
+    )
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="COOPERATIVE_TRANSITION",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        result = await IdentityAdminService().transition_cooperative(
+            session,
+            principal=principal,
+            cooperative_id=cooperative_id,
+            target=payload.target_status,
+            reason_code=payload.reason_code,
+            expected_version=payload.expected_version,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
 @router.get("/members", response_model=MemberCollection)
 async def list_members(
     principal: PrincipalDependency,
@@ -219,6 +318,9 @@ async def list_members(
 ) -> MemberCollection:
     require_role(principal, ADMIN_READ_ROLES)
     statement = select(Member).order_by(Member.created_at.desc(), Member.id).limit(limit)
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
+        statement = statement.where(_member_scope_condition(cooperative_ids))
     if status:
         statement = statement.where(Member.status == status.upper())
     async with database.session() as session:
@@ -234,7 +336,21 @@ async def create_member(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.MEMBER_REGISTRAR})
+    registration_cooperative_id = payload.cooperative_id
+    if registration_cooperative_id is None:
+        registrar_scopes = {
+            grant.cooperative_id
+            for grant in principal.roles
+            if grant.role is RoleCode.MEMBER_REGISTRAR and grant.cooperative_id is not None
+        }
+        if len(registrar_scopes) != 1:
+            raise DomainError(
+                code="COOPERATIVE_SCOPE_REQUIRED",
+                message_key="errors.identity.cooperative_scope_required",
+                status_code=422,
+            )
+        registration_cooperative_id = next(iter(registrar_scopes))
+    require_role(principal, {RoleCode.MEMBER_REGISTRAR}, registration_cooperative_id)
     identifier_value = (
         payload.identifier_value.get_secret_value() if payload.identifier_value else None
     )
@@ -243,6 +359,7 @@ async def create_member(
             result = await IdentityAdminService().create_member(
                 session,
                 principal=principal,
+                cooperative_id=registration_cooperative_id,
                 idempotency_key=idempotency_key,
                 display_name=payload.display_name,
                 identifier_type=payload.identifier_type,
@@ -264,8 +381,17 @@ async def transition_member(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.MEMBER_REGISTRAR, RoleCode.RISK_ADMIN})
+    allowed_roles = {RoleCode.MEMBER_REGISTRAR, RoleCode.RISK_ADMIN}
+    require_role(principal, allowed_roles)
     async with database.session() as session:
+        member = await session.get(Member, member_id)
+        if member is None:
+            raise DomainError(
+                code="MEMBER_NOT_FOUND",
+                message_key="errors.identity.member_not_found",
+                status_code=404,
+            )
+        _require_member_role(principal, member, allowed_roles)
         result = await IdentityAdminService().transition_member(
             session,
             principal=principal,
@@ -285,10 +411,12 @@ async def list_memberships(
     principal: PrincipalDependency, database: DatabaseDependency
 ) -> MembershipCollection:
     require_role(principal, ADMIN_READ_ROLES)
+    statement = select(Membership).order_by(Membership.created_at.desc(), Membership.id)
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
+        statement = statement.where(Membership.cooperative_id.in_(cooperative_ids))
     async with database.session() as session:
-        result = await session.execute(
-            select(Membership).order_by(Membership.created_at.desc(), Membership.id)
-        )
+        result = await session.execute(statement)
         items = list(result.scalars())
     return MembershipCollection(data=items, request_id=get_request_id())
 
@@ -323,13 +451,58 @@ async def create_membership(
     return _command(result)
 
 
+@router.post(
+    "/memberships/{membership_id}/transitions",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def transition_membership(
+    membership_id: UUID,
+    payload: MembershipTransitionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    async with database.session() as session:
+        membership = await session.get(Membership, membership_id)
+        if membership is None:
+            raise DomainError(
+                code="MEMBERSHIP_NOT_FOUND",
+                message_key="errors.identity.membership_not_found",
+                status_code=404,
+            )
+        require_role(
+            principal,
+            {RoleCode.COOPERATIVE_ADMIN, RoleCode.MEMBER_REGISTRAR},
+            membership.cooperative_id,
+        )
+        result = await IdentityAdminService().transition_membership(
+            session,
+            principal=principal,
+            membership_id=membership_id,
+            target=payload.target_status,
+            reason_code=payload.reason_code,
+            expected_version=payload.expected_version,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
 @router.get("/users", response_model=UserCollection)
 async def list_users(
     principal: PrincipalDependency, database: DatabaseDependency
 ) -> UserCollection:
     require_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR})
+    statement = select(UserAccount).order_by(UserAccount.login)
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
+        scoped_member_ids = select(Member.id).where(
+            _member_scope_condition(cooperative_ids)
+        )
+        statement = statement.where(UserAccount.member_id.in_(scoped_member_ids))
     async with database.session() as session:
-        result = await session.execute(select(UserAccount).order_by(UserAccount.login))
+        result = await session.execute(statement)
         items = list(result.scalars())
     return UserCollection(data=items, request_id=get_request_id())
 
@@ -341,8 +514,20 @@ async def create_user(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.SECURITY_ADMIN})
+    allowed_roles = {RoleCode.SECURITY_ADMIN}
+    require_role(principal, allowed_roles)
     async with database.session() as session:
+        if payload.member_id is None:
+            _require_global_role(principal, allowed_roles)
+        else:
+            member = await session.get(Member, payload.member_id)
+            if member is None:
+                raise DomainError(
+                    code="MEMBER_NOT_FOUND",
+                    message_key="errors.identity.member_not_found",
+                    status_code=404,
+                )
+            _require_member_role(principal, member, allowed_roles)
         try:
             result = await IdentityAdminService().create_user(
                 session,
@@ -360,17 +545,74 @@ async def create_user(
     return _command(result)
 
 
+@router.post(
+    "/users/{user_id}/transitions",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def transition_user(
+    user_id: UUID,
+    payload: UserTransitionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    allowed_roles = {RoleCode.SECURITY_ADMIN}
+    require_permanent_role(principal, allowed_roles)
+    async with database.session() as session:
+        account = await session.get(UserAccount, user_id)
+        if account is None:
+            raise DomainError(
+                code="USER_NOT_FOUND",
+                message_key="errors.identity.user_not_found",
+                status_code=404,
+            )
+        if account.member_id is None:
+            _require_global_role(principal, allowed_roles, permanent=True)
+        else:
+            member = await session.get(Member, account.member_id)
+            if member is None:
+                raise DomainError(
+                    code="MEMBER_NOT_FOUND",
+                    message_key="errors.identity.member_not_found",
+                    status_code=404,
+                )
+            _require_member_role(principal, member, allowed_roles, permanent=True)
+        await require_step_up(
+            session,
+            principal,
+            operation="USER_TRANSITION",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        result = await IdentityAdminService().transition_user(
+            session,
+            principal=principal,
+            user_id=user_id,
+            target=payload.target_status,
+            reason_code=payload.reason_code,
+            expected_version=payload.expected_version,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
 @router.get("/roles", response_model=RoleCollection)
 async def list_roles(
     principal: PrincipalDependency, database: DatabaseDependency
 ) -> RoleCollection:
     require_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR, RoleCode.COOPERATIVE_ADMIN})
+    statement = (
+        select(RoleAssignment)
+        .where(RoleAssignment.source == RoleGrantSource.ASSIGNMENT.value)
+        .order_by(RoleAssignment.created_at.desc())
+    )
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
+        statement = statement.where(RoleAssignment.cooperative_id.in_(cooperative_ids))
     async with database.session() as session:
-        result = await session.execute(
-            select(RoleAssignment)
-            .where(RoleAssignment.source == RoleGrantSource.ASSIGNMENT.value)
-            .order_by(RoleAssignment.created_at.desc())
-        )
+        result = await session.execute(statement)
         items = list(result.scalars())
     return RoleCollection(data=items, request_id=get_request_id())
 

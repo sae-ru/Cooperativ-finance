@@ -357,3 +357,18 @@ restore drill. Цель: один реальный товарный процес
 постоянные part-time legal/accounting/audit owners. Один разработчик может
 создать кодовую основу, но не независимо утвердить хозяйственные правила и
 полевую безопасность.
+
+## Slice 22. Раздельный административный реестр
+
+Статус: реализован базовый lifecycle; доказательства и остаточные ограничения:
+[implemented_slice_22.md](implemented_slice_22.md).
+
+- отдельные рабочие реестры Cooperative, Member, Membership, User и Node;
+- server-side cooperative scope для списков, overview и команд;
+- versioned status transitions без удаления истории;
+- немедленный отзыв сессий при отключении User и запрет self-disable;
+- migration `0029`, совместимый OpenAPI, integration и component tests.
+
+Готово: администратор не смешивает хозяйственного участника, его организационную
+связь, login и технический узел. Duplicate merge, service clients и массовый
+staging-import остаются отдельными последующими срезами.

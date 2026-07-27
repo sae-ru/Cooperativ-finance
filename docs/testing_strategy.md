@@ -235,3 +235,16 @@ requirement/reason/fact/threshold keys, предупреждение о неза
 калибровке, generated types, component suite и production PWA build. Реальная
 precision/recall/FPR измеряется только на отдельно утверждённом пилотном наборе
 и не может быть заменена зелёными синтетическими тестами.
+
+## Проверки Slice 22
+
+Domain unit tests фиксируют матрицы переходов Cooperative, Membership и User.
+PostgreSQL integration проходит полный lifecycle, optimistic version, scoped
+registrar lists/overview, запрет чужого cooperative и совместимый single-scope
+Member request. Отдельно выдаётся refresh session и доказывается её немедленный
+отзыв в той же транзакции, где User получает `DISABLED`.
+
+Frontend component tests проверяют пять раздельных вкладок, создание организации,
+переход membership, отключение учётной записи и доступ к node management.
+Migration gate выполняет `0028 -> 0029 -> 0028 -> 0029`; OpenAPI gate требует
+exact frontend mirror и отсутствие несовместимостей с baseline.

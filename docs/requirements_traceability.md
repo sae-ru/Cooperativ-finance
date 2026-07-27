@@ -175,3 +175,14 @@ acceptance criteria и tests. Если строка карты меняется,
 | Честный статус калибровки | synthetic scope, пустой pilot FPR, `production_approved=false` | catalog API/component test |
 | Понятный операторский экран | 13/15, локализованные риски и реакции без внутренних table codes | RU/EN locale, component, build и browser smoke |
 | Реальный пилотный FPR | не заявлен и остаётся внешним gate | unchecked production-readiness item |
+
+## Slice 22 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Раздельные `Member`, `Cooperative`, `Membership`, `User` | пять вкладок реестра и отдельные create/list/transition contracts | frontend component и PostgreSQL integration flow |
+| Отдельный `Node` | локальный и внешний node registry с переходом в trust workspace | component test и federation API contract |
+| Минимальные полномочия и scope | server-side cooperative filtering и command authorization | scoped registrar integration tests |
+| Сохранение истории | доменные status transitions, optimistic version, без DELETE | transition policy tests и signed audit assertions |
+| Немедленное отключение входа | `User -> DISABLED` отзывает sessions в одной транзакции | issued-session revocation integration test |
+| Обратная совместимость API | single-scope inference только при одном доступном кооперативе | OpenAPI compatibility и legacy request test |

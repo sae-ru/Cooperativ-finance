@@ -109,6 +109,7 @@ describe("AntifraudView", () => {
       name: "Демонстрационный кооператив",
       status: "ACTIVE",
       created_at: "2026-07-26T00:00:00Z",
+      updated_at: "2026-07-20T00:00:00Z",
       version: 1,
     }]);
     vi.mocked(api.getAntifraudRules).mockResolvedValue({

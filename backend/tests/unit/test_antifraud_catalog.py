@@ -39,7 +39,8 @@ def test_rule_manifest_is_versioned_stable_and_explicitly_not_pilot_approved() -
     assert rule_manifest_hash().startswith("sha256:")
     assert len(rule_manifest_hash()) == 71
     assert rule_manifest_hash() == rule_manifest_hash()
-    assert [item["code"] for item in payload] == sorted(item["code"] for item in payload)
+    codes = [str(item["code"]) for item in payload]
+    assert codes == sorted(codes)
     assert all(item["engineering_case_count"] == 2 for item in payload)
     assert all(item["pilot_false_positive_rate"] is None for item in payload)
     assert all(item["production_approved"] is False for item in payload)

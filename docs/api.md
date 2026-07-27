@@ -351,3 +351,22 @@ rules, SHA-256, версию синтетического regression-набор�
 приложения и не раскрывает хозяйственные данные. Детали и границы:
 [implemented_slice_19.md](implemented_slice_19.md) и
 [implemented_slice_21.md](implemented_slice_21.md).
+
+## Административный реестр Slice 22
+
+```text
+GET/POST /api/v1/admin/cooperatives
+POST     /api/v1/admin/cooperatives/{id}/transitions
+GET/POST /api/v1/admin/members
+POST     /api/v1/admin/members/{id}/transitions
+GET/POST /api/v1/admin/memberships
+POST     /api/v1/admin/memberships/{id}/transitions
+GET/POST /api/v1/admin/users
+POST     /api/v1/admin/users/{id}/transitions
+```
+
+List и overview endpoints ограничиваются cooperative scope действующих ролей.
+Transition request содержит target status, reason, expected version и
+idempotency key. Отключение User немедленно отзывает его active sessions;
+self-disable отклоняется. `cooperative_id` при создании Member может быть опущен
+только совместимым старым клиентом регистратора с ровно одним доступным scope.

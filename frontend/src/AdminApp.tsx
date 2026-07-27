@@ -60,6 +60,7 @@ import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./admin.css";
 
+const AdminDirectoryView = lazy(() => import("./AdminDirectoryView"));
 const ClearingView = lazy(() => import("./ClearingView"));
 const FederatedClearingView = lazy(() => import("./FederatedClearingView"));
 const CrisisView = lazy(() => import("./CrisisView"));
@@ -77,7 +78,7 @@ const AntifraudView = lazy(() => import("./AntifraudView"));
 const SolidarityView = lazy(() => import("./SolidarityView"));
 const TrustView = lazy(() => import("./TrustView"));
 
-type View = "memberHome" | "overview" | "members" | "access" | "security" | "responsibility" | "discovery" | "exchange" | "clearing" | "federatedClearing" | "risk" | "antifraud" | "trust" | "solidarity" | "crisis" | "inventory" | "rights" | "federation" | "operations" | "audit";
+type View = "memberHome" | "overview" | "directory" | "members" | "access" | "security" | "responsibility" | "discovery" | "exchange" | "clearing" | "federatedClearing" | "risk" | "antifraud" | "trust" | "solidarity" | "crisis" | "inventory" | "rights" | "federation" | "operations" | "audit";
 
 function workspaceViewStorageKey(userId: string): string {
   return `coop.workspace.view.${userId}`;
@@ -248,7 +249,7 @@ function MembersView({ principal }: { principal: Principal }) {
   const cooperativeId = principal.roles.find((item) => ["MEMBER_REGISTRAR", "COOPERATIVE_ADMIN"].includes(item.role) && item.cooperative_id)?.cooperative_id ?? cooperatives.data?.find((item) => item.status === "ACTIVE")?.id ?? "";
   const visibleMembers = (members.data ?? []).filter((item) => item.display_name.toLocaleLowerCase().includes(memberSearch.trim().toLocaleLowerCase())).slice(0, 25);
   const invalidate = () => Promise.all([client.invalidateQueries({ queryKey: ["members"] }), client.invalidateQueries({ queryKey: ["memberships"] }), client.invalidateQueries({ queryKey: ["admin-overview"] })]);
-  const addMember = useMutation({ mutationFn: () => createMember({ display_name: name, ...(identifier ? { identifier_type: "EXTERNAL_REFERENCE", identifier_value: identifier } : {}) }), onSuccess: async () => { setName(""); setIdentifier(""); await invalidate(); } });
+  const addMember = useMutation({ mutationFn: () => createMember({ cooperative_id: cooperativeId, display_name: name, ...(identifier ? { identifier_type: "EXTERNAL_REFERENCE", identifier_value: identifier } : {}) }), onSuccess: async () => { setName(""); setIdentifier(""); await invalidate(); } });
   const changeStatus = useMutation({ mutationFn: ({ member, target }: { member: Member; target: string }) => transitionMember(member, target), onSuccess: invalidate });
   const addMembership = useMutation({ mutationFn: () => createMembership({ cooperative_id: cooperativeId, member_id: membershipMember, member_number: memberNumber }), onSuccess: async () => { setMembershipMember(""); setMemberNumber(""); setMembershipMessage("Членство оформлено"); await invalidate(); } });
   if (members.isPending || memberships.isPending || cooperatives.isPending) return <Loading />;
@@ -416,7 +417,7 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
     const isEverydayParticipant = hasRole(principal, "EXCHANGE_PARTICIPANT") && !hasRole(principal, "MEMBER_REGISTRAR", "COOPERATIVE_ADMIN", "DATA_STEWARD", "RISK_ADMIN", "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_AUDITOR");
     if (isEverydayParticipant) return ["memberHome", "discovery", "exchange", "security"] as View[];
     const result: View[] = ["overview", "security"];
-    if (hasRole(principal, "MEMBER_REGISTRAR", "COOPERATIVE_ADMIN", "RISK_ADMIN", "DATA_STEWARD")) result.push("members");
+    if (hasRole(principal, "MEMBER_REGISTRAR", "COOPERATIVE_ADMIN", "DATA_STEWARD", "RISK_ADMIN", "SECURITY_ADMIN", "NODE_REGISTRAR", "RIGHTS_OPERATOR", "AUDITOR")) result.push("directory");
     if (hasRole(principal, "SECURITY_ADMIN", "AUDITOR")) result.push("access");
     if (hasRole(principal, "COOPERATIVE_ADMIN", "RISK_ADMIN", "DATA_STEWARD", "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR")) result.push("responsibility");
     if (principal.member_id || hasRole(principal, "SECURITY_ADMIN", "AUDITOR", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR")) result.push("discovery");
@@ -464,6 +465,7 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
   const nav = [
     ["memberHome", "Главная", LayoutDashboard],
     ["overview", "Обзор", LayoutDashboard],
+    ["directory", "Администрирование", UserCog],
     ["members", "Участники", Users],
     ["access", "Доступ", UserCog],
     ["security", "Безопасность", KeyRound],
@@ -483,7 +485,7 @@ function Workspace({ session, onLogout }: { session: AuthSession; onLogout: () =
     ["operations", "Эксплуатация", Activity],
     ["audit", "Аудит", ClipboardList]
   ] as const;
-  return <div className="admin-shell"><aside className="admin-sidebar"><div className="brand"><img src="/mark.svg" width="36" height="36" alt="" /><div><strong>Cooperative Clearing</strong><span>Локальный узел</span></div></div><nav ref={navigationRef} aria-label="Основная навигация">{nav.filter(([key]) => available.includes(key)).map(([key, label, Icon]) => <button aria-current={view === key ? "page" : undefined} className={view === key ? "active" : ""} onClick={() => { if (key === "discovery") setDiscoverySection("search"); openView(key); }} key={key}><Icon size={18} /><span>{label}</span></button>)}</nav><div className="operator"><ShieldCheck size={17} /><div><strong>{principal.login}</strong><span>{principal.roles.map((item) => roleNames[item.role]).join(", ")}</span></div><button title="Выйти" onClick={onLogout}><LogOut size={17} /></button></div></aside><main className="admin-main"><div className="admin-topbar"><InterfaceControls placement="topbar" /></div><Suspense fallback={<Loading />}>{view === "memberHome" ? <MemberHomeView onNavigate={navigateParticipant} /> : view === "overview" ? <Overview /> : view === "members" ? <MembersView principal={principal} /> : view === "access" ? <AccessView principal={principal} /> : view === "security" ? <SecurityCenter principal={principal} /> : view === "responsibility" ? <ResponsibilityView principal={principal} /> : view === "discovery" ? <DiscoveryView principal={principal} initialSection={discoverySection} /> : view === "exchange" ? <ExchangeView principal={principal} /> : view === "clearing" ? <ClearingView principal={principal} /> : view === "federatedClearing" ? <FederatedClearingView principal={principal} /> : view === "risk" ? <RiskView principal={principal} /> : view === "antifraud" ? <AntifraudView principal={principal} /> : view === "trust" ? <TrustView principal={principal} /> : view === "solidarity" ? <SolidarityView principal={principal} /> : view === "crisis" ? <CrisisView principal={principal} /> : view === "inventory" ? <InventoryView principal={principal} /> : view === "rights" ? <RightsView principal={principal} /> : view === "federation" ? <FederationView principal={principal} /> : view === "operations" ? <OperationsView /> : <AuditView />}</Suspense></main></div>;
+  return <div className="admin-shell"><aside className="admin-sidebar"><div className="brand"><img src="/mark.svg" width="36" height="36" alt="" /><div><strong>Cooperative Clearing</strong><span>Локальный узел</span></div></div><nav ref={navigationRef} aria-label="Основная навигация">{nav.filter(([key]) => available.includes(key)).map(([key, label, Icon]) => <button aria-current={view === key ? "page" : undefined} className={view === key ? "active" : ""} onClick={() => { if (key === "discovery") setDiscoverySection("search"); openView(key); }} key={key}><Icon size={18} /><span>{label}</span></button>)}</nav><div className="operator"><ShieldCheck size={17} /><div><strong>{principal.login}</strong><span>{principal.roles.map((item) => roleNames[item.role]).join(", ")}</span></div><button title="Выйти" onClick={onLogout}><LogOut size={17} /></button></div></aside><main className="admin-main"><div className="admin-topbar"><InterfaceControls placement="topbar" /></div><Suspense fallback={<Loading />}>{view === "memberHome" ? <MemberHomeView onNavigate={navigateParticipant} /> : view === "overview" ? <Overview /> : view === "directory" ? <AdminDirectoryView principal={principal} onManageNodes={() => openView("federation")} /> : view === "members" ? <MembersView principal={principal} /> : view === "access" ? <AccessView principal={principal} /> : view === "security" ? <SecurityCenter principal={principal} /> : view === "responsibility" ? <ResponsibilityView principal={principal} /> : view === "discovery" ? <DiscoveryView principal={principal} initialSection={discoverySection} /> : view === "exchange" ? <ExchangeView principal={principal} /> : view === "clearing" ? <ClearingView principal={principal} /> : view === "federatedClearing" ? <FederatedClearingView principal={principal} /> : view === "risk" ? <RiskView principal={principal} /> : view === "antifraud" ? <AntifraudView principal={principal} /> : view === "trust" ? <TrustView principal={principal} /> : view === "solidarity" ? <SolidarityView principal={principal} /> : view === "crisis" ? <CrisisView principal={principal} /> : view === "inventory" ? <InventoryView principal={principal} /> : view === "rights" ? <RightsView principal={principal} /> : view === "federation" ? <FederationView principal={principal} /> : view === "operations" ? <OperationsView /> : <AuditView />}</Suspense></main></div>;
 }
 
 export default function AdminApp() {

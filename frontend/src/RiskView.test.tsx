@@ -168,7 +168,7 @@ describe("RiskView", () => {
     const admin = await import("./api/admin");
     const inventory = await import("./api/inventory");
     vi.mocked(admin.getCooperatives).mockResolvedValue([
-      { id: cooperativeId, code: "DEMO", name: "Demo", status: "ACTIVE", created_at: "2026-07-20T00:00:00Z", version: 1 },
+      { id: cooperativeId, code: "DEMO", name: "Demo", status: "ACTIVE", created_at: "2026-07-20T00:00:00Z", updated_at: "2026-07-20T00:00:00Z", version: 1 },
     ]);
     vi.mocked(inventory.getInventoryMembers).mockResolvedValue([
       { member_id: ownerId, cooperative_id: cooperativeId, display_name: "Владелец пая", member_number: "M-1" },

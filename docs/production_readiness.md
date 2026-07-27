@@ -29,9 +29,9 @@
 - [x] Marketplace offer/quote/purchase имеют явного cooperative owner, включая команды global node roles ([evidence](implemented_slice_19.md)).
 - [x] Все классы злоупотреблений раздела 24.5 имеют versioned rule и положительный/отрицательный синтетический regression-сценарий ([evidence](implemented_slice_21.md)).
 - [ ] Для каждого антифрод-правила есть репрезентативный пилотный dataset, утверждённая частота ложных срабатываний и drift review.
-- [ ] Admin console разделяет User, Member, Membership, Organization и Node.
-- [ ] Клиринговый cycle проходит freeze/preview/dispute/finalize/reconcile.
-- [ ] Clearing proof и participant statements воспроизводимы.
+- [x] Admin console разделяет User, Member, Membership, Organization и Node ([evidence](implemented_slice_22.md)).
+- [x] Клиринговый cycle проходит freeze/preview/dispute/finalize/reconcile ([evidence](implemented_slice_7.md)).
+- [x] Clearing proof и participant statements воспроизводимы ([evidence](implemented_slice_7.md)).
 - [x] Active external node имеет owner, named roles и действующий trust contract ([evidence](implemented_slice_11.md)).
 - [x] Bilateral node limits и node bond ограничивают внешнюю exposure ([evidence](implemented_slice_11.md)).
 - [x] Quarantine, revoke и контролируемое восстановление узла проверены end-to-end ([evidence](implemented_slice_11.md)).
@@ -211,3 +211,15 @@ production key ceremony, независимый security review, физичес�
 калибровку. Реальный размеченный dataset, утверждённый false-positive rate,
 monitoring drift, privacy/legal review и независимое adversarial тестирование
 остаются открытыми checkbox перед хозяйственным production.
+
+## Текущее доказательство Slice 22
+
+Организация, участник, membership, учётная запись и узел выведены в пять
+отдельных административных реестров. Server-side cooperative scope применяется
+к спискам, overview и командам. Status transitions сохраняют историю, а
+отключение User атомарно отзывает активные сессии. Migration `0029`, generated
+OpenAPI и проверки описаны в [implemented_slice_22.md](implemented_slice_22.md).
+
+Отмечено только инженерное разделение сущностей. Юридические процедуры выхода,
+обучение реальных ролей, независимый security review, duplicate merge,
+service-client lifecycle и массовый импорт остаются открытыми production gates.

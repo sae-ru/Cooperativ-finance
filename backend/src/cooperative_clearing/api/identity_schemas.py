@@ -77,6 +77,12 @@ class CooperativeCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=200)
 
 
+class CooperativeTransitionRequest(BaseModel):
+    target_status: CooperativeStatus
+    reason_code: str = Field(min_length=2, max_length=100)
+    expected_version: int = Field(ge=1)
+
+
 class CooperativeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -85,10 +91,12 @@ class CooperativeResponse(BaseModel):
     name: str
     status: CooperativeStatus
     created_at: datetime
+    updated_at: datetime
     version: int
 
 
 class MemberCreateRequest(BaseModel):
+    cooperative_id: UUID | None = None
     display_name: str = Field(min_length=2, max_length=200)
     identifier_type: str | None = Field(default=None, max_length=40)
     identifier_value: SecretStr | None = None
@@ -105,6 +113,7 @@ class MemberResponse(BaseModel):
 
     id: UUID
     display_name: str
+    registered_by_cooperative_id: UUID | None
     status: MemberStatus
     created_at: datetime
     updated_at: datetime
@@ -117,6 +126,12 @@ class MembershipCreateRequest(BaseModel):
     member_number: str = Field(min_length=1, max_length=63)
 
 
+class MembershipTransitionRequest(BaseModel):
+    target_status: MembershipStatus
+    reason_code: str = Field(min_length=2, max_length=100)
+    expected_version: int = Field(ge=1)
+
+
 class MembershipResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -126,6 +141,9 @@ class MembershipResponse(BaseModel):
     member_number: str
     status: MembershipStatus
     joined_at: datetime | None
+    ended_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
     version: int
 
 
@@ -133,6 +151,12 @@ class UserCreateRequest(BaseModel):
     login: str = Field(min_length=1, max_length=120)
     temporary_password: SecretStr
     member_id: UUID | None = None
+
+
+class UserTransitionRequest(BaseModel):
+    target_status: UserStatus
+    reason_code: str = Field(min_length=2, max_length=100)
+    expected_version: int = Field(ge=1)
 
 
 class UserResponse(BaseModel):

@@ -590,3 +590,16 @@ Revision `0026_break_glass_authority` добавляет `source` и `expires_at
 обычной principal role query и обычного admin lifecycle. Действующее полномочие
 приходит только из `break_glass_grants` с повторной проверкой status/expiry по
 БД на каждый запрос.
+## Расширение идентификации Slice 22
+
+`identity.members.registered_by_cooperative_id` — nullable внешний ключ на
+`identity.cooperatives`, фиксирующий область первичной регистрации участника.
+Поле не заменяет `identity.memberships`: Member существует как хозяйственный
+субъект, а каждое membership отдельно описывает его связь с организацией,
+номер, статус и даты. Индекс `ix_members_registered_by_cooperative` поддерживает
+server-side scoped registry.
+
+Cooperative, Membership и User используют собственный `status`, `version` и
+timestamps. Завершение membership сохраняет `ended_at`; отключение User не
+удаляет запись и связанные события. Технический Node остаётся в модуле federation
+и не связывается с User или Member общей строкой «клиента».

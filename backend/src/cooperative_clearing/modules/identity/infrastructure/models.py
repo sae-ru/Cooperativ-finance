@@ -53,11 +53,16 @@ class Member(Base):
         ),
         CheckConstraint("version >= 1", name="version_positive"),
         Index("ix_members_status_created_at", "status", "created_at"),
+        Index("ix_members_registered_by_cooperative", "registered_by_cooperative_id"),
         {"schema": "identity"},
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    registered_by_cooperative_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+    )
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

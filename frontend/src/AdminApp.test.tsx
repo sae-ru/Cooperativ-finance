@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import AdminApp from "./AdminApp";
 import * as admin from "./api/admin";
+import * as federation from "./api/federation";
+import * as systemApi from "./api/system";
 import type { SystemStatus } from "./api/system";
 import { useSystemStatus } from "./features/system/use-system-status";
 
@@ -17,6 +19,14 @@ vi.mock("./api/admin", async () => {
     ]),
   );
 });
+vi.mock("./api/federation", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./api/federation")>(),
+  getFederationNodes: vi.fn(),
+}));
+vi.mock("./api/system", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./api/system")>(),
+  fetchSystemStatus: vi.fn(),
+}));
 vi.mock("./features/system/use-system-status", () => ({ useSystemStatus: vi.fn() }));
 vi.mock("./DiscoveryView", () => ({ default: () => <h1>Что вам нужно?</h1> }));
 vi.mock("./MemberHomeView", () => ({ default: () => <h1>Мой кабинет</h1> }));
@@ -87,7 +97,8 @@ describe("AdminApp", () => {
       data: systemStatus,
       error: null
     } as ReturnType<typeof useSystemStatus>);
-    vi.mocked(admin.getOverview).mockResolvedValue({
+    vi.mocked(federation.getFederationNodes).mockResolvedValue([]);
+    vi.mocked(systemApi.fetchSystemStatus).mockResolvedValue(systemStatus);    vi.mocked(admin.getOverview).mockResolvedValue({
       members: 4,
       active_members: 1,
       cooperatives: 1,
@@ -101,11 +112,13 @@ describe("AdminApp", () => {
       name: "Демо кооператив",
       status: "ACTIVE",
       created_at: "2026-07-20T10:00:00Z",
+      updated_at: "2026-07-20T00:00:00Z",
       version: 1
     }]);
     vi.mocked(admin.getMembers).mockResolvedValue([{
       id: "40000000-0000-0000-0000-000000000001",
       display_name: "Анна Петрова",
+      registered_by_cooperative_id: "30000000-0000-0000-0000-000000000001",
       status: "ACTIVE",
       created_at: "2026-07-20T10:00:00Z",
       updated_at: "2026-07-20T10:00:00Z",
@@ -169,10 +182,14 @@ describe("AdminApp", () => {
     }]);
     vi.mocked(admin.logout).mockResolvedValue(undefined);
     for (const command of [
+      admin.createCooperative,
+      admin.transitionCooperative,
       admin.createMember,
       admin.transitionMember,
       admin.createMembership,
+      admin.transitionMembership,
       admin.createUser,
+      admin.transitionUser,
       admin.assignRole,
       admin.decideRole,
       admin.revokeSession
@@ -319,6 +336,7 @@ describe("AdminApp", () => {
     vi.mocked(admin.getMembers).mockResolvedValue([{
       id: "40000000-0000-0000-0000-000000000001",
       display_name: "Анна Петрова",
+      registered_by_cooperative_id: "30000000-0000-0000-0000-000000000001",
       status: "APPLICANT",
       created_at: "2026-07-20T10:00:00Z",
       updated_at: "2026-07-20T10:00:00Z",
@@ -327,14 +345,18 @@ describe("AdminApp", () => {
     vi.mocked(admin.restoreSession).mockResolvedValue(registrarSession);
     const user = userEvent.setup();
     renderApp();
-    await user.click(await screen.findByRole("button", { name: "Участники" }));
+    await user.click(await screen.findByRole("button", { name: "Администрирование" }));
     await user.type(await screen.findByLabelText("Имя участника"), "Новый участник");
-    await user.click(screen.getByRole("button", { name: "Добавить" }));
+    await user.click(screen.getByRole("button", { name: "Добавить участника" }));
     await user.selectOptions(screen.getByLabelText("Новый статус Анна Петрова"), "PENDING_VERIFICATION");
+    await user.click(screen.getByRole("tab", { name: "Членства" }));
     await user.selectOptions(screen.getByLabelText("Участник"), "40000000-0000-0000-0000-000000000001");
-    await user.type(screen.getByLabelText("Номер пая"), "D-1000");
+    await user.type(screen.getByLabelText("Номер членства"), "D-1000");
     await user.click(screen.getByRole("button", { name: "Оформить членство" }));
-    await waitFor(() => expect(admin.createMember).toHaveBeenCalled());
+    await waitFor(() => expect(admin.createMember).toHaveBeenCalledWith(expect.objectContaining({
+      cooperative_id: "30000000-0000-0000-0000-000000000001",
+      display_name: "Новый участник"
+    })));
     expect(admin.transitionMember).toHaveBeenCalled();
     expect(admin.createMembership).toHaveBeenCalledWith({ cooperative_id: "30000000-0000-0000-0000-000000000001", member_id: "40000000-0000-0000-0000-000000000001", member_number: "D-1000" });
   });

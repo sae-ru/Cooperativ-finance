@@ -31,7 +31,7 @@ describe("administration API client", () => {
     vi.stubGlobal("fetch", fetchMock);
     await login("security", "production-password");
     expect((await getOverview()).members).toBe(2);
-    expect((await createMember({ display_name: "Member" })).object_id).toBe("2");
+    expect((await createMember({ cooperative_id: "coop-1", display_name: "Member" })).object_id).toBe("2");
     await logout();
     const commandRequest = fetchMock.mock.calls[2]?.[1] as RequestInit;
     expect(new Headers(commandRequest.headers).get("Authorization")).toBe("Bearer access");

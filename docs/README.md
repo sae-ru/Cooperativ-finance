@@ -95,6 +95,7 @@
 - [Реализованный Slice 19: объяснимая проверка аномалий](implemented_slice_19.md)
 - [Реализованный Slice 20: локальная MFA и аварийный доступ](implemented_slice_20.md)
 - [Реализованный Slice 21: полный версионированный антифрод-контур](implemented_slice_21.md)
+- [Реализованный Slice 22: раздельный административный реестр](implemented_slice_22.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

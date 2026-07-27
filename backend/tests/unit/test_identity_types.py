@@ -4,11 +4,17 @@ import pytest
 
 from cooperative_clearing.modules.identity.domain.types import (
     PRIVILEGED_ROLES,
+    CooperativeStatus,
+    MembershipStatus,
     MemberStatus,
     Principal,
     RoleCode,
     RoleGrant,
+    UserStatus,
+    ensure_cooperative_transition,
     ensure_member_transition,
+    ensure_membership_transition,
+    ensure_user_transition,
     normalize_login,
     require_role,
 )
@@ -69,3 +75,22 @@ def test_member_transition_policy() -> None:
     with pytest.raises(DomainError) as failure:
         ensure_member_transition(MemberStatus.APPLICANT, MemberStatus.ACTIVE)
     assert failure.value.code == "MEMBER_STATUS_TRANSITION_INVALID"
+
+
+def test_administrative_registry_transition_policies() -> None:
+    ensure_cooperative_transition(CooperativeStatus.ACTIVE, CooperativeStatus.SUSPENDED)
+    ensure_membership_transition(MembershipStatus.PENDING, MembershipStatus.ACTIVE)
+    ensure_membership_transition(MembershipStatus.ACTIVE, MembershipStatus.ENDED)
+    ensure_user_transition(UserStatus.ACTIVE, UserStatus.DISABLED)
+
+    with pytest.raises(DomainError) as cooperative_failure:
+        ensure_cooperative_transition(CooperativeStatus.ACTIVE, CooperativeStatus.ACTIVE)
+    assert cooperative_failure.value.code == "COOPERATIVE_STATUS_TRANSITION_INVALID"
+
+    with pytest.raises(DomainError) as membership_failure:
+        ensure_membership_transition(MembershipStatus.ENDED, MembershipStatus.ACTIVE)
+    assert membership_failure.value.code == "MEMBERSHIP_STATUS_TRANSITION_INVALID"
+
+    with pytest.raises(DomainError) as user_failure:
+        ensure_user_transition(UserStatus.DISABLED, UserStatus.DISABLED)
+    assert user_failure.value.code == "USER_STATUS_TRANSITION_INVALID"

@@ -60,12 +60,14 @@ export type Cooperative = {
   name: string;
   status: "ACTIVE" | "SUSPENDED";
   created_at: string;
+  updated_at: string;
   version: number;
 };
 
 export type Member = {
   id: string;
   display_name: string;
+  registered_by_cooperative_id: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -79,6 +81,9 @@ export type Membership = {
   member_number: string;
   status: string;
   joined_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
   version: number;
 };
 
@@ -273,7 +278,28 @@ export const getRoles = () => request<RoleAssignment[]>("/api/v1/admin/roles");
 export const getSessions = () => request<ServerSession[]>("/api/v1/admin/sessions");
 export const getAudit = () => request<AuditEntry[]>("/api/v1/admin/audit?limit=200");
 
+export const createCooperative = (payload: { code: string; name: string }) =>
+  request<{ event_id: string; object_id: string }>("/api/v1/admin/cooperatives", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify(payload)
+  });
+
+export const transitionCooperative = (cooperative: Cooperative, targetStatus: Cooperative["status"]) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/cooperatives/${cooperative.id}/transitions`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        target_status: targetStatus,
+        reason_code: "OPERATOR_CONFIRMED",
+        expected_version: cooperative.version
+      })
+    },
+  );
 export const createMember = (payload: {
+  cooperative_id: string;
   display_name: string;
   identifier_type?: string;
   identifier_value?: string;
@@ -309,6 +335,19 @@ export const createMembership = (payload: {
     body: JSON.stringify(payload)
   });
 
+export const transitionMembership = (membership: Membership, targetStatus: string) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/memberships/${membership.id}/transitions`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        target_status: targetStatus,
+        reason_code: "OPERATOR_CONFIRMED",
+        expected_version: membership.version
+      })
+    },
+  );
 export const createUser = (payload: {
   login: string;
   temporary_password: string;
@@ -320,6 +359,19 @@ export const createUser = (payload: {
     body: JSON.stringify(payload)
   });
 
+export const transitionUser = (user: UserAccount, targetStatus: "ACTIVE" | "DISABLED") =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/users/${user.id}/transitions`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        target_status: targetStatus,
+        reason_code: "SECURITY_ADMIN_CONFIRMED",
+        expected_version: user.version
+      })
+    },
+  );
 export const assignRole = (payload: {
   user_id: string;
   role: RoleCode;
