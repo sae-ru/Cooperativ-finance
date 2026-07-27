@@ -301,3 +301,46 @@ the source facts or use the established dispute procedure.
 6. Кандидат входит под собственной учетной записью, проверяет список и срок, прикладывает подписанный акт и нажимает «Принять лично».
 
 До шага 6 товар остается записан за прежним хранителем и не может выдаваться или передаваться обычным путем. При расхождении не исправляйте цифру вручную: дело остановится и создаст запись для разбирательства.
+
+## Проверка узла и диагностический пакет
+
+Раздел **Эксплуатация** видят администратор кооператива, администратор
+безопасности и аудитор.
+
+1. Сначала посмотрите общий статус **Готов**, **Требует внимания** или
+   **Критично**.
+2. Прочитайте пять строк: диск, часы, резервная копия, сертификаты, питание и
+   ИБП. В каждой строке написано конкретное действие; внутренние коды знать не
+   нужно.
+3. Если копия просрочена, выполните штатный backup и дождитесь обновления
+   статуса. Не редактируйте `.operations` вручную.
+4. Если ИБП не настроен, подтвердите фактическую схему питания с техническим
+   владельцем. Не маскируйте предупреждение значением environment.
+5. Для обращения в поддержку придумайте отдельную фразу не короче 16 символов,
+   введите её дважды и нажмите **Скачать пакет**.
+6. Передайте файл `.ccdiag` и фразу разными согласованными каналами. В журнале
+   аудита останутся ваш пользователь, время, размер и SHA-256 пакета.
+
+Пакет не содержит логов, персональных данных, паролей, токенов и закрытых
+ключей. После расшифровки всё равно обращайтесь с каталогом как с внутренним
+операционным материалом.
+
+## Node checks and diagnostic bundle
+
+The **Operations** section is available to the cooperative administrator,
+security administrator, and auditor.
+
+1. Read the overall **Ready**, **Needs attention**, or **Critical** status.
+2. Review storage, clock, backup, certificates, and power/UPS. Each row gives a
+   human action; internal codes are not shown.
+3. If the backup is overdue, run the approved backup procedure and wait for the
+   status to refresh. Do not edit `.operations` manually.
+4. If UPS monitoring is not configured, confirm the real power arrangement with
+   the technical owner. Do not hide the warning with an environment override.
+5. For a support case, enter the same new passphrase of at least 16 characters
+   twice and select **Download bundle**.
+6. Send the `.ccdiag` file and passphrase through separate approved channels.
+   The audit log records your user, time, encrypted size, and SHA-256.
+
+The bundle excludes logs, personal data, passwords, tokens, and private keys.
+Treat the decrypted directory as restricted operational material nevertheless.

@@ -60,8 +60,9 @@ acceptance criteria и tests. Если строка карты меняется,
 
 | Требование | Реализация | Проверка |
 |---|---|---|
-| Защищённая наблюдаемость без PII labels | `api/operations.py`, `shared/core/metrics.py`, `modules/operations/application/status.py` | `test_metrics.py`, `test_operations_observability.py` |
-| Локальная диагностика | `coopctl diagnostics` | deployed diagnostics и evidence pack |
+| Защищённая наблюдаемость без PII labels | `api/operations.py`, `shared/core/metrics.py`, `modules/operations/application/status.py`, `readiness.py` | `test_metrics.py`, `test_host_readiness.py`, `test_operations_observability.py` |
+| Host readiness без Интернета | `scripts/operational_status.py`, `.operations` read-only mount, диск/часы/backup/certificate/UPS checks | 41 script tests, backend unit/integration, Windows start/stop smoke; target Linux/UPS evidence открыт |
+| Локальная диагностика | encrypted API/GUI, `diagnostics.py`, `scripts/diagnostic_bundle.py`, append-only export audit | crypto/tamper/duplicate/oversize tests и PostgreSQL audit integration; independent privacy review открыт |
 | Read-only capacity runner | `tools/capacity.py`, `scripts/capacity-smoke.*` | unit tests и 500-request smoke |
 | GUI эксплуатации | `OperationsView.tsx`, role-filtered workspace | API/component/type/build tests |
 | Automated accessibility baseline | `frontend/src/test/accessibility.ts` | login/password DOM audit tests |
@@ -115,7 +116,7 @@ acceptance criteria и tests. Если строка карты меняется,
 
 | Требование | Реализация | Проверка |
 |---|---|---|
-| API compatibility | scripts/openapi_compat.py и baseline 0.1.0 | 7 negative tests, 298 operations, exact mirror |
+| API compatibility | scripts/openapi_compat.py и baseline 0.1.0 | 7 negative tests, 363 operations, exact mirror |
 | Contract freshness | OpenAPI snapshot в backend test image | API snapshot equality test |
 | Clearing properties | seeded local/federated graph matrix | 300 graphs и три input order |
 | Previous-schema migration | scripts/test-migration.sh | 0017 -> 0018 -> 0017 -> 0018 |

@@ -186,4 +186,15 @@ finally {
     }
 }
 
+$statusArguments = @(
+    (Join-Path $PSScriptRoot "operational_status.py")
+    "record-backup"
+    "--root"
+    $root
+    "--backup-dir"
+    $final
+)
+& python @statusArguments | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Backup status recording failed" }
+
 Write-Output $final

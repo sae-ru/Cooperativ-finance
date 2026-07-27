@@ -3640,6 +3640,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations/diagnostic-bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Diagnostic Bundle */
+        post: operations["diagnostic_bundle_api_v1_operations_diagnostic_bundle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/diagnostic-bundle/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diagnostic Bundle Plan */
+        get: operations["diagnostic_bundle_plan_api_v1_operations_diagnostic_bundle_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/host-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Host Readiness */
+        get: operations["host_readiness_api_v1_operations_host_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/operations/metrics": {
         parameters: {
             query?: never;
@@ -7758,6 +7809,29 @@ export interface components {
              */
             recipient_member_id: string;
         };
+        /** DiagnosticBundleRequest */
+        DiagnosticBundleRequest: {
+            /**
+             * Passphrase
+             * Format: password
+             */
+            passphrase: string;
+        };
+        /** DiagnosticPlanEnvelope */
+        DiagnosticPlanEnvelope: {
+            data: components["schemas"]["DiagnosticPlanResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** DiagnosticPlanResponse */
+        DiagnosticPlanResponse: {
+            /** Encryption */
+            encryption: string;
+            /** Excluded */
+            excluded: string[];
+            /** Included */
+            included: string[];
+        };
         /** DiscrepancyRequest */
         DiscrepancyRequest: {
             /** Actual Quantity */
@@ -8342,6 +8416,42 @@ export interface components {
              * @enum {string}
              */
             status: "LIVE" | "READY" | "NOT_READY";
+        };
+        /** HostCheckResponse */
+        HostCheckResponse: {
+            /** Code */
+            code: string;
+            /** Metrics */
+            metrics: {
+                [key: string]: number | string | boolean | null;
+            };
+            /** Name */
+            name: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Status */
+            status: string;
+        };
+        /** HostReadinessEnvelope */
+        HostReadinessEnvelope: {
+            data: components["schemas"]["HostReadinessResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** HostReadinessResponse */
+        HostReadinessResponse: {
+            /** Checks */
+            checks: components["schemas"]["HostCheckResponse"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Status */
+            status: string;
         };
         /** IdentityVerificationRequest */
         IdentityVerificationRequest: {
@@ -10367,8 +10477,12 @@ export interface components {
         OperationalSnapshotResponse: {
             /** Active Crisis Mandates */
             active_crisis_mandates: number;
+            /** Active Federated Prepares */
+            active_federated_prepares: number;
             /** Active Sessions */
             active_sessions: number;
+            /** Expired Federated Prepares */
+            expired_federated_prepares: number;
             /**
              * Generated At
              * Format: date-time
@@ -10390,6 +10504,8 @@ export interface components {
             outbox_pending: number;
             /** Outbox Quarantined */
             outbox_quarantined: number;
+            /** Pending Federated Applies */
+            pending_federated_applies: number;
             /** Pending Key Rotations */
             pending_key_rotations: number;
             /** Schema Revision */
@@ -23277,6 +23393,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OutboxStatusEnvelope"];
+                };
+            };
+        };
+    };
+    diagnostic_bundle_api_v1_operations_diagnostic_bundle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiagnosticBundleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diagnostic_bundle_plan_api_v1_operations_diagnostic_bundle_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiagnosticPlanEnvelope"];
+                };
+            };
+        };
+    };
+    host_readiness_api_v1_operations_host_readiness_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostReadinessEnvelope"];
                 };
             };
         };

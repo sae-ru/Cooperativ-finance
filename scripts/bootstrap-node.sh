@@ -3,6 +3,7 @@ set -eu
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 secrets_dir="$root_dir/secrets"
+operations_dir="$root_dir/.operations"
 mode="${1:-}"
 release="${2:-}"
 python_bin="${PYTHON:-python3}"
@@ -26,7 +27,7 @@ case "$mode" in
 esac
 
 umask 077
-mkdir -p "$secrets_dir"
+mkdir -p "$secrets_dir" "$operations_dir"
 
 write_secret() {
   path="$1"
@@ -60,6 +61,13 @@ write_initial_password "$secrets_dir/bootstrap_auditor_password" "CoopDemo-Audit
 
 if [ ! -f "$root_dir/.env" ]; then
   cp "$root_dir/.env.example" "$root_dir/.env"
+fi
+
+if command -v "$python_bin" >/dev/null 2>&1; then
+  "$python_bin" "$root_dir/scripts/operational_status.py" start-probe --root "$root_dir" >/dev/null
+elif [ "$mode" = "production" ]; then
+  echo "Python 3 is required to write the production host probe." >&2
+  exit 1
 fi
 
 echo "Node secrets and non-secret configuration are ready."

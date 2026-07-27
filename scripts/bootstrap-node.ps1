@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $secrets = Join-Path $root "secrets"
+$operations = Join-Path $root ".operations"
 $utf8 = [Text.UTF8Encoding]::new($false)
 
 if ($DemoCredentials -and $Mode -and $Mode -ne "demo") {
@@ -31,6 +32,7 @@ if ($Mode) {
 }
 
 [IO.Directory]::CreateDirectory($secrets) | Out-Null
+[IO.Directory]::CreateDirectory($operations) | Out-Null
 
 function New-HexSecret([string] $Path, [int] $Bytes) {
     if (Test-Path -LiteralPath $Path) {
@@ -76,6 +78,15 @@ New-InitialPassword (Join-Path $secrets "bootstrap_auditor_password") "CoopDemo-
 $environmentFile = Join-Path $root ".env"
 if (-not (Test-Path -LiteralPath $environmentFile)) {
     Copy-Item -LiteralPath (Join-Path $root ".env.example") -Destination $environmentFile
+}
+
+$python = Get-Command python -ErrorAction SilentlyContinue
+if ($python) {
+    & python (Join-Path $PSScriptRoot "operational_status.py") start-probe --root $root | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Host probe failed" }
+}
+elseif ($Mode -eq "production") {
+    throw "Python 3 is required to write the production host probe"
 }
 
 Write-Host "Node secrets and non-secret configuration are ready."

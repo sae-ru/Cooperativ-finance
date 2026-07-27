@@ -29,7 +29,7 @@ mkdir -p "$destination"
 started_epoch="$(date +%s)"
 python "$root_dir/scripts/openapi_compat.py"   --baseline "$root_dir/infra/contracts/openapi-0.1.0.json"   --current "$root_dir/backend/openapi.json"   --mirror "$root_dir/frontend/openapi.json"   --report "$destination/openapi-compatibility.json"   >/dev/null
 
-if [ ! -s "$root_dir/secrets/postgres_migrator_password.txt" ]; then
+if [ ! -s "$root_dir/secrets/postgres_migrator_password" ]; then
   bash "$root_dir/scripts/bootstrap-node.sh"
 fi
 
@@ -67,8 +67,8 @@ cat > "$destination/manifest.json" <<EOF
   "status": "passed",
   "repeat_count": $repeats,
   "duration_seconds": $duration_seconds,
-  "previous_schema": "0017_peer_reservations",
-  "current_schema": "0021_logistics_contacts",
+  "previous_schema": "0033_member_continuity",
+  "current_schema": "0034_custody_continuity",
   "openapi_baseline": "0.1.0"
 }
 EOF

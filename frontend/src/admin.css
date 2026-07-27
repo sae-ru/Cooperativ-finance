@@ -100,6 +100,29 @@ input, select { width: 100%; min-height: 40px; padding: 0 10px; color: var(--ink
 .status.good { color: var(--green); background: var(--green-soft); }
 .status.warn { color: var(--amber); background: var(--amber-soft); }
 .status.bad { color: var(--red); background: var(--red-soft); }
+.status.danger { color: var(--red); background: var(--red-soft); }
+.host-readiness .panel-heading > div { display: grid; gap: 3px; }
+.readiness-summary { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; font-size: 9px; font-weight: 750; border-radius: 4px; }
+.readiness-summary.operational { color: var(--green); background: var(--green-soft); }
+.readiness-summary.attention { color: var(--amber); background: var(--amber-soft); }
+.readiness-summary.critical { color: var(--red); background: var(--red-soft); }
+.host-check-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.host-check { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; gap: 8px; min-height: 132px; padding: 14px; border-right: 1px solid var(--line); }
+.host-check:last-child { border-right: 0; }
+.host-check > svg { color: var(--green); }
+.host-check.warning > svg, .host-check.unknown > svg { color: var(--amber); }
+.host-check.critical > svg { color: var(--red); }
+.host-check > div { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.host-check strong { font-size: 11px; }
+.host-check span:not(.status), .host-check small { color: var(--muted); font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
+.host-check > .status { grid-column: 2; justify-self: start; min-width: 0; }
+.diagnostic-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(360px, 1.2fr); gap: 20px; padding: 15px; }
+.diagnostic-inventory { display: grid; align-content: start; gap: 7px; }
+.diagnostic-inventory > span { display: flex; align-items: center; gap: 8px; min-height: 31px; padding: 0 9px; background: #f1f5f3; border-radius: 4px; }
+.diagnostic-inventory svg { color: var(--green); }
+.diagnostic-inventory code { min-width: 0; overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-layout form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 10px; }
+.diagnostic-panel > .form-error { padding: 0 15px 14px; }
 .action-band { padding: 14px 15px; background: #eef3f1; border-block: 1px solid var(--line); }
 .action-band form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto; align-items: end; gap: 10px; }
 .action-band .form-error { margin-top: 9px; }
@@ -116,7 +139,12 @@ td select { min-width: 120px; min-height: 32px; font-size: 10px; }
 .spin { animation: spin .85s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-@media (max-width: 1050px) { .metric-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1050px) {
+  .metric-grid { grid-template-columns: repeat(3, 1fr); }
+  .host-check-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .host-check { border-bottom: 1px solid var(--line); }
+  .diagnostic-layout { grid-template-columns: 1fr; }
+}
 @media (max-width: 760px) {
   .admin-topbar {
     min-height: 50px;
@@ -130,6 +158,9 @@ td select { min-width: 120px; min-height: 32px; font-size: 10px; }
   .view-stack { padding: 20px 14px 28px; }
   .view-header h1 { font-size: 24px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .host-check-grid { grid-template-columns: 1fr; }
+  .host-check { min-height: 112px; border-right: 0; }
+  .diagnostic-layout form { grid-template-columns: 1fr; }
   .action-band form { grid-template-columns: 1fr; }
   .data-row { grid-template-columns: minmax(130px, 1fr) auto; }
   .data-row > :nth-child(2) { display: none; }
@@ -362,6 +393,7 @@ html[data-theme="dark"] .trust-case-list > button {
 }
 
 html[data-theme="dark"] th,
+html[data-theme="dark"] .diagnostic-inventory > span,
 html[data-theme="dark"] .canonical-preview,
 html[data-theme="dark"] .cost-breakdown,
 html[data-theme="dark"] .price-details dl,

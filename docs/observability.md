@@ -98,8 +98,9 @@ Operational logs имеют ограниченный срок и rotation. Audit
 ## Диагностический bundle
 
 Локальный оператор может сформировать зашифрованный bundle с manifest,
-версиями, health, redacted logs и metrics snapshot. Перед экспортом показывается
-перечень включаемых данных; private keys и raw PII никогда не включаются.
+операционной сводкой, готовностью host и metrics snapshot. Логи, private keys,
+токены, signed payload и raw PII не включаются. Перед экспортом показывается
+точный закрытый перечень файлов.
 ## Реализованный локальный baseline
 
 `GET /api/v1/operations/snapshot` и `GET /api/v1/operations/metrics` доступны
@@ -134,3 +135,30 @@ Alert после commit имеет более высокий приоритет,
 certificate уже означает экономическую финальность и требует доведения apply.
 Недоступность peer не делает локальный `/health/ready` красным, но блокирует
 новый межузловой переход, которому этот peer необходим.
+
+## Локальная готовность и диагностика Slice 29
+
+`GET /api/v1/operations/host-readiness` объединяет локальные и серверные сигналы:
+
+- свободное место blob volume и host filesystem;
+- расхождение часов приложения и PostgreSQL, плюс host sync status;
+- возраст и тип последней завершённой резервной копии;
+- просроченные и приближающиеся к замене сертификаты;
+- штатное питание, работа от батареи и низкий заряд ИБП.
+
+Host marker-файлы ограничены 64 КиБ, имеют versioned format и читаются API из
+read-only mount `.operations`. Probe старше 180 секунд не считается текущим.
+Пороговые значения задаются environment variables и проверяются при запуске.
+В hardened-среде отсутствующая backup/UPS информация не превращается в зелёный
+статус: итог будет `ATTENTION` или `CRITICAL`.
+
+`GET /api/v1/operations/metrics` публикует `coop_host_readiness` и
+`coop_host_check_severity` с пятью фиксированными именами. Ни пользовательские
+идентификаторы, ни пути, ни payload не используются как labels.
+
+`POST /api/v1/operations/diagnostic-bundle` выполняется только ролями
+`COOPERATIVE_ADMIN`, `SECURITY_ADMIN`, `AUDITOR`, принимает passphrase как
+`SecretStr`, строит пакет вне event loop и возвращает только зашифрованный
+`.ccdiag` с `Cache-Control: no-store`. Успешная выдача обязательно создаёт
+append-only audit с actor, request ID, размером и SHA-256 ciphertext. Формат,
+проверка и ограничения описаны в [Slice 29](implemented_slice_29.md).

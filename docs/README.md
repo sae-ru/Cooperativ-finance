@@ -102,6 +102,7 @@
 - [Реализованный Slice 26: контролируемый выход и преемственность](implemented_slice_26.md)
 - [Реализованный Slice 27: аварийная непрерывность физического хранения](implemented_slice_27.md)
 - [Реализованный Slice 28: fail-closed production deployment](implemented_slice_28.md)
+- [Реализованный Slice 29: локальная готовность узла и безопасная диагностика](implemented_slice_29.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

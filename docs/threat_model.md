@@ -336,3 +336,21 @@ allowlist соответствует реальному egress внешней п
 | production update включает faultpoint или DATA_ONLY backup | canonical production guard в обеих ОС | оператор обходит scripts и вручную меняет Compose state |
 | evidence скрывает dirty source | clean worktree обязателен, override запрещён | committed malicious change требует review/CI/signature controls |
 | режим меняют только переменной Compose | PostgreSQL profile блокирует demo marker и hardened transition | физический DB administrator может подменить state; это должно попасть в external audit |
+
+## Локальная готовность и диагностика Slice 29
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| Подмена host marker даёт ложный зелёный статус | versioned bounded JSON, freshness, enum/range validation, read-only mount в API | пользователь с доступом к host root может подменить marker; production требует OS ACL и независимый осмотр |
+| Повторно использованный PID приводит к остановке чужого процесса | stop сверяет PID, случайный `monitor_id` и свежий probe того же monitor; при сомнении fail-closed | полный компромисс учётной записи host позволяет подменить оба файла и process state |
+| Probe перестал работать, но старые данные выглядят текущими | stale после 180 секунд, UNKNOWN/WARNING в hardened-среде | оператор игнорирует предупреждение или вручную меняет порог |
+| Неисправность ИБП скрыта отсутствием интеграции | `NOT_CONFIGURED` и `UNKNOWN` не считаются OK в staging/pilot/production | ложный override environment вне контроля приложения |
+| Диагностический пакет раскрывает PII или секрет | закрытый inventory из четырёх агрегированных файлов; raw logs/PII/secrets/tokens/keys/signed payload исключены | новая метрика может косвенно стать идентифицирующей без privacy review |
+| Passphrase попадает в URL, audit или process list | POST body как `SecretStr`; CLI читает отдельный файл; audit содержит только размер и hash ciphertext | TLS termination, браузер или скомпрометированный host видит passphrase в памяти |
+| Подмена или подбор пароля к `.ccdiag` | AES-256-GCM, scrypt N=32768/r=8/p=1, случайные salt/nonce, authenticated header | слабая 16-символьная passphrase может иметь низкую энтропию; требуется operator policy |
+| Враждебный диагностический архив вызывает zip-slip или exhaustion | AEAD до разбора, общий/entry size limits, точные имена без путей, запрет duplicate, manifest SHA-256 | уязвимость стандартной крипто/ZIP библиотеки или локальный disk-full при записи |
+| Экспорт не связан с человеком | обязательный append-only `DIAGNOSTIC_BUNDLE_EXPORTED` с actor, request ID, bytes и SHA-256 | авторизованный оператор может передать уже расшифрованные данные вне системы |
+
+Независимый security/privacy review должен отдельно проверить отсутствие новых
+идентифицирующих labels, параметры KDF для целевого оборудования, ACL каталога
+`.operations`, реальную NUT/time-sync интеграцию и процедуру передачи passphrase.

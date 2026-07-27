@@ -409,8 +409,8 @@ export async function requestDirect<T>(path: string, init: RequestInit = {}): Pr
   return response.json() as Promise<T>;
 }
 
-export async function requestBlob(path: string): Promise<Blob> {
-  return (await authorizedFetch(path)).blob();
+export async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  return (await authorizedFetch(path, init)).blob();
 }
 export function commandHeaders(): HeadersInit {
   return { "Idempotency-Key": crypto.randomUUID() };

@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
+import AppErrorBoundary from "./AppErrorBoundary";
 import "./i18n";
 import "./styles.css";
 
@@ -22,8 +23,10 @@ if (root === null) {
 
 createRoot(root).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 );

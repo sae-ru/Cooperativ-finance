@@ -13,6 +13,16 @@ x-runtime-environment: &runtime-environment
   COOP_DATABASE_USER: coop_app
   COOP_DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
   COOP_BLOB_ROOT: /var/lib/cooperative-clearing/blobs
+  COOP_OPERATIONS_STATE_ROOT: /var/lib/cooperative-clearing/operations
+  COOP_HOST_PROBE_STALE_SECONDS: ${COOP_HOST_PROBE_STALE_SECONDS:-180}
+  COOP_DISK_WARNING_PERCENT: ${COOP_DISK_WARNING_PERCENT:-15}
+  COOP_DISK_CRITICAL_PERCENT: ${COOP_DISK_CRITICAL_PERCENT:-5}
+  COOP_CLOCK_DRIFT_WARNING_SECONDS: ${COOP_CLOCK_DRIFT_WARNING_SECONDS:-5}
+  COOP_CLOCK_DRIFT_CRITICAL_SECONDS: ${COOP_CLOCK_DRIFT_CRITICAL_SECONDS:-60}
+  COOP_BACKUP_WARNING_HOURS: ${COOP_BACKUP_WARNING_HOURS:-36}
+  COOP_BACKUP_CRITICAL_HOURS: ${COOP_BACKUP_CRITICAL_HOURS:-72}
+  COOP_CERTIFICATE_WARNING_DAYS: ${COOP_CERTIFICATE_WARNING_DAYS:-30}
+  COOP_CERTIFICATE_CRITICAL_DAYS: ${COOP_CERTIFICATE_CRITICAL_DAYS:-7}
   COOP_BLOB_ENCRYPTION_KEY_FILE: /run/secrets/blob_encryption_key
   COOP_MFA_ENCRYPTION_KEY_FILE: /run/secrets/mfa_encryption_key
   COOP_NODE_SIGNING_SEED_FILE: /run/secrets/node_signing_seed
@@ -151,6 +161,7 @@ services:
       COOP_SERVICE_NAME: api
     volumes:
       - blob-data:/var/lib/cooperative-clearing/blobs
+      - ./.operations:/var/lib/cooperative-clearing/operations:ro
     networks:
       - app
       - data

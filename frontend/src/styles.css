@@ -678,3 +678,43 @@ button:focus-visible {
     min-width: 74px;
   }
 }
+
+.app-recovery {
+  align-items: center;
+  background: var(--canvas);
+  color: var(--ink);
+  display: flex;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.app-recovery__content {
+  max-width: 560px;
+}
+
+.app-recovery__content h1 {
+  font-size: 2rem;
+  margin: 0 0 12px;
+}
+
+.app-recovery__content p {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.app-recovery__content button {
+  align-items: center;
+  background: var(--forest);
+  border: 1px solid var(--forest);
+  border-radius: 5px;
+  color: #ffffff;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.app-recovery__status {
+  font-weight: 700;
+}

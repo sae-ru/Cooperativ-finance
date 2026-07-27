@@ -264,3 +264,44 @@ Unit-тесты покрывают нормализацию входа и refere
 Pure Python tests проверяют precedence process/`.env`, точные environment values, atomic rewrite без дублей, fresh production, запрет demo promotion, known demo credentials и hardened downgrade. Static contract tests требуют одинаковые signed-bundle/no-build guards в Windows/Linux wrappers, сохранение operational artifacts, их чтение backup/update scripts и отсутствие alias `prod`.
 
 PowerShell scripts проходят parser, Linux scripts - `sh -n`. PostgreSQL integration отдельно доказывает отказ при `demo_data_loaded`, отказ in-place hardened transition и допустимый повторный старт fresh production profile. Release bundle suite включает `runtime_environment.py` в подписанный node payload. Живой demo regression должен подтвердить `environment=dev`, `demo_data_loaded=true`, `OPERATIONAL`, `RUNNING` и отсутствие browser regressions.
+
+## Проверки Slice 29
+
+Backend unit tests проверяют расчёт пяти состояний узла, границы порогов,
+устаревший probe, детерминированный plain ZIP, AES-256-GCM/scrypt round-trip,
+неверную passphrase и изменение ciphertext. PostgreSQL integration проверяет
+RBAC трёх эксплуатационных ролей, readiness, план содержимого, binary download,
+Prometheus host metrics и audit `DIAGNOSTIC_BUNDLE_EXPORTED` без passphrase.
+
+Pure Python script suite проверяет atomic bounded marker-файлы, регистрацию
+только завершённой FULL/DATA_ONLY копии, цикл фонового probe, повторный запуск,
+сверку `monitor_id` перед остановкой, точный ZIP inventory, duplicate names,
+oversized input, manifest SHA-256 и отказ при неверном пароле. Отдельный живой
+Windows smoke обязан доказать start -> owned marker -> stop -> process absent;
+Linux shell syntax проверяется в контейнере Alpine, PowerShell - встроенным
+parser API.
+
+Frontend gate проверяет типизированные API, binary POST, понятные RU-статусы без
+внутренних `BACKUP_DATA_ONLY`/`NOT_CONFIGURED`, совпадение passphrase, XML parity,
+полную английскую эксплуатационную страницу без кириллицы, PWA recovery после
+устаревшего lazy chunk, TypeScript и production build. OpenAPI gate требует 363
+операции, совместимость с baseline и byte-exact frontend mirror.
+
+Проверенный checkpoint: Ruff, strict mypy по 262 source files, `249 passed, 1
+deselected` и line coverage `77.29%` при обязательном пороге 75%; 41 script
+tests; 66 frontend files / 186 tests и coverage `81.82%` statements / `70.77%`
+branches / `75.08%` functions / `87.48%` lines; production PWA build; 21
+critical tests, migration cycle `0033 <-> 0034`, signed journal verification и
+трёхузловой acceptance `1 passed`. Browser smoke прошёл RU/EN, light/dark и
+desktop/mobile без смешения языков и горизонтального overflow.
+
+CI job обязан собирать frontend с repository root context и
+`-f frontend/Dockerfile`, потому что build contract читает корневой `/lang`.
+Migration job использует текущий переход `0033_member_continuity` ->
+`0034_custody_continuity`, secret `secrets/postgres_migrator_password` и TCP
+readiness внутри Compose network. Локальный эквивалент не закрывает remote CI
+checkbox до зелёного workflow на опубликованном commit.
+
+Эти проверки подтверждают code-level baseline. Они не заменяют длительный
+мониторинг на целевом host, физическое испытание ИБП, ручную browser/device
+матрицу и независимую проверку диагностического пакета по privacy policy.

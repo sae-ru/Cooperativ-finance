@@ -78,11 +78,11 @@
 ## Operations
 
 - [ ] Назначены оператор, security admin, backup custodian и on-call contacts.
-- [ ] Dashboards/alerts работают без внешнего Интернета.
+- [ ] Dashboards/alerts работают без внешнего Интернета (code-level baseline: [Slice 29](implemented_slice_29.md); target-host evidence не приложен).
 - [ ] Runbooks доступны локально и на бумаге.
-- [ ] Clock, disk, UPS и certificate monitoring работают.
+- [ ] Clock, disk, UPS и certificate monitoring работают (code-level baseline: [Slice 29](implemented_slice_29.md); реальный ИБП и target host не проверены).
 - [ ] Support и escalation обучены без доступа к production secrets.
-- [ ] Диагностический bundle проверен на отсутствие PII/secrets.
+- [ ] Диагностический bundle проверен на отсутствие PII/secrets (bounded implementation: [Slice 29](implemented_slice_29.md); независимый privacy review не приложен).
 - [ ] SBOM, licenses, image digests и release signature опубликованы локально.
 
 ## Pilot evidence
@@ -306,3 +306,30 @@ Demo configuration, известные demo credentials и PostgreSQL marker `de
 Checkpoint: `244 passed, 1 deselected`, backend coverage `77.81%`, Ruff, strict mypy по `258` файлам, `29` script tests, shell/PowerShell syntax, `alembic check`, compatible exact-mirror OpenAPI и живой `OPERATIONAL` demo-узел после `start.bat demo`.
 
 Закрыт только code-level deployment invariant. Подписанный readiness protocol, production key ceremony, назначенные реальные custodians, независимые security/legal reviews, target-host RTO/RPO/capacity, accessibility matrix и полевой pilot остаются открытыми внешними checkbox.
+
+## Текущее доказательство Slice 29
+
+Реализованы локальные readiness API/GUI/metrics, минутный host probe,
+автоматический marker завершённой backup, зашифрованный диагностический пакет,
+автономная проверка его inventory/checksums и персональный audit скачивания.
+Windows start/stop smoke, 41 script tests, backend unit/integration, frontend
+component/typecheck и OpenAPI compatibility подтверждают инженерный baseline.
+Подробности: [implemented_slice_29.md](implemented_slice_29.md).
+
+Локальный checkpoint: `249 passed, 1 deselected`, backend line coverage
+`77.29%`, Ruff, strict mypy по `262` файлам; 66 frontend test files / 186 tests
+и coverage `81.82%` statements / `70.77%` branches / `75.08%` functions /
+`87.48%` lines; production PWA build; 21 critical tests; migration
+`0033 <-> 0034`; signed journal verification; OpenAPI 363 exact mirror и
+трёхузловой acceptance. Browser smoke подтвердил RU/EN без смешения языков,
+light/dark, desktop/mobile без overflow и обновление старой PWA-вкладки.
+
+Ошибки исполняемого CI-контракта исправлены локально, но remote workflow на
+этих изменениях ещё не запускался. Поэтому checkbox **CI release gates зелёные
+на конкретном commit** остаётся открытым и не подменяется локальным прогоном.
+
+Operations checkbox остаются открытыми до проверки на конкретном Linux host с
+реальным диском, службой времени, ИБП/NUT и сертификатами. Диагностический
+checkbox требует независимого просмотра privacy owner; организационные роли,
+runbooks на бумаге, support training, RTO/RPO и pilot evidence также не могут
+быть закрыты результатом автоматических тестов.

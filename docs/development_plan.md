@@ -443,3 +443,21 @@ Service-client lifecycle реализован в Slice 24. Управляемо�
 - одинаковый контракт Windows/Linux и regression tests.
 
 Доказательства и внешние границы: [implemented_slice_28.md](implemented_slice_28.md). Этот срез устраняет ложный production mode, но не заменяет подписанный readiness review, production keys, внешний security/legal review и полевой pilot.
+
+## Slice 29. Локальная готовность узла и безопасная диагностика
+
+Реализован автономный эксплуатационный контур:
+
+- фоновая host-проба диска, часов и ИБП с идемпотентным запуском и
+  подтверждённой остановкой на Windows/Linux;
+- регистрация свежести и полноты последней резервной копии;
+- серверная оценка диска, часов БД, backup, сертификатов и ИБП;
+- защищённые API, bounded Prometheus metrics и RU/EN GUI без сырых кодов;
+- зашифрованный диагностический пакет с точным inventory, автономной проверкой
+  и персональной audit-записью скачивания;
+- OpenAPI, unit/integration/frontend/script tests и signed release payload.
+
+Доказательства и границы: [implemented_slice_29.md](implemented_slice_29.md).
+Следующий code-level приоритет определяется по оставшимся пунктам матрицы ТЗ;
+целевой host, внешняя security/legal проверка, RTO/RPO и полевой пилот остаются
+отдельными обязательными production gates.

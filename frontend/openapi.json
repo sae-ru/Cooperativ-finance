@@ -6278,6 +6278,69 @@
         "title": "DeliveryResponse",
         "type": "object"
       },
+      "DiagnosticBundleRequest": {
+        "properties": {
+          "passphrase": {
+            "format": "password",
+            "maxLength": 128,
+            "minLength": 16,
+            "title": "Passphrase",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "passphrase"
+        ],
+        "title": "DiagnosticBundleRequest",
+        "type": "object"
+      },
+      "DiagnosticPlanEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiagnosticPlanResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "DiagnosticPlanEnvelope",
+        "type": "object"
+      },
+      "DiagnosticPlanResponse": {
+        "properties": {
+          "encryption": {
+            "title": "Encryption",
+            "type": "string"
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "included": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Included",
+            "type": "array"
+          }
+        },
+        "required": [
+          "included",
+          "excluded",
+          "encryption"
+        ],
+        "title": "DiagnosticPlanResponse",
+        "type": "object"
+      },
       "DiscrepancyRequest": {
         "properties": {
           "actual_quantity": {
@@ -7710,6 +7773,100 @@
           "request_id"
         ],
         "title": "HealthResponse",
+        "type": "object"
+      },
+      "HostCheckResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "code",
+          "observed_at",
+          "metrics"
+        ],
+        "title": "HostCheckResponse",
+        "type": "object"
+      },
+      "HostReadinessEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HostReadinessResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "HostReadinessEnvelope",
+        "type": "object"
+      },
+      "HostReadinessResponse": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/HostCheckResponse"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generated_at",
+          "status",
+          "checks"
+        ],
+        "title": "HostReadinessResponse",
         "type": "object"
       },
       "IdentityVerificationRequest": {
@@ -12781,8 +12938,16 @@
             "title": "Active Crisis Mandates",
             "type": "integer"
           },
+          "active_federated_prepares": {
+            "title": "Active Federated Prepares",
+            "type": "integer"
+          },
           "active_sessions": {
             "title": "Active Sessions",
+            "type": "integer"
+          },
+          "expired_federated_prepares": {
+            "title": "Expired Federated Prepares",
             "type": "integer"
           },
           "generated_at": {
@@ -12822,6 +12987,10 @@
             "title": "Outbox Quarantined",
             "type": "integer"
           },
+          "pending_federated_applies": {
+            "title": "Pending Federated Applies",
+            "type": "integer"
+          },
           "pending_key_rotations": {
             "title": "Pending Key Rotations",
             "type": "integer"
@@ -12853,6 +13022,9 @@
           "pending_key_rotations",
           "open_offline_epochs",
           "issued_federation_forms",
+          "active_federated_prepares",
+          "pending_federated_applies",
+          "expired_federated_prepares",
           "active_crisis_mandates",
           "issued_crisis_forms"
         ],
@@ -38210,6 +38382,97 @@
         "summary": "Outbox Status",
         "tags": [
           "signed-journal"
+        ]
+      }
+    },
+    "/api/v1/operations/diagnostic-bundle": {
+      "post": {
+        "operationId": "diagnostic_bundle_api_v1_operations_diagnostic_bundle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiagnosticBundleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Diagnostic Bundle",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/operations/diagnostic-bundle/plan": {
+      "get": {
+        "operationId": "diagnostic_bundle_plan_api_v1_operations_diagnostic_bundle_plan_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticPlanEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Diagnostic Bundle Plan",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/operations/host-readiness": {
+      "get": {
+        "operationId": "host_readiness_api_v1_operations_host_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostReadinessEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Host Readiness",
+        "tags": [
+          "operations"
         ]
       }
     },

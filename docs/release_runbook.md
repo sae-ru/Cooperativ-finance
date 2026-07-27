@@ -148,3 +148,29 @@ contract сравнивается с принятым release baseline, а front
 совпасть побайтово. Отчет входит в production evidence. Любой breaking или
 неразрешимый contract change останавливает package job; обход допускается
 только новой версией baseline и отдельным принятым решением о переходе.
+
+## Эксплуатационная проверка Slice 29
+
+Перед подписанием release bundle:
+
+1. убедиться, что payload содержит `scripts/operational_status.py`,
+   `scripts/diagnostic_bundle.py`, `docs/observability.md` и
+   `docs/implemented_slice_29.md`;
+2. выполнить script suite и живой start/stop smoke host probe на целевой ОС;
+3. запустить узел и убедиться, что раздел **Эксплуатация** показывает свежие
+   диск и часы, а отсутствующая backup/ИБП информация явно помечена;
+4. создать тестовый `.ccdiag`, найти audit `DIAGNOSTIC_BUNDLE_EXPORTED`,
+   расшифровать пакет автономной утилитой и проверить ровно четыре файла;
+5. убедиться, что в manifest и содержимом нет raw logs, PII, secrets, tokens,
+   private keys и signed payload;
+6. передать `.ccdiag` и passphrase разными согласованными каналами;
+7. оставить PWA-вкладку открытой, заменить frontend image, снова открыть узел и
+   убедиться, что устаревший lazy chunk приводит максимум к одной автоматической
+   перезагрузке, после чего загружается текущий интерфейс без цикла reload;
+8. проверить раздел **Эксплуатация** на русском и английском, light/dark и
+   desktop/mobile; в английском UI не должно быть кириллицы, а в русском
+   латиница допустима только для технических идентификаторов и имён файлов.
+
+Зелёный code-level тест не закрывает target-host checkbox: production review
+прикладывает снимок GUI, host marker, результат проверки реального ИБП, возраст
+последнего restore-tested backup и протокол обращения с расшифрованным пакетом.

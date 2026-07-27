@@ -54,11 +54,21 @@ class Settings(BaseSettings):
     database_connect_timeout_seconds: int = Field(default=5, ge=1, le=30)
 
     blob_root: Path = Path("/var/lib/cooperative-clearing/blobs")
+    operations_state_root: Path = Path("/var/lib/cooperative-clearing/operations")
     blob_encryption_key_file: Path = Path("/run/secrets/blob_encryption_key")
     node_signing_seed_file: Path = Path("/run/secrets/node_signing_seed")
     readiness_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     worker_heartbeat_seconds: float = Field(default=5.0, ge=1, le=60)
     worker_stale_after_seconds: float = Field(default=20.0, ge=5, le=600)
+    host_probe_stale_seconds: int = Field(default=180, ge=30, le=3600)
+    disk_warning_percent: int = Field(default=15, ge=2, le=80)
+    disk_critical_percent: int = Field(default=5, ge=1, le=50)
+    clock_drift_warning_seconds: int = Field(default=5, ge=1, le=300)
+    clock_drift_critical_seconds: int = Field(default=60, ge=2, le=3600)
+    backup_warning_hours: int = Field(default=36, ge=1, le=720)
+    backup_critical_hours: int = Field(default=72, ge=2, le=2160)
+    certificate_warning_days: int = Field(default=30, ge=2, le=365)
+    certificate_critical_days: int = Field(default=7, ge=1, le=90)
     outbox_poll_seconds: float = Field(default=1.0, ge=0.2, le=60)
     outbox_batch_size: int = Field(default=50, ge=1, le=500)
     outbox_lease_seconds: int = Field(default=30, ge=5, le=600)
@@ -111,6 +121,7 @@ class Settings(BaseSettings):
             for path in (
                 self.database_password_file,
                 self.blob_root,
+                self.operations_state_root,
                 self.blob_encryption_key_file,
                 self.mfa_encryption_key_file,
                 self.node_signing_seed_file,
@@ -129,6 +140,14 @@ class Settings(BaseSettings):
             ):
                 if not path.is_absolute():
                     raise ValueError("runtime paths must be absolute")
+        if self.disk_critical_percent >= self.disk_warning_percent:
+            raise ValueError("critical disk threshold must be below warning threshold")
+        if self.clock_drift_warning_seconds >= self.clock_drift_critical_seconds:
+            raise ValueError("clock warning threshold must be below critical threshold")
+        if self.backup_warning_hours >= self.backup_critical_hours:
+            raise ValueError("backup warning threshold must be below critical threshold")
+        if self.certificate_critical_days >= self.certificate_warning_days:
+            raise ValueError("critical certificate threshold must be below warning threshold")
         return self
 
     @property

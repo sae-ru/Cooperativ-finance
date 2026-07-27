@@ -360,3 +360,41 @@ restore записанного backup. Restore сначала проверяет
 release, затем возвращает DB ACL/data и blobs, выполняет init/bootstrap и
 заканчивается health/journal gates. Evidence:
 [implemented_slice_16.md](implemented_slice_16.md).
+## Локальный монитор узла и диагностика
+
+`start.sh` и `start.bat` через bootstrap автоматически создают `.operations` и
+идемпотентно запускают host probe раз в 60 секунд. Каталог монтируется в API
+только для чтения. Для ручной проверки:
+
+```sh
+python scripts/operational_status.py probe --root .
+python scripts/operational_status.py start-probe --root .
+python scripts/operational_status.py stop-probe --root .
+```
+
+
+Параметры probe читаются из локального `.env`; непустая переменная процесса имеет приоритет. Для Linux production задайте `COOP_UPS_NAME=<имя устройства NUT>`. Если NUT не
+используется, интеграционный слой может передать одно из фиксированных значений
+`COOP_UPS_STATUS`: `ONLINE`, `ON_BATTERY`, `LOW_BATTERY`, `NOT_CONFIGURED` или
+`UNKNOWN`. Произвольное значение отклоняется. Аналогично допустим только
+фиксированный `COOP_HOST_CLOCK_STATUS`. Эти overrides не должны маскировать
+неисправность: их источник и владелец фиксируются в host runbook.
+
+После `backup-node.sh` или `backup-node.ps1` успешная завершённая копия
+автоматически обновляет `.operations/backup-status.json`. Ручное редактирование
+marker не считается evidence восстановления.
+
+Зашифрованный пакет скачивается в GUI **Эксплуатация**. Для автономной
+расшифровки:
+
+```sh
+python scripts/diagnostic_bundle.py \
+  --input ./cooperative-clearing-diagnostic-YYYYMMDDTHHMMSSZ.ccdiag \
+  --output-dir ./diagnostic-decoded \
+  --passphrase-file ./diagnostic-passphrase.txt
+```
+
+Файл passphrase хранится и передаётся отдельно от `.ccdiag`; после работы его
+удаляют по локальной secret-handling policy. Расшифрованный каталог считается
+операционным материалом ограниченного доступа, даже несмотря на исключение PII
+по контракту. Подробности: [implemented_slice_29.md](implemented_slice_29.md).

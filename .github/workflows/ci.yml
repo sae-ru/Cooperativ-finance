@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Build frontend test image
-        run: docker build --target test --tag cooperative-clearing/frontend-test:ci frontend
+        run: docker build -f frontend/Dockerfile --target test --tag cooperative-clearing/frontend-test:ci .
       - name: Run type checks, unit tests and production build
         run: |
           docker run --rm cooperative-clearing/frontend-test:ci \
@@ -126,12 +126,12 @@ jobs:
         run: |
           docker buildx build --target runtime --sbom=true --provenance=mode=max \
             --load --tag cooperative-clearing/backend:ci-contract backend
-          docker buildx build --target runtime --sbom=true --provenance=mode=max \
-            --load --tag cooperative-clearing/frontend:ci-contract frontend
+          docker buildx build -f frontend/Dockerfile --target runtime --sbom=true --provenance=mode=max \
+            --load --tag cooperative-clearing/frontend:ci-contract .
           docker buildx build --sbom=true --provenance=mode=max \
             --load --tag cooperative-clearing/gateway:ci-contract infra/gateway
-          docker build --target test \
-            --tag cooperative-clearing/frontend-test:ci-contract frontend
+          docker build -f frontend/Dockerfile --target test \
+            --tag cooperative-clearing/frontend-test:ci-contract .
           docker pull postgres:18-alpine
       - name: Create and independently verify signed offline release
         run: |

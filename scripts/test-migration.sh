@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-previous_revision="${COOP_MIGRATION_FROM:-0017_peer_reservations}"
-expected_head="${COOP_MIGRATION_HEAD:-0021_logistics_contacts}"
+previous_revision="${COOP_MIGRATION_FROM:-0033_member_continuity}"
+expected_head="${COOP_MIGRATION_HEAD:-0034_custody_continuity}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 project="${COOP_MIGRATION_PROJECT:-coop-migration-${timestamp,,}}"
 report="${COOP_MIGRATION_REPORT:-$root_dir/evidence/migration-$timestamp.json}"
@@ -26,7 +26,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [ ! -s "$root_dir/secrets/postgres_migrator_password.txt" ]; then
+if [ ! -s "$root_dir/secrets/postgres_migrator_password" ]; then
   bash "$root_dir/scripts/bootstrap-node.sh"
 fi
 
@@ -37,7 +37,7 @@ fi
 
 ready=0
 for _attempt in $(seq 1 60); do
-  if "${compose[@]}" exec -T postgres-test     pg_isready -q -U coop_migrator -d cooperative_clearing_test; then
+  if "${compose[@]}" exec -T postgres-test     pg_isready -q -h postgres-test -U coop_migrator -d cooperative_clearing_test; then
     ready=1
     break
   fi

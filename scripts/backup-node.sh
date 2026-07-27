@@ -164,4 +164,8 @@ work_dir=""
 docker start "$api_container" "$worker_container" >/dev/null
 services_stopped=0
 
+"$python_bin" "$root_dir/scripts/operational_status.py" record-backup \
+  --root "$root_dir" \
+  --backup-dir "$final_dir" >/dev/null
+
 echo "$final_dir"

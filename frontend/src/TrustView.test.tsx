@@ -201,7 +201,8 @@ describe("TrustView", () => {
 
     renderView();
     expect(await screen.findByText("Готово к решению")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Заявить об отсутствии конфликта" }));
+    await user.click(screen.getByRole("button", { name: /DEMO-TRUST-APPEAL-001/u }));
+    await user.click(await screen.findByRole("button", { name: "Заявить об отсутствии конфликта" }));
     await user.click(screen.getByRole("button", { name: "Апелляции" }));
     expect(await screen.findByText(appeal.grounds)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Подтвердить независимость" }));

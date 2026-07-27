@@ -58,6 +58,7 @@ export default defineConfig({
       },
       workbox: {
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
         skipWaiting: true,
         navigateFallback: "/index.html",
         runtimeCaching: [
