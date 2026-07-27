@@ -46,7 +46,7 @@
 - [ ] Threat model и independent security review завершены.
 - [ ] Production keys сгенерированы и разделены по назначению.
 - [ ] Private keys/secrets отсутствуют в Git/images/plain backup.
-- [ ] Local auth, revoke, step-up и break-glass протестированы.
+- [x] Local auth, revoke, TOTP step-up и scoped break-glass протестированы ([evidence](implemented_slice_20.md)); WebAuthn остаётся отдельным gate.
 - [x] Release/package/event signatures имеют independent test vectors ([evidence](implemented_slice_15.md), [evidence](implemented_slice_11.md)).
 - [ ] Critical/high findings закрыты или formal accepted risk подписан.
 - [ ] Incident drill key compromise выполнен.
@@ -182,3 +182,16 @@ compatibility и живой RU/EN desktop/mobile light/dark browser smoke зел
 Это закрывает только реализованные инженерные контроли. Полный набор правил
 раздела 24.5, policy calibration на реальных данных, privacy/security/legal
 review, manual accessibility matrix и пилотные решения остаются открытыми.
+
+## Текущее доказательство Slice 20
+
+TOTP seed зашифрован отдельным node secret, server-side step-up имеет expiry,
+replay и brute-force controls. Recovery и break-glass требуют двух разных
+персональных сотрудников, сохраняют подписанные события, а аварийная роль имеет
+отдельный source/scope/expiry и исчезает из действующей сессии после отзыва.
+Backend, frontend и populated migration cycle проверены; подробности:
+[implemented_slice_20.md](implemented_slice_20.md).
+
+Это закрывает только инженерную проверку local auth/TOTP/break-glass. WebAuthn,
+production key ceremony, независимый security review, физическое учение с
+реальными сотрудниками и formal accepted risks остаются открытыми checkbox.

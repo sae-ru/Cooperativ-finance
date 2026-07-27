@@ -302,3 +302,20 @@ expired/released, apply receipt accepted и clearing reconciled.
 Локальное принятие чужого signed artifact и локальное хозяйственное применение
 являются разными событиями. Это позволяет доказать, какой узел создал документ,
 кто его принял и когда именно изменилось локальное состояние.
+
+## События локальной безопасности Slice 20
+
+| Event type | Назначение |
+|---|---|
+| `identity.account_recovery_requested` | персональный requester, target, reason, expiry и evidence заявки |
+| `identity.account_recovery_executed` | независимое решение, отзыв сессий/TOTP и обязательная смена пароля |
+| `identity.account_recovery_rejected` | мотивированное независимое отклонение |
+| `identity.break_glass_requested` | target, allowlisted role, scope, requested duration и evidence |
+| `identity.break_glass_activated` | независимый approver и точный момент expiry временной власти |
+| `identity.break_glass_rejected` | мотивированное отклонение аварийной власти |
+| `identity.break_glass_revoked` | досрочный отзыв, revoker и причина |
+
+Все события подписывает node key, они входят в общую hash-chain и outbox.
+Открытый/временный пароль и TOTP seed не входят ни в payload, ни в evidence.
+Обычный audit дополнительно связывает событие с HTTP request id; каждое
+фактическое использование active break-glass создаёт `BREAK_GLASS_ACCESS_USED`.

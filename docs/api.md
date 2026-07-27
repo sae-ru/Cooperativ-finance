@@ -25,6 +25,29 @@
 - service client использует отдельные credentials, scopes и network policy;
 - внешний OIDC не является обязательным.
 
+Реализованный локальный контур:
+
+```text
+GET    /api/v1/auth/security
+POST   /api/v1/auth/totp/enrollment
+POST   /api/v1/auth/totp/enrollment/confirm
+POST   /api/v1/auth/step-up/totp
+DELETE /api/v1/auth/totp
+
+GET/POST /api/v1/admin/account-recoveries
+POST     /api/v1/admin/account-recoveries/{id}/decision
+GET/POST /api/v1/admin/break-glass
+POST     /api/v1/admin/break-glass/{id}/decision
+POST     /api/v1/admin/break-glass/{id}/revoke
+```
+
+TOTP enrollment возвращает seed и provisioning URI только в ответе создания.
+Step-up grant находится в server-side session и не доверяется полю access token.
+Recovery и break-glass команды требуют `Idempotency-Key`, reason/evidence,
+активный step-up и независимого второго человека. Command `event_id` ссылается
+на подписанный node event, а не только на обычную audit-запись. WebAuthn пока не
+входит в реализованный OpenAPI и остаётся отдельным production gate.
+
 ## Формат успешной команды
 
 ```json

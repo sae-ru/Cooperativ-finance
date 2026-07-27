@@ -12,7 +12,7 @@
 | 8 Резервы | `crisis_protocol` | 10 | [implemented Slice 10](implemented_slice_10.md) |
 | 9 Офлайн | `offline_protocol`, ADR-0005/0006 | 11 | [implemented Slice 11](implemented_slice_11.md) |
 | 10 Кризис | `crisis_protocol` | 10 | [implemented Slice 10](implemented_slice_10.md) |
-| 11 Доверие/безопасность | `security`, `threat_model` | 1-12 | [node controls](implemented_slice_11.md), independent review |
+| 11 Доверие/безопасность | `security`, `threat_model` | 1-12, 19-20 | [node controls](implemented_slice_11.md), [local MFA and emergency access](implemented_slice_20.md), independent review |
 | 12 Объектная модель | `domain_model`, `data_model` | 1-11 | migrations/constraints |
 | 13 Архитектура | `architecture`, ADR | 0 | architecture tests |
 | 14 API/UI | `api`, `gui_architecture`, `design_system` | все, 18 | OpenAPI/E2E/a11y and participant browser path |
@@ -149,3 +149,14 @@ acceptance criteria и tests. Если строка карты меняется,
 | Нет обхода через global node role | revision `0024`, обязательный cooperative owner в offer/quote/intent и fail-closed context resolution | populated migration invariants и global-role HOLD integration |
 | Операторское рабочее место | overview, filters, fact/threshold explanation, decision form | API/component/build и browser acceptance |
 | Полный перечень раздела 24.5 | шесть правил реализованы; оставшиеся классы явно учтены как gap | [границы Slice 19](implemented_slice_19.md#проверка-и-границы) |
+## Slice 20 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Локальный второй фактор | encrypted TOTP factor, replay/brute-force controls, QR enrollment | AES-GCM/TOTP unit tests, API and component flow |
+| Короткое подтверждение личности | server-side session step-up with expiry | critical endpoint integration assertions |
+| Восстановление без внешних сервисов | two-person recovery, Argon2id temporary password, session/factor revoke | end-to-end PostgreSQL flow and signed events |
+| Ограниченный аварийный доступ | allowlist, scope, 15-60 minute expiry, independent approval and usage audit | activation/use/revoke integration flow |
+| Запрет саморасширения | permanent assignment source required for ordinary role lifecycle | break-glass delegation rejection test |
+| Проверяемая власть | linked authority assignment and signed lifecycle events | migration FK/backfill cycle and signature assertions |
+| Понятный интерфейс | Security workspace, RU/EN errors and reason labels | component, locale, typecheck, build and browser checks |

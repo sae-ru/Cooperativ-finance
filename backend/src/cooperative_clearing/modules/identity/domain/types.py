@@ -1,6 +1,7 @@
 """Stable identity lifecycle and authorization types."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -39,6 +40,11 @@ class AssignmentStatus(StrEnum):
     ACTIVE = "ACTIVE"
     REVOKED = "REVOKED"
     REJECTED = "REJECTED"
+
+
+class RoleGrantSource(StrEnum):
+    ASSIGNMENT = "ASSIGNMENT"
+    BREAK_GLASS = "BREAK_GLASS"
 
 
 class SessionStatus(StrEnum):
@@ -107,6 +113,8 @@ class RoleGrant:
     assignment_id: UUID
     role: RoleCode
     cooperative_id: UUID | None
+    source: RoleGrantSource = RoleGrantSource.ASSIGNMENT
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,9 +126,25 @@ class Principal:
     must_change_password: bool
     roles: tuple[RoleGrant, ...]
 
+    @property
+    def break_glass_grants(self) -> tuple[RoleGrant, ...]:
+        return tuple(grant for grant in self.roles if grant.source is RoleGrantSource.BREAK_GLASS)
+
     def has_role(self, roles: set[RoleCode], cooperative_id: UUID | None = None) -> bool:
         return any(
             grant.role in roles
+            and (
+                cooperative_id is None
+                or grant.cooperative_id is None
+                or grant.cooperative_id == cooperative_id
+            )
+            for grant in self.roles
+        )
+
+    def has_permanent_role(self, roles: set[RoleCode], cooperative_id: UUID | None = None) -> bool:
+        return any(
+            grant.source is RoleGrantSource.ASSIGNMENT
+            and grant.role in roles
             and (
                 cooperative_id is None
                 or grant.cooperative_id is None
@@ -156,6 +180,25 @@ def require_role(
         raise DomainError(
             code="AUTHORIZATION_DENIED",
             message_key="errors.auth.authorization_denied",
+            status_code=403,
+        )
+
+
+def require_permanent_role(
+    principal: Principal,
+    allowed: set[RoleCode],
+    cooperative_id: UUID | None = None,
+) -> None:
+    if principal.must_change_password:
+        raise DomainError(
+            code="PASSWORD_CHANGE_REQUIRED",
+            message_key="errors.auth.password_change_required",
+            status_code=403,
+        )
+    if not principal.has_permanent_role(allowed, cooperative_id):
+        raise DomainError(
+            code="PERMANENT_ROLE_REQUIRED",
+            message_key="errors.auth.permanent_role_required",
             status_code=403,
         )
 

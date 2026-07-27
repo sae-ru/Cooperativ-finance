@@ -58,12 +58,21 @@ status, rotation link и revocation evidence. Private material в БД отсу�
 - refresh session хранится server-side и отзывается;
 - короткий access token не содержит долгоживущих полномочий;
 - роль проверяется по БД на момент критической команды;
-- step-up authentication требуется для ключей, кризиса, взыскания, финализации
-  клиринга и security policy;
-- защита от brute force использует локальный rate limit и audit;
-- recovery доступа требует двух независимых людей и создаёт событие;
-- break-glass role ограничена временем и scope, все действия немедленно
-  оповещаются аудиторам.
+- TOTP seed зашифрован AES-256-GCM отдельным `mfa_encryption_key`; seed никогда
+  не возвращается после незавершённого enrollment;
+- TOTP имеет окно ±30 секунд, запрет повторного moving counter, локальный
+  brute-force lock и audit отказов;
+- step-up хранится в server-side session, по умолчанию действует 10 минут и
+  требуется для ключей, кризиса, взыскания, финализации клиринга и security policy;
+- финализация local/inter-node клиринга не допускает break-glass bypass;
+- recovery доступа требует двух независимых персональных сотрудников, отзывает
+  старые сессии/TOTP и создаёт подписанное событие;
+- break-glass ограничен allowlist роли, scope и сроком 15-60 минут; отдельный
+  `source=BREAK_GLASS` не попадает в обычную выдачу ролей;
+- временное право нельзя использовать для recovery, делегирования или
+  превращения в постоянное; каждое HTTP-обращение с ним журналируется;
+- WebAuthn остаётся обязательным расширением для production-профилей, где
+  утверждена device-bound аутентификация.
 
 ## Secrets
 
@@ -71,6 +80,8 @@ status, rotation link и revocation evidence. Private material в БД отсу�
 журналах, exception text и test fixtures. `.env` содержит только несекретные
 настройки или путь к secret file. Production secrets монтируются с минимальными
 filesystem permissions.
+
+`mfa_encryption_key` генерируется отдельно, монтируется только backend-сервисам и входит в зашифрованный recovery material; потеря этого ключа делает активные TOTP seeds непригодными и требует контролируемого восстановления учётных записей.
 
 Secret scanning запускается локально и в CI. Найденный опубликованный secret
 считается скомпрометированным, а не просто удаляется из последнего commit.

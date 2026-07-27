@@ -32,6 +32,7 @@ write_secret "$secrets_dir/postgres_migrator_password" 32
 write_secret "$secrets_dir/postgres_app_password" 32
 write_secret "$secrets_dir/node_signing_seed" 32
 write_secret "$secrets_dir/blob_encryption_key" 32
+write_secret "$secrets_dir/mfa_encryption_key" 32
 write_initial_password "$secrets_dir/bootstrap_registrar_password" "CoopDemo-Registrar-2026!"
 write_initial_password "$secrets_dir/bootstrap_security_password" "CoopDemo-Security-2026!"
 write_initial_password "$secrets_dir/bootstrap_auditor_password" "CoopDemo-Auditor-2026!"

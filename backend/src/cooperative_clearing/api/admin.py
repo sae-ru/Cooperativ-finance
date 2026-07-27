@@ -9,10 +9,18 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from cooperative_clearing.api.auth import _request_uuid
-from cooperative_clearing.api.dependencies import DatabaseDependency, PrincipalDependency
+from cooperative_clearing.api.dependencies import (
+    DatabaseDependency,
+    PrincipalDependency,
+    SettingsDependency,
+)
 from cooperative_clearing.api.identity_schemas import (
+    AccountRecoveryCollection,
+    AccountRecoveryCreateRequest,
     AdminOverviewResponse,
     AuditEntryResponse,
+    BreakGlassCollection,
+    BreakGlassCreateRequest,
     CommandEnvelope,
     CooperativeCreateRequest,
     CooperativeResponse,
@@ -25,6 +33,7 @@ from cooperative_clearing.api.identity_schemas import (
     RoleApprovalRequest,
     RoleAssignmentRequest,
     RoleAssignmentResponse,
+    SecurityDecisionRequest,
     SessionAdminResponse,
     UserCreateRequest,
     UserResponse,
@@ -38,9 +47,23 @@ from cooperative_clearing.modules.identity.application.admin import (
     IdentityAdminService,
     admin_overview,
 )
-from cooperative_clearing.modules.identity.domain.types import RoleCode, require_role
+from cooperative_clearing.modules.identity.application.security import (
+    RECOVERY_CONTROL_ROLES,
+    IdentitySecurityService,
+    SecurityCommandResult,
+    expire_security_workflows,
+    require_step_up,
+)
+from cooperative_clearing.modules.identity.domain.types import (
+    RoleCode,
+    RoleGrantSource,
+    require_permanent_role,
+    require_role,
+)
 from cooperative_clearing.modules.identity.infrastructure.models import (
+    AccountRecoveryRequest,
     AuthSession,
+    BreakGlassGrant,
     Cooperative,
     Member,
     Membership,
@@ -104,7 +127,7 @@ class ReasonRequest(BaseModel):
     reason_code: str = Field(min_length=2, max_length=100)
 
 
-def _command(result: CommandResult) -> CommandEnvelope:
+def _command(result: CommandResult | SecurityCommandResult) -> CommandEnvelope:
     return CommandEnvelope(
         data=ApiCommandResult(
             event_id=result.event_id,
@@ -164,6 +187,13 @@ async def create_cooperative(
 ) -> CommandEnvelope:
     require_role(principal, {RoleCode.NODE_REGISTRAR, RoleCode.SECURITY_ADMIN})
     async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="COOPERATIVE_CREATE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         try:
             result = await IdentityAdminService().create_cooperative(
                 session,
@@ -337,7 +367,9 @@ async def list_roles(
     require_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR, RoleCode.COOPERATIVE_ADMIN})
     async with database.session() as session:
         result = await session.execute(
-            select(RoleAssignment).order_by(RoleAssignment.created_at.desc())
+            select(RoleAssignment)
+            .where(RoleAssignment.source == RoleGrantSource.ASSIGNMENT.value)
+            .order_by(RoleAssignment.created_at.desc())
         )
         items = list(result.scalars())
     return RoleCollection(data=items, request_id=get_request_id())
@@ -356,14 +388,21 @@ async def assign_role(
         RoleCode.AUDITOR,
         RoleCode.ARBITRATOR,
     }:
-        require_role(principal, {RoleCode.SECURITY_ADMIN})
+        require_permanent_role(principal, {RoleCode.SECURITY_ADMIN})
     else:
-        require_role(
+        require_permanent_role(
             principal,
             {RoleCode.SECURITY_ADMIN, RoleCode.COOPERATIVE_ADMIN},
             payload.cooperative_id,
         )
     async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="ROLE_ASSIGN",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         try:
             result = await IdentityAdminService().assign_role(
                 session,
@@ -389,8 +428,15 @@ async def decide_role(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR})
+    require_permanent_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR})
     async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="ROLE_DECIDE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         result = await IdentityAdminService().decide_role(
             session,
             principal=principal,
@@ -412,8 +458,15 @@ async def revoke_role(
     principal: PrincipalDependency,
     database: DatabaseDependency,
 ) -> CommandEnvelope:
-    require_role(principal, {RoleCode.SECURITY_ADMIN})
+    require_permanent_role(principal, {RoleCode.SECURITY_ADMIN})
     async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="ROLE_REVOKE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         result = await IdentityAdminService().revoke_role(
             session,
             principal=principal,
@@ -449,6 +502,13 @@ async def revoke_session(
 ) -> CommandEnvelope:
     require_role(principal, {RoleCode.SECURITY_ADMIN})
     async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="SESSION_REVOKE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         result = await IdentityAdminService().revoke_session(
             session,
             principal=principal,
@@ -471,3 +531,204 @@ async def list_audit(
     async with database.session() as session:
         items = await AuditRepository(session).list_recent(limit=limit)
     return AuditCollection(data=items, request_id=get_request_id())
+
+
+@router.get("/account-recoveries", response_model=AccountRecoveryCollection)
+async def list_account_recoveries(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> AccountRecoveryCollection:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await expire_security_workflows(session)
+        result = await session.execute(
+            select(AccountRecoveryRequest).order_by(
+                AccountRecoveryRequest.created_at.desc(), AccountRecoveryRequest.id
+            )
+        )
+        items = list(result.scalars())
+        await session.commit()
+    return AccountRecoveryCollection(data=items, request_id=get_request_id())
+
+
+@router.post("/account-recoveries", response_model=CommandEnvelope, status_code=201)
+async def request_account_recovery(
+    payload: AccountRecoveryCreateRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="ACCOUNT_RECOVERY_REQUEST",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN, RoleCode.NODE_SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        try:
+            result = await IdentitySecurityService(settings).request_account_recovery(
+                session,
+                principal=principal,
+                target_user_id=payload.target_user_id,
+                temporary_password=payload.temporary_password.get_secret_value(),
+                reason_code=payload.reason_code,
+                evidence_id=payload.evidence_id,
+                idempotency_key=idempotency_key,
+                request_id=_request_uuid(),
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _map_integrity_error(exc) from exc
+    return _command(result)
+
+
+@router.post(
+    "/account-recoveries/{recovery_id}/decision",
+    response_model=CommandEnvelope,
+)
+async def decide_account_recovery(
+    recovery_id: UUID,
+    payload: SecurityDecisionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="ACCOUNT_RECOVERY_DECIDE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN, RoleCode.NODE_SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        result = await IdentitySecurityService(settings).decide_account_recovery(
+            session,
+            principal=principal,
+            recovery_id=recovery_id,
+            approve=payload.approve,
+            reason_code=payload.reason_code,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
+
+@router.get("/break-glass", response_model=BreakGlassCollection)
+async def list_break_glass(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> BreakGlassCollection:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await expire_security_workflows(session)
+        result = await session.execute(
+            select(BreakGlassGrant).order_by(BreakGlassGrant.created_at.desc(), BreakGlassGrant.id)
+        )
+        items = list(result.scalars())
+        await session.commit()
+    return BreakGlassCollection(data=items, request_id=get_request_id())
+
+
+@router.post("/break-glass", response_model=CommandEnvelope, status_code=201)
+async def request_break_glass(
+    payload: BreakGlassCreateRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="BREAK_GLASS_REQUEST",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN, RoleCode.NODE_SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        try:
+            result = await IdentitySecurityService(settings).request_break_glass(
+                session,
+                principal=principal,
+                target_user_id=payload.target_user_id,
+                role=payload.role,
+                cooperative_id=payload.cooperative_id,
+                duration_minutes=payload.duration_minutes,
+                reason_code=payload.reason_code,
+                evidence_id=payload.evidence_id,
+                idempotency_key=idempotency_key,
+                request_id=_request_uuid(),
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _map_integrity_error(exc) from exc
+    return _command(result)
+
+
+@router.post("/break-glass/{grant_id}/decision", response_model=CommandEnvelope)
+async def decide_break_glass(
+    grant_id: UUID,
+    payload: SecurityDecisionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="BREAK_GLASS_DECIDE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN, RoleCode.NODE_SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        result = await IdentitySecurityService(settings).decide_break_glass(
+            session,
+            principal=principal,
+            grant_id=grant_id,
+            approve=payload.approve,
+            reason_code=payload.reason_code,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
+
+@router.post("/break-glass/{grant_id}/revoke", response_model=CommandEnvelope)
+async def revoke_break_glass(
+    grant_id: UUID,
+    payload: ReasonRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_role(principal, set(RECOVERY_CONTROL_ROLES))
+    async with database.session() as session:
+        await require_step_up(
+            session,
+            principal,
+            operation="BREAK_GLASS_REVOKE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN, RoleCode.NODE_SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
+        result = await IdentitySecurityService(settings).revoke_break_glass(
+            session,
+            principal=principal,
+            grant_id=grant_id,
+            reason_code=payload.reason_code,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)

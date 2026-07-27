@@ -23,6 +23,15 @@ describe("userErrorMessage", () => {
     ).toBe("Enter an amount greater than zero. Use digits and a decimal separator only.");
   });
 
+  it("explains why emergency access cannot delegate permanent roles", () => {
+    expect(
+      userErrorMessage(new AdminApiError("PERMANENT_ROLE_REQUIRED", "request-role", 403), "ru"),
+    ).toBe("Для управления постоянными правами нужна обычная, не аварийная роль.");
+    expect(
+      userErrorMessage(new AdminApiError("PERMANENT_ROLE_REQUIRED", "request-role", 403), "en"),
+    ).toBe("A regular, non-emergency role is required to manage permanent access.");
+  });
+
   it("explains permissions and server failures without exposing internal codes", () => {
     expect(
       userErrorMessage(new AdminApiError("RISK_READ_DENIED", "request-2", 403), "ru"),

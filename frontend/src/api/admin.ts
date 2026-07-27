@@ -29,7 +29,13 @@ export type Principal = {
   login: string;
   member_id: string | null;
   must_change_password: boolean;
-  roles: Array<{ assignment_id: string; role: RoleCode; cooperative_id: string | null }>;
+  roles: Array<{
+    assignment_id: string;
+    role: RoleCode;
+    cooperative_id: string | null;
+    source?: "ASSIGNMENT" | "BREAK_GLASS";
+    expires_at?: string | null;
+  }>;
 };
 
 export type AuthSession = {
@@ -342,5 +348,157 @@ export const revokeSession = (sessionId: string) =>
       method: "POST",
       headers: commandHeaders(),
       body: JSON.stringify({ reason_code: "SECURITY_REVOKED" })
+    },
+  );
+
+export type SecurityState = {
+  totp_enabled: boolean;
+  totp_confirmed_at: string | null;
+  enrollment_pending: boolean;
+  enrollment_expires_at: string | null;
+  step_up_active: boolean;
+  step_up_method: string | null;
+  step_up_expires_at: string | null;
+  break_glass_grants: number;
+};
+
+export type TotpEnrollment = {
+  factor_id: string;
+  secret: string;
+  provisioning_uri: string;
+  expires_at: string;
+};
+
+export type StepUpGrant = {
+  method: "TOTP";
+  verified_at: string;
+  expires_at: string;
+};
+
+export type AccountRecovery = {
+  id: string;
+  target_user_id: string;
+  requested_by_user_id: string;
+  decided_by_user_id: string | null;
+  reason_code: string;
+  evidence_id: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  version: number;
+};
+
+export type BreakGlassGrant = {
+  id: string;
+  target_user_id: string;
+  role_code: RoleCode;
+  cooperative_id: string | null;
+  requested_by_user_id: string;
+  approved_by_user_id: string | null;
+  revoked_by_user_id: string | null;
+  reason_code: string;
+  evidence_id: string;
+  requested_duration_minutes: number;
+  status: string;
+  created_at: string;
+  approved_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  version: number;
+};
+
+export const getSecurityState = () => request<SecurityState>("/api/v1/auth/security");
+
+export const beginTotpEnrollment = (currentPassword: string, currentTotpCode?: string) =>
+  request<TotpEnrollment>("/api/v1/auth/totp/enrollment", {
+    method: "POST",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      current_totp_code: currentTotpCode || null,
+    }),
+  });
+
+export const confirmTotpEnrollment = (code: string) =>
+  request<StepUpGrant>("/api/v1/auth/totp/enrollment/confirm", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+
+export const verifyTotpStepUp = (code: string) =>
+  request<StepUpGrant>("/api/v1/auth/step-up/totp", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+
+export const disableTotp = (currentPassword: string, code: string, reasonCode: string) =>
+  request<{ event_id: string; object_id: string }>("/api/v1/auth/totp", {
+    method: "DELETE",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      code,
+      reason_code: reasonCode,
+    }),
+  });
+
+export const getAccountRecoveries = () =>
+  request<AccountRecovery[]>("/api/v1/admin/account-recoveries");
+
+export const requestAccountRecovery = (payload: {
+  target_user_id: string;
+  temporary_password: string;
+  reason_code: string;
+  evidence_id: string;
+}) =>
+  request<{ event_id: string; object_id: string }>("/api/v1/admin/account-recoveries", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const decideAccountRecovery = (id: string, approve: boolean, reasonCode: string) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/account-recoveries/${id}/decision`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ approve, reason_code: reasonCode }),
+    },
+  );
+
+export const getBreakGlassGrants = () =>
+  request<BreakGlassGrant[]>("/api/v1/admin/break-glass");
+
+export const requestBreakGlass = (payload: {
+  target_user_id: string;
+  role: RoleCode;
+  cooperative_id: string | null;
+  duration_minutes: number;
+  reason_code: string;
+  evidence_id: string;
+}) =>
+  request<{ event_id: string; object_id: string }>("/api/v1/admin/break-glass", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const decideBreakGlass = (id: string, approve: boolean, reasonCode: string) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/break-glass/${id}/decision`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ approve, reason_code: reasonCode }),
+    },
+  );
+
+export const revokeBreakGlass = (id: string, reasonCode: string) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/break-glass/${id}/revoke`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ reason_code: reasonCode }),
     },
   );

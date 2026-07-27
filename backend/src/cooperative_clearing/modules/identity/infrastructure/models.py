@@ -4,11 +4,13 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -161,9 +163,7 @@ class UserAccount(Base):
 class ParticipantAddress(Base):
     __tablename__ = "participant_addresses"
     __table_args__ = (
-        CheckConstraint(
-            "purpose IN ('PICKUP','DELIVERY','BOTH')", name="purpose_allowed"
-        ),
+        CheckConstraint("purpose IN ('PICKUP','DELIVERY','BOTH')", name="purpose_allowed"),
         CheckConstraint("status IN ('ACTIVE','ARCHIVED')", name="status_allowed"),
         CheckConstraint("version >= 1", name="version_positive"),
         Index("ix_participant_addresses_member_status", "member_id", "status"),
@@ -196,15 +196,9 @@ class ParticipantAddress(Base):
     contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
     contact_phone: Mapped[str] = mapped_column(String(80), nullable=False)
     instructions: Mapped[str | None] = mapped_column(Text())
-    is_default_pickup: Mapped[bool] = mapped_column(
-        nullable=False, server_default=text("false")
-    )
-    is_default_delivery: Mapped[bool] = mapped_column(
-        nullable=False, server_default=text("false")
-    )
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default=text("'ACTIVE'")
-    )
+    is_default_pickup: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    is_default_delivery: Mapped[bool] = mapped_column(nullable=False, server_default=text("false"))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'ACTIVE'"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -229,6 +223,7 @@ class RoleAssignment(Base):
             "status IN ('PENDING_APPROVAL','ACTIVE','REVOKED','REJECTED')",
             name="status_allowed",
         ),
+        CheckConstraint("source IN ('ASSIGNMENT','BREAK_GLASS')", name="source_allowed"),
         CheckConstraint("version >= 1", name="version_positive"),
         Index(
             "uq_role_assignments_active_scope",
@@ -254,6 +249,10 @@ class RoleAssignment(Base):
         ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
     )
     status: Mapped[str] = mapped_column(String(24), nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'ASSIGNMENT'")
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     granted_by_user_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
     )
@@ -298,3 +297,159 @@ class AuthSession(Base):
     )
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    step_up_method: Mapped[str | None] = mapped_column(String(16))
+    step_up_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    step_up_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthenticationFactor(Base):
+    __tablename__ = "authentication_factors"
+    __table_args__ = (
+        CheckConstraint("factor_type IN ('TOTP')", name="factor_type_allowed"),
+        CheckConstraint("status IN ('PENDING','ACTIVE','DISABLED')", name="status_allowed"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "uq_authentication_factors_active",
+            "user_id",
+            "factor_type",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+        Index(
+            "uq_authentication_factors_pending",
+            "user_id",
+            "factor_type",
+            unique=True,
+            postgresql_where=text("status = 'PENDING'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.users.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    factor_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    secret_nonce: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    encryption_key_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    last_accepted_counter: Mapped[int | None] = mapped_column(BigInteger())
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    enrollment_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class AccountRecoveryRequest(Base):
+    __tablename__ = "account_recovery_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING_APPROVAL','EXECUTED','REJECTED','EXPIRED')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "decided_by_user_id IS NULL OR "
+            "(decided_by_user_id <> requested_by_user_id "
+            "AND decided_by_user_id <> target_user_id)",
+            name="independent_decider",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "uq_account_recovery_pending_target",
+            "target_user_id",
+            unique=True,
+            postgresql_where=text("status = 'PENDING_APPROVAL'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    target_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    temporary_password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class BreakGlassGrant(Base):
+    __tablename__ = "break_glass_grants"
+    __table_args__ = (
+        CheckConstraint(
+            "role_code IN ('SECURITY_ADMIN','NODE_SECURITY_ADMIN','NODE_TECHNICAL_CUSTODIAN',"
+            "'CRISIS_OPERATOR','CRISIS_CONTROLLER')",
+            name="role_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('PENDING_APPROVAL','ACTIVE','REJECTED','REVOKED','EXPIRED')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "approved_by_user_id IS NULL OR "
+            "(approved_by_user_id <> requested_by_user_id "
+            "AND approved_by_user_id <> target_user_id)",
+            name="independent_approver",
+        ),
+        CheckConstraint("requested_duration_minutes BETWEEN 15 AND 240", name="duration_allowed"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "uq_break_glass_open_scope",
+            "target_user_id",
+            "role_code",
+            text("COALESCE(cooperative_id, '00000000-0000-0000-0000-000000000000'::uuid)"),
+            unique=True,
+            postgresql_where=text("status IN ('PENDING_APPROVAL','ACTIVE')"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    target_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    role_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    cooperative_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    approved_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    revoked_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    requested_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))

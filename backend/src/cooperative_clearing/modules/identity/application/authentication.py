@@ -12,10 +12,12 @@ from cooperative_clearing.modules.identity.domain.types import (
     Principal,
     RoleCode,
     RoleGrant,
+    RoleGrantSource,
     normalize_login,
 )
 from cooperative_clearing.modules.identity.infrastructure.models import (
     AuthSession,
+    BreakGlassGrant,
     RoleAssignment,
     UserAccount,
 )
@@ -292,6 +294,7 @@ class AuthenticationService:
             select(RoleAssignment).where(
                 RoleAssignment.user_id == user.id,
                 RoleAssignment.status == "ACTIVE",
+                RoleAssignment.source == RoleGrantSource.ASSIGNMENT.value,
             )
         )
         roles = tuple(
@@ -302,13 +305,31 @@ class AuthenticationService:
             )
             for item in result.scalars()
         )
+        now = datetime.now(UTC)
+        emergency_result = await session.execute(
+            select(BreakGlassGrant).where(
+                BreakGlassGrant.target_user_id == user.id,
+                BreakGlassGrant.status == "ACTIVE",
+                BreakGlassGrant.expires_at > now,
+            )
+        )
+        emergency_roles = tuple(
+            RoleGrant(
+                assignment_id=item.id,
+                role=RoleCode(item.role_code),
+                cooperative_id=item.cooperative_id,
+                source=RoleGrantSource.BREAK_GLASS,
+                expires_at=item.expires_at,
+            )
+            for item in emergency_result.scalars()
+        )
         return Principal(
             user_id=user.id,
             session_id=auth_session_id,
             login=user.login,
             member_id=user.member_id,
             must_change_password=user.must_change_password,
-            roles=roles,
+            roles=roles + emergency_roles,
         )
 
     @staticmethod

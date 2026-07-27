@@ -130,6 +130,146 @@
         "title": "AccountOpenRequest",
         "type": "object"
       },
+      "AccountRecoveryCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AccountRecoveryResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "AccountRecoveryCollection",
+        "type": "object"
+      },
+      "AccountRecoveryCreateRequest": {
+        "properties": {
+          "evidence_id": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          },
+          "temporary_password": {
+            "format": "password",
+            "title": "Temporary Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "target_user_id",
+          "temporary_password",
+          "reason_code",
+          "evidence_id"
+        ],
+        "title": "AccountRecoveryCreateRequest",
+        "type": "object"
+      },
+      "AccountRecoveryResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "target_user_id",
+          "requested_by_user_id",
+          "decided_by_user_id",
+          "reason_code",
+          "evidence_id",
+          "status",
+          "created_at",
+          "expires_at",
+          "decided_at",
+          "version"
+        ],
+        "title": "AccountRecoveryResponse",
+        "type": "object"
+      },
       "AccountResponse": {
         "properties": {
           "balance": {
@@ -1099,6 +1239,217 @@
           "required_confirmations"
         ],
         "title": "BilateralLimitRequest",
+        "type": "object"
+      },
+      "BreakGlassCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BreakGlassResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "BreakGlassCollection",
+        "type": "object"
+      },
+      "BreakGlassCreateRequest": {
+        "properties": {
+          "cooperative_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooperative Id"
+          },
+          "duration_minutes": {
+            "maximum": 240.0,
+            "minimum": 15.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "evidence_id": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleCode"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_user_id",
+          "role",
+          "duration_minutes",
+          "reason_code",
+          "evidence_id"
+        ],
+        "title": "BreakGlassCreateRequest",
+        "type": "object"
+      },
+      "BreakGlassResponse": {
+        "properties": {
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By User Id"
+          },
+          "cooperative_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooperative Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "requested_duration_minutes": {
+            "title": "Requested Duration Minutes",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By User Id"
+          },
+          "role_code": {
+            "$ref": "#/components/schemas/RoleCode"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_user_id": {
+            "format": "uuid",
+            "title": "Target User Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "target_user_id",
+          "role_code",
+          "cooperative_id",
+          "requested_by_user_id",
+          "approved_by_user_id",
+          "revoked_by_user_id",
+          "reason_code",
+          "evidence_id",
+          "requested_duration_minutes",
+          "status",
+          "created_at",
+          "approved_at",
+          "expires_at",
+          "revoked_at",
+          "version"
+        ],
+        "title": "BreakGlassResponse",
         "type": "object"
       },
       "BucketBalanceResponse": {
@@ -15063,8 +15414,24 @@
             ],
             "title": "Cooperative Id"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "role": {
             "$ref": "#/components/schemas/RoleCode"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RoleGrantSource",
+            "default": "ASSIGNMENT"
           }
         },
         "required": [
@@ -15074,6 +15441,14 @@
         ],
         "title": "RoleGrantResponse",
         "type": "object"
+      },
+      "RoleGrantSource": {
+        "enum": [
+          "ASSIGNMENT",
+          "BREAK_GLASS"
+        ],
+        "title": "RoleGrantSource",
+        "type": "string"
       },
       "RoundingMode": {
         "enum": [
@@ -15519,6 +15894,122 @@
           "request_id"
         ],
         "title": "SearchResponse",
+        "type": "object"
+      },
+      "SecurityDecisionRequest": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve",
+          "reason_code"
+        ],
+        "title": "SecurityDecisionRequest",
+        "type": "object"
+      },
+      "SecurityStateEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SecurityStateResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "SecurityStateEnvelope",
+        "type": "object"
+      },
+      "SecurityStateResponse": {
+        "properties": {
+          "break_glass_grants": {
+            "title": "Break Glass Grants",
+            "type": "integer"
+          },
+          "enrollment_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrollment Expires At"
+          },
+          "enrollment_pending": {
+            "title": "Enrollment Pending",
+            "type": "boolean"
+          },
+          "step_up_active": {
+            "title": "Step Up Active",
+            "type": "boolean"
+          },
+          "step_up_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Up Expires At"
+          },
+          "step_up_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Up Method"
+          },
+          "totp_confirmed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totp Confirmed At"
+          },
+          "totp_enabled": {
+            "title": "Totp Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "totp_enabled",
+          "totp_confirmed_at",
+          "enrollment_pending",
+          "enrollment_expires_at",
+          "step_up_active",
+          "step_up_method",
+          "step_up_expires_at",
+          "break_glass_grants"
+        ],
+        "title": "SecurityStateResponse",
         "type": "object"
       },
       "SessionAdminResponse": {
@@ -16268,6 +16759,49 @@
         "title": "StatementResponse",
         "type": "object"
       },
+      "StepUpEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StepUpResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "StepUpEnvelope",
+        "type": "object"
+      },
+      "StepUpResponse": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "method": {
+            "const": "TOTP",
+            "default": "TOTP",
+            "title": "Method",
+            "type": "string"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "title": "Verified At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verified_at",
+          "expires_at"
+        ],
+        "title": "StepUpResponse",
+        "type": "object"
+      },
       "SystemStatusData": {
         "properties": {
           "checks": {
@@ -16328,6 +16862,122 @@
           "request_id"
         ],
         "title": "SystemStatusEnvelope",
+        "type": "object"
+      },
+      "TotpConfirmationRequest": {
+        "properties": {
+          "code": {
+            "pattern": "^[0-9]{6}$",
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "TotpConfirmationRequest",
+        "type": "object"
+      },
+      "TotpDisableRequest": {
+        "properties": {
+          "code": {
+            "pattern": "^[0-9]{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "current_password": {
+            "format": "password",
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "code",
+          "reason_code"
+        ],
+        "title": "TotpDisableRequest",
+        "type": "object"
+      },
+      "TotpEnrollmentEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TotpEnrollmentResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "TotpEnrollmentEnvelope",
+        "type": "object"
+      },
+      "TotpEnrollmentRequest": {
+        "properties": {
+          "current_password": {
+            "format": "password",
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "current_totp_code": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]{6}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Totp Code"
+          }
+        },
+        "required": [
+          "current_password"
+        ],
+        "title": "TotpEnrollmentRequest",
+        "type": "object"
+      },
+      "TotpEnrollmentResponse": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "factor_id": {
+            "format": "uuid",
+            "title": "Factor Id",
+            "type": "string"
+          },
+          "provisioning_uri": {
+            "title": "Provisioning Uri",
+            "type": "string"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "factor_id",
+          "secret",
+          "provisioning_uri",
+          "expires_at"
+        ],
+        "title": "TotpEnrollmentResponse",
         "type": "object"
       },
       "TransferResponse": {
@@ -20923,6 +21573,158 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/account-recoveries": {
+      "get": {
+        "operationId": "list_account_recoveries_api_v1_admin_account_recoveries_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountRecoveryCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Account Recoveries",
+        "tags": [
+          "administration"
+        ]
+      },
+      "post": {
+        "operationId": "request_account_recovery_api_v1_admin_account_recoveries_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountRecoveryCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Account Recovery",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/account-recoveries/{recovery_id}/decision": {
+      "post": {
+        "operationId": "decide_account_recovery_api_v1_admin_account_recoveries__recovery_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recovery_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recovery Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Account Recovery",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
     "/api/v1/admin/audit": {
       "get": {
         "operationId": "list_audit_api_v1_admin_audit_get",
@@ -20968,6 +21770,227 @@
           }
         ],
         "summary": "List Audit",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/break-glass": {
+      "get": {
+        "operationId": "list_break_glass_api_v1_admin_break_glass_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreakGlassCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Break Glass",
+        "tags": [
+          "administration"
+        ]
+      },
+      "post": {
+        "operationId": "request_break_glass_api_v1_admin_break_glass_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BreakGlassCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Break Glass",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/break-glass/{grant_id}/decision": {
+      "post": {
+        "operationId": "decide_break_glass_api_v1_admin_break_glass__grant_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecurityDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Break Glass",
+        "tags": [
+          "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/break-glass/{grant_id}/revoke": {
+      "post": {
+        "operationId": "revoke_break_glass_api_v1_admin_break_glass__grant_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Break Glass",
         "tags": [
           "administration"
         ]
@@ -22345,6 +23368,216 @@
           }
         },
         "summary": "Refresh",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/security": {
+      "get": {
+        "operationId": "security_state_api_v1_auth_security_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityStateEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Security State",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/step-up/totp": {
+      "post": {
+        "operationId": "verify_totp_step_up_api_v1_auth_step_up_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepUpEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verify Totp Step Up",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/totp": {
+      "delete": {
+        "operationId": "disable_totp_api_v1_auth_totp_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Disable Totp",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/enrollment": {
+      "post": {
+        "operationId": "begin_totp_enrollment_api_v1_auth_totp_enrollment_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpEnrollmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnrollmentEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Begin Totp Enrollment",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/totp/enrollment/confirm": {
+      "post": {
+        "operationId": "confirm_totp_enrollment_api_v1_auth_totp_enrollment_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepUpEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Totp Enrollment",
         "tags": [
           "authentication"
         ]

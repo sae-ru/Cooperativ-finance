@@ -380,6 +380,13 @@
     <message key="errors.quantityInvalid">Введите количество больше нуля.</message>
     <message key="errors.permissionDenied">У вас нет права выполнять это действие. Обратитесь к администратору кооператива.</message>
     <message key="errors.authenticationFailed">Неверный логин или пароль.</message>
+    <message key="errors.stepUpRequired">Перед важным действием подтвердите личность в разделе «Безопасность».</message>
+    <message key="errors.totpNotEnrolled">Сначала подключите приложение с одноразовыми кодами в разделе «Безопасность».</message>
+    <message key="errors.totpInvalid">Код неверный, уже использован или успел измениться. Введите новый код из приложения.</message>
+    <message key="errors.totpLocked">Слишком много неверных кодов. Подождите и попробуйте снова.</message>
+    <message key="errors.independentApprovalRequired">Это должен подтвердить другой уполномоченный сотрудник.</message>
+    <message key="errors.personalSecurityActorRequired">Для этого действия нужна персональная учётная запись сотрудника с постоянным правом безопасности.</message>
+    <message key="errors.permanentRoleRequired">Для управления постоянными правами нужна обычная, не аварийная роль.</message>
     <message key="errors.evidenceRequired">Добавьте требуемый документ или фотографию.</message>
     <message key="errors.evidenceTypeInvalid">Выбран неподдерживаемый тип файла. Используйте PDF, JPEG, PNG, WebP или текстовый файл.</message>
     <message key="errors.evidenceSizeInvalid">Файл слишком большой. Выберите файл меньшего размера.</message>
@@ -426,7 +433,8 @@
     <message key="logistics.carrier">Перевозчик</message>
     <message key="logistics.quantity">Количество</message>
     <message key="logistics.due">Срок доставки</message>
-    <message key="logistics.action">Действие</message>    <message key="logistics.pickupPoint">Забрать груз</message>
+    <message key="logistics.action">Действие</message>
+    <message key="logistics.pickupPoint">Забрать груз</message>
     <message key="logistics.deliveryPoint">Передать получателю</message>
     <message key="logistics.acceptOrder">Принять перевозку</message>
     <message key="logistics.uploadPickupProof">Добавить акт забора</message>
@@ -550,6 +558,8 @@
     <value code="OPEN">Открыто</value>
     <value code="CLOSED">Закрыто</value>
     <value code="PENDING">Ожидает</value>
+    <value code="PENDING_APPROVAL">Ожидает независимого решения</value>
+    <value code="EXECUTED">Выполнено</value>
     <value code="RECORDED">Зарегистрировано</value>
     <value code="REJECTED">Отклонено</value>
     <value code="PROPOSED">Предложено</value>
@@ -1017,5 +1027,6 @@
     <phrase source="Offline-эпоха">Автономный период</phrase>
     <phrase source="Главная">Главная</phrase>
     <phrase source="Milk listing intentionally awaiting an independent demo price review">Предложение молока ожидает независимой демонстрационной проверки цены</phrase>
+    <phrase source="Подтвердить">Подтвердить</phrase>
   </phrases>
 </locale>

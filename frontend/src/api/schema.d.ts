@@ -4,6 +4,41 @@
  */
 
 export interface paths {
+    "/api/v1/admin/account-recoveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Account Recoveries */
+        get: operations["list_account_recoveries_api_v1_admin_account_recoveries_get"];
+        put?: never;
+        /** Request Account Recovery */
+        post: operations["request_account_recovery_api_v1_admin_account_recoveries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/account-recoveries/{recovery_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Account Recovery */
+        post: operations["decide_account_recovery_api_v1_admin_account_recoveries__recovery_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -15,6 +50,58 @@ export interface paths {
         get: operations["list_audit_api_v1_admin_audit_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Break Glass */
+        get: operations["list_break_glass_api_v1_admin_break_glass_get"];
+        put?: never;
+        /** Request Break Glass */
+        post: operations["request_break_glass_api_v1_admin_break_glass_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass/{grant_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Break Glass */
+        post: operations["decide_break_glass_api_v1_admin_break_glass__grant_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/break-glass/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Break Glass */
+        post: operations["revoke_break_glass_api_v1_admin_break_glass__grant_id__revoke_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -378,6 +465,91 @@ export interface paths {
         put?: never;
         /** Refresh */
         post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/security": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Security State */
+        get: operations["security_state_api_v1_auth_security_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/step-up/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Totp Step Up */
+        post: operations["verify_totp_step_up_api_v1_auth_step_up_totp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disable Totp */
+        delete: operations["disable_totp_api_v1_auth_totp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/enrollment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Begin Totp Enrollment */
+        post: operations["begin_totp_enrollment_api_v1_auth_totp_enrollment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/enrollment/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Totp Enrollment */
+        post: operations["confirm_totp_enrollment_api_v1_auth_totp_enrollment_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4668,6 +4840,70 @@ export interface components {
             /** Source Reference */
             source_reference: string;
         };
+        /** AccountRecoveryCollection */
+        AccountRecoveryCollection: {
+            /** Data */
+            data: components["schemas"]["AccountRecoveryResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** AccountRecoveryCreateRequest */
+        AccountRecoveryCreateRequest: {
+            /** Evidence Id */
+            evidence_id: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Target User Id
+             * Format: uuid
+             */
+            target_user_id: string;
+            /**
+             * Temporary Password
+             * Format: password
+             */
+            temporary_password: string;
+        };
+        /** AccountRecoveryResponse */
+        AccountRecoveryResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: string | null;
+            /** Evidence Id */
+            evidence_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Target User Id
+             * Format: uuid
+             */
+            target_user_id: string;
+            /** Version */
+            version: number;
+        };
         /** AccountResponse */
         AccountResponse: {
             /** Balance */
@@ -5049,6 +5285,76 @@ export interface components {
             required_confirmations: number;
             /** Unit */
             unit: string;
+        };
+        /** BreakGlassCollection */
+        BreakGlassCollection: {
+            /** Data */
+            data: components["schemas"]["BreakGlassResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** BreakGlassCreateRequest */
+        BreakGlassCreateRequest: {
+            /** Cooperative Id */
+            cooperative_id?: string | null;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Reason Code */
+            reason_code: string;
+            role: components["schemas"]["RoleCode"];
+            /**
+             * Target User Id
+             * Format: uuid
+             */
+            target_user_id: string;
+        };
+        /** BreakGlassResponse */
+        BreakGlassResponse: {
+            /** Approved At */
+            approved_at: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Cooperative Id */
+            cooperative_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /** Requested Duration Minutes */
+            requested_duration_minutes: number;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By User Id */
+            revoked_by_user_id: string | null;
+            role_code: components["schemas"]["RoleCode"];
+            /** Status */
+            status: string;
+            /**
+             * Target User Id
+             * Format: uuid
+             */
+            target_user_id: string;
+            /** Version */
+            version: number;
         };
         /** BucketBalanceResponse */
         BucketBalanceResponse: {
@@ -10716,8 +11022,17 @@ export interface components {
             assignment_id: string;
             /** Cooperative Id */
             cooperative_id: string | null;
+            /** Expires At */
+            expires_at?: string | null;
             role: components["schemas"]["RoleCode"];
+            /** @default ASSIGNMENT */
+            source: components["schemas"]["RoleGrantSource"];
         };
+        /**
+         * RoleGrantSource
+         * @enum {string}
+         */
+        RoleGrantSource: "ASSIGNMENT" | "BREAK_GLASS";
         /**
          * RoundingMode
          * @enum {string}
@@ -10882,6 +11197,38 @@ export interface components {
             ranking_version: string;
             /** Request Id */
             request_id: string;
+        };
+        /** SecurityDecisionRequest */
+        SecurityDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** SecurityStateEnvelope */
+        SecurityStateEnvelope: {
+            data: components["schemas"]["SecurityStateResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** SecurityStateResponse */
+        SecurityStateResponse: {
+            /** Break Glass Grants */
+            break_glass_grants: number;
+            /** Enrollment Expires At */
+            enrollment_expires_at: string | null;
+            /** Enrollment Pending */
+            enrollment_pending: boolean;
+            /** Step Up Active */
+            step_up_active: boolean;
+            /** Step Up Expires At */
+            step_up_expires_at: string | null;
+            /** Step Up Method */
+            step_up_method: string | null;
+            /** Totp Confirmed At */
+            totp_confirmed_at: string | null;
+            /** Totp Enabled */
+            totp_enabled: boolean;
         };
         /** SessionAdminResponse */
         SessionAdminResponse: {
@@ -11267,6 +11614,31 @@ export interface components {
              */
             unit_id: string;
         };
+        /** StepUpEnvelope */
+        StepUpEnvelope: {
+            data: components["schemas"]["StepUpResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** StepUpResponse */
+        StepUpResponse: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Method
+             * @default TOTP
+             * @constant
+             */
+            method: "TOTP";
+            /**
+             * Verified At
+             * Format: date-time
+             */
+            verified_at: string;
+        };
         /** SystemStatusData */
         SystemStatusData: {
             /** Checks */
@@ -11287,6 +11659,56 @@ export interface components {
             data: components["schemas"]["SystemStatusData"];
             /** Request Id */
             request_id: string;
+        };
+        /** TotpConfirmationRequest */
+        TotpConfirmationRequest: {
+            /** Code */
+            code: string;
+        };
+        /** TotpDisableRequest */
+        TotpDisableRequest: {
+            /** Code */
+            code: string;
+            /**
+             * Current Password
+             * Format: password
+             */
+            current_password: string;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** TotpEnrollmentEnvelope */
+        TotpEnrollmentEnvelope: {
+            data: components["schemas"]["TotpEnrollmentResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** TotpEnrollmentRequest */
+        TotpEnrollmentRequest: {
+            /**
+             * Current Password
+             * Format: password
+             */
+            current_password: string;
+            /** Current Totp Code */
+            current_totp_code?: string | null;
+        };
+        /** TotpEnrollmentResponse */
+        TotpEnrollmentResponse: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Factor Id
+             * Format: uuid
+             */
+            factor_id: string;
+            /** Provisioning Uri */
+            provisioning_uri: string;
+            /** Secret */
+            secret: string;
         };
         /** TransferResponse */
         TransferResponse: {
@@ -13238,6 +13660,98 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_account_recoveries_api_v1_admin_account_recoveries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountRecoveryCollection"];
+                };
+            };
+        };
+    };
+    request_account_recovery_api_v1_admin_account_recoveries_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRecoveryCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_account_recovery_api_v1_admin_account_recoveries__recovery_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                recovery_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_audit_api_v1_admin_audit_get: {
         parameters: {
             query?: {
@@ -13256,6 +13770,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_break_glass_api_v1_admin_break_glass_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BreakGlassCollection"];
+                };
+            };
+        };
+    };
+    request_break_glass_api_v1_admin_break_glass_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BreakGlassCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_break_glass_api_v1_admin_break_glass__grant_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_break_glass_api_v1_admin_break_glass__grant_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -14072,6 +14715,158 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    security_state_api_v1_auth_security_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityStateEnvelope"];
+                };
+            };
+        };
+    };
+    verify_totp_step_up_api_v1_auth_step_up_totp_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_totp_api_v1_auth_totp_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpDisableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    begin_totp_enrollment_api_v1_auth_totp_enrollment_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpEnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpEnrollmentEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_totp_enrollment_api_v1_auth_totp_enrollment_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TotpConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpEnvelope"];
                 };
             };
             /** @description Validation Error */

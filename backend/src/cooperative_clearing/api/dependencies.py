@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from cooperative_clearing.modules.audit.infrastructure.repository import AuditRepository
 from cooperative_clearing.modules.identity.application.authentication import AuthenticationService
 from cooperative_clearing.modules.identity.domain.types import Principal
 from cooperative_clearing.shared.core.config import Settings
@@ -48,6 +49,22 @@ async def get_principal(
         principal = await AuthenticationService(settings).principal_for_access(
             session, credentials.credentials
         )
+        if principal.break_glass_grants:
+            await AuditRepository(session).record(
+                action="BREAK_GLASS_ACCESS_USED",
+                object_type="AuthSession",
+                object_id=principal.session_id,
+                actor_user_id=principal.user_id,
+                outcome="SUCCESS",
+                payload={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "grant_ids": [
+                        str(grant.assignment_id) for grant in principal.break_glass_grants
+                    ],
+                },
+            )
+            await session.commit()
     request.state.principal = principal
     return principal
 

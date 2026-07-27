@@ -38,6 +38,7 @@
 - Участники;
 - Организации и членство;
 - Учётные записи и сессии;
+- Безопасность входа, recovery и временный аварийный доступ;
 - Роли и полномочия;
 - Паи, лимиты и поручительства;
 - Связанные лица;
@@ -124,6 +125,24 @@ Admin action не перескакивает обязательную прове
 network allowlist, credentials/certificates, rate limits, expiry и audit. Один
 service client не используется несколькими независимыми организациями.
 
+## Безопасность учётной записи
+
+Раздел **Безопасность** доступен каждому пользователю, а не только
+администратору. Пользователь сам подключает/заменяет TOTP, видит срок текущего
+step-up и подтверждает личность перед критической командой. Seed показывается
+один раз как QR и ключ ручного ввода.
+
+Контрольные роли дополнительно видят два отдельных workflow:
+
+1. Recovery: один персональный сотрудник создаёт запрос с временным паролем и
+   актом, другой независимо одобряет или отклоняет.
+2. Break-glass: один сотрудник запрашивает allowlisted роль, scope и срок,
+   другой принимает решение; active grant можно немедленно отозвать.
+
+Инициатор и получатель не видят кнопки собственного независимого решения.
+Интерфейс не смешивает временный grant с обычными ролями, показывает expiry и
+понятные причины вместо внутренних кодов. Полученное временно право не даёт
+создавать recovery или делегировать новое аварийное право.
 ## API admin
 
 ```text
@@ -139,7 +158,16 @@ POST /admin/role-assignments
 POST /admin/role-assignments/{id}/revoke
 GET /admin/accounts/{id}/sessions
 POST /admin/accounts/{id}/revoke-sessions
-POST /admin/accounts/{id}/recovery-cases
+GET/POST /api/v1/admin/account-recoveries
+POST /api/v1/admin/account-recoveries/{id}/decision
+GET/POST /api/v1/admin/break-glass
+POST /api/v1/admin/break-glass/{id}/decision
+POST /api/v1/admin/break-glass/{id}/revoke
+GET /api/v1/auth/security
+POST /api/v1/auth/totp/enrollment
+POST /api/v1/auth/totp/enrollment/confirm
+POST /api/v1/auth/step-up/totp
+DELETE /api/v1/auth/totp
 GET/POST /admin/service-clients
 POST /admin/imports
 POST /admin/imports/{id}/dry-run

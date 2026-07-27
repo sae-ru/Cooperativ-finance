@@ -142,6 +142,13 @@ runtime user контейнера. Ротация ключа требует от
 проверки plaintext hash и re-encrypt; простая замена secret сделает старые
 объекты недоступными.
 
+Отдельный `mfa_encryption_key` создаётся тем же bootstrap-скриптом как
+независимое 32-байтовое hex-значение. Compose монтирует его только backend
+runtime/migration jobs через `/run/secrets/mfa_encryption_key`. Файл нельзя
+копировать в release, image или обычный `.env`. Он должен входить только в
+зашифрованный recovery material: без него существующие TOTP seeds нельзя
+расшифровать, поэтому восстановление потребует двойного контроля, сброса MFA и
+повторного подключения пользователями.
 Согласованный backup обязан фиксировать одну точку восстановления для:
 
 1. PostgreSQL с таблицами `assets.evidence_blobs` и `assets.evidence_links`.

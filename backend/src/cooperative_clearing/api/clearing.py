@@ -35,6 +35,7 @@ from cooperative_clearing.modules.clearing.infrastructure.models import (
     ClearingProof,
     ClearingStatement,
 )
+from cooperative_clearing.modules.identity.application.security import require_step_up
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
@@ -802,6 +803,12 @@ async def finalize(
     settings: SettingsDependency,
 ) -> CommandEnvelope:
     async def action(session: AsyncSession) -> ClearingCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation="CLEARING_FINALIZE",
+            request_id=_request_uuid(),
+        )
         return await ClearingService(settings).finalize(
             session,
             principal=principal,

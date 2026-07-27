@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     auth_max_failed_attempts: int = Field(default=5, ge=3, le=20)
     auth_lock_seconds: int = Field(default=900, ge=60, le=86400)
     auth_cookie_secure: bool | None = None
+    step_up_ttl_minutes: int = Field(default=10, ge=2, le=30)
+    totp_enrollment_minutes: int = Field(default=15, ge=5, le=60)
+    account_recovery_minutes: int = Field(default=30, ge=10, le=120)
+    break_glass_max_minutes: int = Field(default=60, ge=15, le=240)
+    mfa_encryption_key_file: Path = Path("/run/secrets/mfa_encryption_key")
 
     database_host: str = "postgres"
     database_port: int = Field(default=5432, ge=1, le=65535)
@@ -107,6 +112,7 @@ class Settings(BaseSettings):
                 self.database_password_file,
                 self.blob_root,
                 self.blob_encryption_key_file,
+                self.mfa_encryption_key_file,
                 self.node_signing_seed_file,
                 self.bootstrap_registrar_password_file,
                 self.bootstrap_security_password_file,

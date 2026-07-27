@@ -46,6 +46,7 @@ New-HexSecret (Join-Path $secrets "postgres_migrator_password") 32
 New-HexSecret (Join-Path $secrets "postgres_app_password") 32
 New-HexSecret (Join-Path $secrets "node_signing_seed") 32
 New-HexSecret (Join-Path $secrets "blob_encryption_key") 32
+New-HexSecret (Join-Path $secrets "mfa_encryption_key") 32
 New-InitialPassword (Join-Path $secrets "bootstrap_registrar_password") "CoopDemo-Registrar-2026!"
 New-InitialPassword (Join-Path $secrets "bootstrap_security_password") "CoopDemo-Security-2026!"
 New-InitialPassword (Join-Path $secrets "bootstrap_auditor_password") "CoopDemo-Auditor-2026!"

@@ -19,6 +19,7 @@ from cooperative_clearing.api.dependencies import (
 )
 from cooperative_clearing.api.identity_schemas import CommandEnvelope
 from cooperative_clearing.api.identity_schemas import CommandResult as ApiCommandResult
+from cooperative_clearing.modules.identity.application.security import require_step_up
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.modules.risk.application.antifraud import AntifraudService
 from cooperative_clearing.modules.risk.application.common import RiskCommandResult
@@ -31,9 +32,7 @@ from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
 
 router = APIRouter(prefix="/api/v1/antifraud", tags=["anti-fraud"])
-IdempotencyKey = Annotated[
-    str, Header(alias="Idempotency-Key", min_length=8, max_length=100)
-]
+IdempotencyKey = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=100)]
 READ_ROLES = {RoleCode.RISK_ADMIN, RoleCode.AUDITOR, RoleCode.SECURITY_ADMIN}
 
 
@@ -143,9 +142,7 @@ def _scope_condition(
         raise risk_error("AUTHORIZATION_DENIED", 403)
     if any(grant.cooperative_id is None for grant in grants):
         return None
-    cooperative_ids = {
-        grant.cooperative_id for grant in grants if grant.cooperative_id is not None
-    }
+    cooperative_ids = {grant.cooperative_id for grant in grants if grant.cooperative_id is not None}
     return column.in_(cooperative_ids)
 
 
@@ -259,9 +256,7 @@ async def list_scans(
     limit: int = Query(default=100, ge=1, le=500),
 ) -> Collection[ScanResponse]:
     condition = _scope_condition(principal, AntifraudScan.cooperative_id)
-    statement = select(AntifraudScan).order_by(
-        AntifraudScan.created_at.desc(), AntifraudScan.id
-    )
+    statement = select(AntifraudScan).order_by(AntifraudScan.created_at.desc(), AntifraudScan.id)
     if condition is not None:
         statement = statement.where(condition)
     if cooperative_id is not None:
@@ -357,6 +352,13 @@ async def decide_signal(
     settings: SettingsDependency,
 ) -> CommandEnvelope:
     async def action(session: AsyncSession) -> RiskCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation="ANTIFRAUD_DECIDE",
+            emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
+            request_id=_request_uuid(),
+        )
         return await AntifraudService(settings).decide(
             session,
             principal=principal,

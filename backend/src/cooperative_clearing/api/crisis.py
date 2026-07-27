@@ -41,6 +41,7 @@ from cooperative_clearing.modules.crisis.infrastructure.models import (
     ReserveSnapshot,
     ReserveTarget,
 )
+from cooperative_clearing.modules.identity.application.security import require_step_up
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
@@ -902,17 +903,24 @@ async def activate_mandate(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
-        database,
-        lambda session: CrisisService(settings).activate_mandate(
+    async def action(session: AsyncSession) -> CrisisCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation="CRISIS_MANDATE_ACTIVATE",
+            emergency_roles=frozenset({RoleCode.CRISIS_CONTROLLER}),
+            request_id=_request_uuid(),
+        )
+        return await CrisisService(settings).activate_mandate(
             session,
             principal=principal,
             mandate_id=mandate_id,
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),
             **payload.model_dump(),
-        ),
-    )
+        )
+
+    return await _commit(database, action)
 
 
 @router.post("/mandates/{mandate_id}/review", response_model=CommandEnvelope, status_code=201)
@@ -946,17 +954,24 @@ async def close_mandate(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
-        database,
-        lambda session: CrisisService(settings).close_mandate(
+    async def action(session: AsyncSession) -> CrisisCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation="CRISIS_MANDATE_CLOSE",
+            emergency_roles=frozenset({RoleCode.CRISIS_CONTROLLER}),
+            request_id=_request_uuid(),
+        )
+        return await CrisisService(settings).close_mandate(
             session,
             principal=principal,
             mandate_id=mandate_id,
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),
             **payload.model_dump(),
-        ),
-    )
+        )
+
+    return await _commit(database, action)
 
 
 @router.post("/mandates/{mandate_id}/expire", response_model=CommandEnvelope, status_code=201)
@@ -1058,17 +1073,24 @@ async def confirm_rationing_plan(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
-        database,
-        lambda session: CrisisService(settings).confirm_rationing_plan(
+    async def action(session: AsyncSession) -> CrisisCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation="CRISIS_RATIONING_CONFIRM",
+            emergency_roles=frozenset({RoleCode.CRISIS_CONTROLLER}),
+            request_id=_request_uuid(),
+        )
+        return await CrisisService(settings).confirm_rationing_plan(
             session,
             principal=principal,
             plan_id=plan_id,
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),
             **payload.model_dump(),
-        ),
-    )
+        )
+
+    return await _commit(database, action)
 
 
 @router.post("/rationing-plans/{plan_id}/cancel", response_model=CommandEnvelope, status_code=201)

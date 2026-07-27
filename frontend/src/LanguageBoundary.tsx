@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getPhraseMap, getValueMap } from "./i18n";
 
 const skippedElements = new Set(["CODE", "PRE", "SCRIPT", "STYLE", "TEXTAREA"]);
-const translatedAttributes = ["aria-label", "placeholder", "title"] as const;
+const translatedAttributes = ["aria-label", "alt", "placeholder", "title"] as const;
 
 function escapePattern(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");

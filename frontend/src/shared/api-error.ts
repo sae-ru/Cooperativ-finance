@@ -27,6 +27,19 @@ export function userErrorMessage(error: unknown, language?: string): string {
 
   const code = apiError.code.toUpperCase();
 
+  if (code === "STEP_UP_REQUIRED") return translate("errors.stepUpRequired");
+  if (code === "TOTP_NOT_ENROLLED") return translate("errors.totpNotEnrolled");
+  if (code === "TOTP_INVALID_OR_REPLAYED") return translate("errors.totpInvalid");
+  if (code === "TOTP_TEMPORARILY_LOCKED") return translate("errors.totpLocked");
+  if (code === "INDEPENDENT_APPROVAL_REQUIRED") {
+    return translate("errors.independentApprovalRequired");
+  }
+  if (code === "PERSONAL_ACTOR_REQUIRED" || code === "PERMANENT_SECURITY_ROLE_REQUIRED") {
+    return translate("errors.personalSecurityActorRequired");
+  }
+  if (code === "PERMANENT_ROLE_REQUIRED") {
+    return translate("errors.permanentRoleRequired");
+  }
   if (code.includes("AUTHORIZATION") || code.includes("DENIED") || apiError.status === 403) {
     return translate("errors.permissionDenied");
   }

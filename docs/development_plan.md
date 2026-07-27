@@ -292,6 +292,22 @@ readiness review остаются отдельными обязательным�
 - независимый аудитор, READY evidence и запрет самоаудита;
 - scoped API, русско-английское рабочее место и демосигнал;
 - честно зафиксированный остаток правил раздела 24.5 ТЗ.
+## Slice 20. Локальная MFA и аварийный доступ
+
+Статус: реализован TOTP-контур; доказательства и честные остаточные ограничения:
+[implemented_slice_20.md](implemented_slice_20.md).
+
+- AES-256-GCM encryption отдельного TOTP seed и безопасная ротация;
+- server-side step-up с expiry и replay/brute-force controls;
+- двухэтапное восстановление с отзывом сессий и факторов;
+- scoped/time-bounded break-glass без превращения в постоянную роль;
+- подписанные recovery/break-glass events и audit каждого использования;
+- русско-английский кабинет безопасности с QR enrollment;
+- миграционный rollback/forward и сквозные backend/frontend tests.
+
+Готово: потеря второго фактора восстанавливается двумя независимыми людьми, а
+временное аварийное право исчезает из уже открытой сессии после отзыва. WebAuthn,
+независимый security review и реальное учение остаются production gates.
 ## Definition of Done для каждого slice
 
 - approved policy/open decision для затронутого поведения;

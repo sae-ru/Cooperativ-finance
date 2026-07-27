@@ -39,7 +39,11 @@ operator/key store, backup/media, system/paper process.
 | переписывание журнала | append-only DB role, hash chain, external roots/backups | полный захват узла до публикации root |
 | replay package | inbox unique, nonce, sequence, expiry | stolen active node key |
 | кража ключа | encrypted storage, step-up, rotation, limits | coercion владельца активного ключа |
-| admin escalation | separation of duties, audit, break-glass alert | сговор security admins |
+| admin escalation | separation of duties, signed recovery/break-glass events, source/scope/expiry | сговор двух контрольных сотрудников |
+| кража пароля критической роли | Argon2id, TOTP, server-side step-up, revoke | кража пароля и активного устройства одновременно |
+| replay TOTP | moving-counter replay guard, ±30 секунд, brute-force lock | захват активной server-side сессии внутри step-up TTL |
+| единоличное восстановление себе | запрет requester/target/decider, персональная постоянная роль, signed event | сговор независимого approver |
+| превращение break-glass в постоянную роль | отдельный source/lifecycle, обычные role endpoints отклоняют, max 60 минут | ошибочно слишком широкий allowlist/scope |
 | подмена подтверждённых условий | versioned canonical hash, подпись каждой стороны, optimistic lock | принуждение стороны подтвердить ложные условия |
 | завышение исполнения | submitted reserve, независимая приёмка кредитором, quantity CHECK | сговор должника и кредитора |
 | подмена перевозчика | named carrier member/user, role scope, evidence на pickup/delivery | передача физического доступа без фиксации |
@@ -69,6 +73,12 @@ operator/key store, backup/media, system/paper process.
 
 - один человек создаёт обе обязательные подписи через разные аккаунты;
 - отозванная роль подтверждает pending approval;
+- инициатор или получатель recovery пытается одобрить собственный запрос;
+- один TOTP-код повторно используется для двух step-up;
+- серия неверных TOTP не приводит к локальной блокировке;
+- пользователь с одним только break-glass пытается восстановить доступ или выдать новое аварийное право;
+- временная роль остаётся доступной в уже открытой сессии после revoke/expiry;
+- обычный endpoint назначения роли пытается активировать break-glass authority anchor;
 - оператор меняет terms после первой подписи;
 - повторный Idempotency-Key используется с другим payload;
 - сторона подтверждает прежний hash после пересмотра условий;

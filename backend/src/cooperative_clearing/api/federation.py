@@ -62,6 +62,7 @@ from cooperative_clearing.modules.federation.infrastructure.models import (
     SyncPackage,
     SyncReceipt,
 )
+from cooperative_clearing.modules.identity.application.security import require_step_up
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode, require_role
 from cooperative_clearing.shared.core.request_context import get_request_id
 
@@ -323,6 +324,26 @@ async def _commit(database: DatabaseDependency, action: CommandAction) -> Comman
             await session.rollback()
             raise federation_error("CONFLICT") from exc
     return _command(result)
+
+
+async def _critical_commit(
+    database: DatabaseDependency,
+    principal: Principal,
+    operation: str,
+    emergency_roles: frozenset[RoleCode],
+    action: CommandAction,
+) -> CommandEnvelope:
+    async def guarded(session: AsyncSession) -> FederationCommandResult:
+        await require_step_up(
+            session,
+            principal,
+            operation=operation,
+            emergency_roles=emergency_roles,
+            request_id=_request_uuid(),
+        )
+        return await action(session)
+
+    return await _commit(database, guarded)
 
 
 def _read(principal: Principal) -> None:
@@ -1360,8 +1381,11 @@ async def activate_node(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "NODE_ACTIVATE",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: NodeTrustService(settings).activate_node(
             session,
             principal=principal,
@@ -1382,8 +1406,11 @@ def _status_endpoint(action: str) -> Callable[..., Awaitable[CommandEnvelope]]:
         database: DatabaseDependency,
         settings: SettingsDependency,
     ) -> CommandEnvelope:
-        return await _commit(
+        return await _critical_commit(
             database,
+            principal,
+            f"NODE_{action.upper()}",
+            frozenset({RoleCode.NODE_SECURITY_ADMIN}),
             lambda session: NodeTrustService(settings).change_node_status(
                 session,
                 principal=principal,
@@ -1419,8 +1446,11 @@ async def open_incident(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "NODE_INCIDENT_OPEN",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: NodeTrustService(settings).open_incident(
             session,
             principal=principal,
@@ -1445,8 +1475,11 @@ async def resolve_incident(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "NODE_INCIDENT_RESOLVE",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: NodeTrustService(settings).resolve_incident(
             session,
             principal=principal,
@@ -1481,8 +1514,11 @@ async def request_rotation(
         new_signature = base64.b64decode(payload.new_signature_base64, validate=True)
     except ValueError as exc:
         raise federation_error("KEY_ROTATION_ENCODING_INVALID", 422) from exc
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "NODE_KEY_ROTATION_REQUEST",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN, RoleCode.NODE_TECHNICAL_CUSTODIAN}),
         lambda session: NodeTrustService(settings).request_key_rotation(
             session,
             principal=principal,
@@ -1512,8 +1548,11 @@ async def decide_rotation(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "NODE_KEY_ROTATION_DECIDE",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: NodeTrustService(settings).approve_key_rotation(
             session,
             principal=principal,
@@ -1778,8 +1817,11 @@ async def resolve_conflict(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "SYNC_CONFLICT_RESOLVE",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: SyncService(settings).resolve_conflict(
             session,
             principal=principal,
@@ -1807,8 +1849,11 @@ async def apply_package(
     database: DatabaseDependency,
     settings: SettingsDependency,
 ) -> CommandEnvelope:
-    return await _commit(
+    return await _critical_commit(
         database,
+        principal,
+        "SYNC_PACKAGE_APPLY",
+        frozenset({RoleCode.NODE_SECURITY_ADMIN}),
         lambda session: SyncService(settings).apply_package(
             session,
             principal=principal,

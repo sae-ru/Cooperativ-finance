@@ -203,3 +203,17 @@ federated generated graphs; переход 0017 -> 0018, downgrade и re-upgrade
 сохранением identity; три раунда по 21 critical test; итоговый signed journal
 556/556 без failures. Подробности:
 [implemented_slice_17.md](implemented_slice_17.md).
+## Проверки Slice 20
+
+Unit-тесты проверяют AES-256-GCM round-trip и отказ при подмене ciphertext,
+TOTP window и replay counter. Интеграционный сценарий проходит enrollment,
+step-up, recovery с двумя сотрудниками, отзыв прежних сессий и фактора,
+break-glass activation/use/revoke, подписанные события и запрет делегировать
+постоянную роль из временного полномочия. Миграционный gate выполняет populated
+цикл `0024 -> 0025 -> 0026 -> 0027 -> 0026 -> 0025 -> 0024 -> 0027`.
+
+Frontend gate проверяет QR enrollment, понятные RU/EN ошибки и независимые
+решения recovery/break-glass. Обязательны typecheck, production build и
+визуальная проверка раздела **Безопасность** в RU/EN на desktop и mobile.
+WebAuthn, независимый security review и физическое учение восстановления
+остаются отдельными production gates.

@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+import pyotp
 import pytest
 from fastapi.testclient import TestClient
 
@@ -69,6 +70,20 @@ async def test_authenticated_admin_api_flow() -> None:
         rotated_access = refresh.json()["data"]["access_token"]
         assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
         headers = {"Authorization": f"Bearer {rotated_access}"}
+
+        enrollment = client.post(
+            "/api/v1/auth/totp/enrollment",
+            headers=headers,
+            json={"current_password": password},
+        )
+        assert enrollment.status_code == 201
+        code = pyotp.TOTP(enrollment.json()["data"]["secret"]).now()
+        confirmation = client.post(
+            "/api/v1/auth/totp/enrollment/confirm",
+            headers=headers,
+            json={"code": code},
+        )
+        assert confirmation.status_code == 200
 
         assert client.get("/api/v1/admin/overview", headers=headers).status_code == 200
         assert client.get("/api/v1/admin/cooperatives", headers=headers).status_code == 200

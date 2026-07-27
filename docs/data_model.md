@@ -540,3 +540,33 @@ Partial unique index допускает только один активный �
 пороги, первое наблюдение и событие обнаружения; допустимый переход оформляется
 новой версией и подписанным событием. Runtime role не имеет DELETE, а downgrade
 непустого контура запрещён.
+
+## Реализованная schema локальной MFA и аварийного доступа Slice 20
+
+Revision `0025_identity_step_up` расширяет `identity.auth_sessions` полями
+`step_up_method`, `step_up_verified_at` и `step_up_expires_at`, создаёт
+`authentication_factors`, `account_recovery_requests` и `break_glass_grants`.
+TOTP seed хранится как nonce + AES-GCM ciphertext + версия отдельного ключа.
+Partial unique indexes разрешают не более одного активного и одного ожидающего
+TOTP на пользователя. Последний принятый moving counter и brute-force state
+хранятся server-side.
+
+Recovery содержит только Argon2id-хеш временного пароля, requester, независимого
+decider, reason/evidence, expiry и lifecycle. CHECK запрещает requester/target
+быть decider, partial unique index — параллельные pending recovery одного
+пользователя.
+
+Break-glass содержит target, allowlisted role, cooperative/node scope,
+requester, независимого approver, revoker, срок, reason/evidence и lifecycle.
+CHECK ограничивает срок 15-240 минут на уровне общей schema; runtime policy
+сужает максимум до 60 минут. Partial unique index не допускает два открытых
+права одной роли и scope.
+
+Revision `0026_break_glass_authority` добавляет `source` и `expires_at` в
+`RoleAssignment`. Revision `0027_identity_index_alignment` обратимо приводит
+имя индекса `authentication_factors.user_id` к имени SQLAlchemy metadata без
+изменения строк факторов. Для временного права создаётся authority anchor с тем же UUID
+и `source=BREAK_GLASS`. Он удовлетворяет FK signed journal, но исключён из
+обычной principal role query и обычного admin lifecycle. Действующее полномочие
+приходит только из `break_glass_grants` с повторной проверкой status/expiry по
+БД на каждый запрос.

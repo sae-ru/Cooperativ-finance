@@ -79,6 +79,7 @@ function renderApp() {
 
 describe("AdminApp", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     vi.clearAllMocks();
     vi.mocked(useSystemStatus).mockReturnValue({
       isPending: false,
@@ -217,6 +218,23 @@ describe("AdminApp", () => {
     await waitFor(() => expect(admin.logout).toHaveBeenCalledOnce());
     expect(await screen.findByRole("heading", { name: "Вход оператора" })).toBeInTheDocument();
   });
+  it("restores the active workspace after the language reload", async () => {
+    vi.mocked(admin.restoreSession).mockResolvedValue(securitySession);
+    const user = userEvent.setup();
+    const firstView = renderApp();
+    await user.click(await screen.findByRole("button", { name: "Аудит" }));
+    expect(await screen.findByRole("heading", { name: "Журнал аудита" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(window.sessionStorage.getItem(
+        `coop.workspace.view.${securitySession.principal.user_id}`,
+      )).toBe("audit");
+    });
+
+    firstView.unmount();
+    renderApp();
+    expect(await screen.findByRole("heading", { name: "Журнал аудита" })).toBeInTheDocument();
+  });
+
   it("keeps the active section visible in mobile navigation", async () => {
     vi.mocked(admin.restoreSession).mockResolvedValue(securitySession);
     const originalMatchMedia = window.matchMedia;

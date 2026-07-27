@@ -59,6 +59,7 @@ sh ./start.sh
 - [Алгоритм клиринга](docs/clearing_algorithm.md)
 - [Федеративный поиск каталога](docs/federated_catalog_search.md)
 - [Администрирование пользователей, ролей и прав](docs/admin_console.md)
+- [Безопасность учётной записи](docs/user-guide/account-security.md)
 - [Как добавить язык интерфейса](lang/README.md)
 - [Полный индекс документации](docs/README.md)
 
@@ -117,6 +118,7 @@ For a node without demo data, use `start.bat production` or `sh ./start.sh produ
 - [Clearing algorithm](docs/clearing_algorithm.md)
 - [Federated catalog search](docs/federated_catalog_search.md)
 - [User, role, and permission administration](docs/admin_console.md)
+- [Account security](docs/user-guide/account-security.md)
 - [Adding an interface language](lang/README.md)
 - [Complete documentation index](docs/README.md)
 

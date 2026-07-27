@@ -46,6 +46,7 @@ from cooperative_clearing.modules.federation.infrastructure.clearing_models impo
     NodeClearingApproval,
     NodePrepareReceipt,
 )
+from cooperative_clearing.modules.identity.application.security import require_step_up
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
@@ -519,6 +520,11 @@ async def release_cycle(
 ) -> CommandEnvelope:
     async def action(session: AsyncSession) -> dict[str, object]:
         await federation_actor(session, principal, FINALIZER_ROLES)
+        await require_step_up(
+            session,
+            principal,
+            operation="FEDERATED_CLEARING_RELEASE",
+        )
         result = await FederatedClearingCoordinator(settings).release(
             session, cycle_id=cycle_id, expired=payload.expired
         )

@@ -81,6 +81,7 @@
 
 - [Концепция / Concept](concept.md)
 - [Руководство пользователя / User guide](user_guide.md)
+- [Безопасность учётной записи / Account security](user-guide/account-security.md)
 - [Установка / Deployment](deployment.md)
 - [Архитектура / Architecture](architecture.md)
 - [Интерфейс / Interface architecture](gui_architecture.md)
@@ -92,6 +93,7 @@
 - [Реализованный Slice 17](implemented_slice_17.md)
 - [Реализованный Slice 18: кабинет пайщика и сквозной обмен](implemented_slice_18.md)
 - [Реализованный Slice 19: объяснимая проверка аномалий](implemented_slice_19.md)
+- [Реализованный Slice 20: локальная MFA и аварийный доступ](implemented_slice_20.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

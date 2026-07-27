@@ -12,6 +12,7 @@ from cooperative_clearing.modules.identity.domain.types import (
     MembershipStatus,
     MemberStatus,
     RoleCode,
+    RoleGrantSource,
     UserStatus,
 )
 
@@ -30,6 +31,8 @@ class RoleGrantResponse(BaseModel):
     assignment_id: UUID
     role: RoleCode
     cooperative_id: UUID | None
+    source: RoleGrantSource = RoleGrantSource.ASSIGNMENT
+    expires_at: datetime | None = None
 
 
 class PrincipalResponse(BaseModel):
@@ -216,4 +219,126 @@ class ListEnvelope(BaseModel):
 
 class OverviewEnvelope(BaseModel):
     data: AdminOverviewResponse
+    request_id: str
+
+
+class TotpEnrollmentRequest(BaseModel):
+    current_password: SecretStr
+    current_totp_code: str | None = Field(default=None, pattern=r"^[0-9]{6}$")
+
+
+class TotpEnrollmentResponse(BaseModel):
+    factor_id: UUID
+    secret: str
+    provisioning_uri: str
+    expires_at: datetime
+
+
+class TotpConfirmationRequest(BaseModel):
+    code: str = Field(pattern=r"^[0-9]{6}$")
+
+
+class TotpDisableRequest(BaseModel):
+    current_password: SecretStr
+    code: str = Field(pattern=r"^[0-9]{6}$")
+    reason_code: str = Field(min_length=2, max_length=100)
+
+
+class StepUpResponse(BaseModel):
+    method: Literal["TOTP"] = "TOTP"
+    verified_at: datetime
+    expires_at: datetime
+
+
+class SecurityStateResponse(BaseModel):
+    totp_enabled: bool
+    totp_confirmed_at: datetime | None
+    enrollment_pending: bool
+    enrollment_expires_at: datetime | None
+    step_up_active: bool
+    step_up_method: str | None
+    step_up_expires_at: datetime | None
+    break_glass_grants: int
+
+
+class SecurityStateEnvelope(BaseModel):
+    data: SecurityStateResponse
+    request_id: str
+
+
+class TotpEnrollmentEnvelope(BaseModel):
+    data: TotpEnrollmentResponse
+    request_id: str
+
+
+class StepUpEnvelope(BaseModel):
+    data: StepUpResponse
+    request_id: str
+
+
+class AccountRecoveryCreateRequest(BaseModel):
+    target_user_id: UUID
+    temporary_password: SecretStr
+    reason_code: str = Field(min_length=2, max_length=100)
+    evidence_id: str = Field(min_length=2, max_length=200)
+
+
+class SecurityDecisionRequest(BaseModel):
+    approve: bool
+    reason_code: str = Field(min_length=2, max_length=100)
+
+
+class AccountRecoveryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    target_user_id: UUID
+    requested_by_user_id: UUID
+    decided_by_user_id: UUID | None
+    reason_code: str
+    evidence_id: str
+    status: str
+    created_at: datetime
+    expires_at: datetime
+    decided_at: datetime | None
+    version: int
+
+
+class AccountRecoveryCollection(BaseModel):
+    data: list[AccountRecoveryResponse]
+    request_id: str
+
+
+class BreakGlassCreateRequest(BaseModel):
+    target_user_id: UUID
+    role: RoleCode
+    cooperative_id: UUID | None = None
+    duration_minutes: int = Field(ge=15, le=240)
+    reason_code: str = Field(min_length=2, max_length=100)
+    evidence_id: str = Field(min_length=2, max_length=200)
+
+
+class BreakGlassResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    target_user_id: UUID
+    role_code: RoleCode
+    cooperative_id: UUID | None
+    requested_by_user_id: UUID
+    approved_by_user_id: UUID | None
+    revoked_by_user_id: UUID | None
+    reason_code: str
+    evidence_id: str
+    requested_duration_minutes: int
+    status: str
+    created_at: datetime
+    approved_at: datetime | None
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    version: int
+
+
+class BreakGlassCollection(BaseModel):
+    data: list[BreakGlassResponse]
     request_id: str

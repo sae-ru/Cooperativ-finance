@@ -20,6 +20,7 @@ from cooperative_clearing.modules.identity.domain.types import (
     MemberStatus,
     Principal,
     RoleCode,
+    RoleGrantSource,
     ensure_member_transition,
     normalize_login,
 )
@@ -380,6 +381,12 @@ class IdentityAdminService:
         assignment = await session.get(RoleAssignment, assignment_id, with_for_update=True)
         if assignment is None:
             raise self._not_found("ROLE_ASSIGNMENT_NOT_FOUND")
+        if assignment.source != RoleGrantSource.ASSIGNMENT.value:
+            raise DomainError(
+                code="BREAK_GLASS_MANAGED_SEPARATELY",
+                message_key="errors.identity.break_glass_managed_separately",
+                status_code=409,
+            )
         if assignment.status != "PENDING_APPROVAL":
             raise DomainError(
                 code="ROLE_ASSIGNMENT_NOT_PENDING",
@@ -428,6 +435,12 @@ class IdentityAdminService:
         assignment = await session.get(RoleAssignment, assignment_id, with_for_update=True)
         if assignment is None:
             raise self._not_found("ROLE_ASSIGNMENT_NOT_FOUND")
+        if assignment.source != RoleGrantSource.ASSIGNMENT.value:
+            raise DomainError(
+                code="BREAK_GLASS_MANAGED_SEPARATELY",
+                message_key="errors.identity.break_glass_managed_separately",
+                status_code=409,
+            )
         if assignment.status != "ACTIVE":
             raise DomainError(
                 code="ROLE_ASSIGNMENT_NOT_ACTIVE",
@@ -539,6 +552,8 @@ async def admin_overview(session: AsyncSession) -> dict[str, int]:
         "users": await count(UserAccount),
         "active_sessions": await count(AuthSession, AuthSession.status == "ACTIVE"),
         "pending_role_approvals": await count(
-            RoleAssignment, RoleAssignment.status == "PENDING_APPROVAL"
+            RoleAssignment,
+            RoleAssignment.status == "PENDING_APPROVAL",
+            RoleAssignment.source == RoleGrantSource.ASSIGNMENT.value,
         ),
     }
