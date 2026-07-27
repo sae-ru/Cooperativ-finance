@@ -345,9 +345,21 @@ local entries/events hash. Reconciliation проверяет полный requir
 
 - `identity.cooperatives`: организация и status;
 - `identity.memberships`: member/cooperative, level, period, exit state;
-- `identity.service_clients`: owner, scopes, credential refs, limits, expiry;
+- `identity.service_clients`: owner, contact, scopes, network allowlist, rate limit, status, expiry и version;
+- `identity.service_client_credentials`: client, secret hash/prefix, status, issuer, expiry и retirement/revocation time;
+- `identity.service_client_requests`: operation, proposed policy, expected client version, requester, independent decider, expiry и issued credential ref;
+- `identity.service_client_access_tokens`: credential/client, token hash, source IP, status, expiry и last seen;
+- `identity.service_client_rate_buckets`: client/minute и request count;
 - `identity.member_merge_cases`: duplicate candidates, evidence, decision, id map;
 - `identity.recovery_cases`: account, approvers, reason, status, event.
+
+Для live client имя уникально внутри owner cooperative. Ровно один active
+credential допускается partial unique index, а pending request существующего
+client также может быть только один. DB CHECK запрещает совпадение requester и
+decider, пустые scopes/allowlist, невалидные статусы, отрицательные versions и
+rate вне `1..6000`. Открытый secret не является полем модели. Worker переводит
+истёкшие tokens в `EXPIRED`, удаляет finished tokens старше 30 дней и rate
+buckets старше двух дней.
 
 ### `node.node_applications`
 

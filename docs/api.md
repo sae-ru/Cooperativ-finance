@@ -48,6 +48,41 @@ Recovery и break-glass команды требуют `Idempotency-Key`, reason/
 на подписанный node event, а не только на обычную audit-запись. WebAuthn пока не
 входит в реализованный OpenAPI и остаётся отдельным production gate.
 
+## Реализованный API внешних программ
+
+Human и machine authentication разделены. `ServiceClient` сначала проходит
+административную заявку и независимое решение:
+
+```text
+GET  /api/v1/admin/service-clients
+GET  /api/v1/admin/service-client-requests
+POST /api/v1/admin/service-client-requests
+POST /api/v1/admin/service-client-requests/{request_id}/decision
+POST /api/v1/admin/service-clients/{client_id}/suspend
+POST /api/v1/admin/service-clients/{client_id}/revoke
+```
+
+Create/update/rotate/reactivate требуют permanent manager role,
+`Idempotency-Key` и versioned state. Decision, suspend и revoke дополнительно
+требуют permanent `SECURITY_ADMIN`, персонального member, active step-up и не
+допускают self-review. Secret возвращается только при первом успешном create или
+rotate decision и никогда не включается в replay response.
+
+```text
+POST /api/v1/service-auth/token
+GET  /api/v1/service/context
+POST /api/v1/service/catalog/search
+GET  /api/v1/service/clearing/cycles/{cycle_id}/accounting-export
+```
+
+Token endpoint принимает `client_id` и `client_secret`, проверяет credential,
+client/cooperative expiry/status, trusted source IP и PostgreSQL rate bucket.
+Machine bearer token не принимается в human endpoints. `catalog:read` разрешает
+только bounded local/indexed/offline search; `DIRECT` fanout запрещён.
+`clearing:accounting:read` возвращает только готовый export своего owner
+cooperative. Подробности и эксплуатационные границы:
+[implemented_slice_24.md](implemented_slice_24.md).
+
 ## Формат успешной команды
 
 ```json

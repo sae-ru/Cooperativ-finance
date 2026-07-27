@@ -184,6 +184,72 @@ export type AuditEntry = {
   reason_code: string | null;
 };
 
+export type ServiceScope = "catalog:read" | "clearing:accounting:read";
+export type ServiceClientOperation = "CREATE" | "UPDATE" | "ROTATE" | "REACTIVATE";
+export type ServiceClientStatus = "ACTIVE" | "SUSPENDED" | "REVOKED";
+export type ServiceClientRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type ServiceClient = {
+  id: string;
+  client_code: string;
+  owner_cooperative_id: string;
+  display_name: string;
+  technical_contact_name: string;
+  technical_contact_email: string;
+  scopes: ServiceScope[];
+  network_allowlist: string[];
+  rate_limit_per_minute: number;
+  status: ServiceClientStatus;
+  effective_status: ServiceClientStatus | "EXPIRED";
+  expires_at: string;
+  registered_by_user_id: string;
+  approved_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+  suspended_at: string | null;
+  revoked_at: string | null;
+  version: number;
+};
+
+export type ServiceClientConfig = {
+  display_name: string;
+  technical_contact_name: string;
+  technical_contact_email: string;
+  scopes: ServiceScope[];
+  network_allowlist: string[];
+  rate_limit_per_minute: number;
+  expires_at: string;
+};
+
+export type ServiceClientRequest = {
+  id: string;
+  service_client_id: string | null;
+  owner_cooperative_id: string;
+  operation: ServiceClientOperation;
+  proposed_config: ServiceClientConfig | null;
+  expected_client_version: number | null;
+  reason_code: string;
+  status: ServiceClientRequestStatus;
+  requested_by_user_id: string;
+  decided_by_user_id: string | null;
+  decision_reason_code: string | null;
+  issued_credential_id: string | null;
+  created_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  version: number;
+};
+
+export type ServiceClientDecision = {
+  event_id: string;
+  object_id: string;
+  replayed: boolean;
+  service_client_id: string | null;
+  client_code: string | null;
+  credential_secret: string | null;
+  credential_expires_at: string | null;
+};
+
 export class AdminApiError extends Error {
   constructor(
     public readonly code: string,
@@ -332,6 +398,10 @@ export const getUsers = () => request<UserAccount[]>("/api/v1/admin/users");
 export const getRoles = () => request<RoleAssignment[]>("/api/v1/admin/roles");
 export const getSessions = () => request<ServerSession[]>("/api/v1/admin/sessions");
 export const getAudit = () => request<AuditEntry[]>("/api/v1/admin/audit?limit=200");
+export const getServiceClients = () =>
+  request<ServiceClient[]>("/api/v1/admin/service-clients");
+export const getServiceClientRequests = () =>
+  request<ServiceClientRequest[]>("/api/v1/admin/service-client-requests");
 
 export const createCooperative = (payload: { code: string; name: string }) =>
   request<{ event_id: string; object_id: string }>("/api/v1/admin/cooperatives", {
@@ -488,6 +558,67 @@ export const transitionUser = (user: UserAccount, targetStatus: "ACTIVE" | "DISA
       })
     },
   );
+export const requestServiceClientChange = (payload: {
+  owner_cooperative_id: string;
+  operation: ServiceClientOperation;
+  service_client_id?: string | null;
+  config?: ServiceClientConfig | null;
+  expected_client_version?: number | null;
+  reason_code: string;
+}) =>
+  request<{ event_id: string; object_id: string; replayed: boolean }>(
+    "/api/v1/admin/service-client-requests",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const decideServiceClientRequest = (
+  changeRequest: ServiceClientRequest,
+  approve: boolean,
+  reasonCode: string,
+) =>
+  request<ServiceClientDecision>(
+    `/api/v1/admin/service-client-requests/${changeRequest.id}/decision`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        approve,
+        reason_code: reasonCode,
+        expected_version: changeRequest.version,
+      }),
+    },
+  );
+
+export const suspendServiceClient = (serviceClient: ServiceClient, reasonCode: string) =>
+  request<{ event_id: string; object_id: string; replayed: boolean }>(
+    `/api/v1/admin/service-clients/${serviceClient.id}/suspend`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        reason_code: reasonCode,
+        expected_version: serviceClient.version,
+      }),
+    },
+  );
+
+export const revokeServiceClient = (serviceClient: ServiceClient, reasonCode: string) =>
+  request<{ event_id: string; object_id: string; replayed: boolean }>(
+    `/api/v1/admin/service-clients/${serviceClient.id}/revoke`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        reason_code: reasonCode,
+        expected_version: serviceClient.version,
+      }),
+    },
+  );
+
 export const assignRole = (payload: {
   user_id: string;
   role: RoleCode;

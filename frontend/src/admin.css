@@ -531,3 +531,82 @@ html[data-theme="dark"] .duplicate-review.blocking { color: #ffb9b9; background:
 html[data-theme="dark"] .duplicate-review.clear { color: #a9e6c3; background: #17382c; border-color: #356b55; }
 html[data-theme="dark"] .duplicate-candidates > span { background: color-mix(in srgb, var(--surface) 80%, transparent); }
 html[data-theme="dark"] .selected-row { background: #2a3a34; }
+
+/* External application access is intentionally separate from human accounts. */
+.service-client-workspace { display: grid; gap: 14px; }
+.service-client-editor form { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 11px; padding: 14px; }
+.service-client-editor .panel-heading > div,
+.service-request-panel .panel-heading > div,
+.service-client-list .panel-heading > div { display: grid; gap: 3px; }
+.service-client-editor .panel-heading small,
+.service-request-panel .panel-heading small,
+.service-client-list .panel-heading small { color: var(--muted); font-size: 10px; font-weight: 500; }
+.service-client-editor label { align-content: start; }
+.service-client-editor textarea { min-height: 61px; resize: vertical; }
+.service-client-editor label > small { color: var(--muted); font-size: 9px; font-weight: 500; }
+.service-client-editor .primary-button { align-self: end; min-height: 36px; }
+.service-scope-picker { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; min-width: 0; margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; }
+.service-scope-picker legend { padding: 0 4px; color: var(--muted); font-size: 9px; font-weight: 700; }
+.service-scope-picker label { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 7px; color: var(--ink); font-size: 10px; font-weight: 650; }
+.service-scope-picker input { width: 15px; height: 15px; }
+.service-client-summary { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); border-block: 1px solid var(--line); background: var(--surface); }
+.service-client-summary > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 54px; padding: 9px 14px; border-right: 1px solid var(--line); }
+.service-client-summary > div:last-child { border-right: 0; }
+.service-client-summary span { color: var(--muted); font-size: 10px; font-weight: 700; }
+.service-client-summary strong { font-size: 20px; font-weight: 760; }
+.service-scope-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.service-scope-list span { padding: 3px 5px; color: var(--forest); font-size: 9px; font-weight: 700; background: var(--green-soft); border: 1px solid color-mix(in srgb, var(--green) 28%, var(--line)); border-radius: 3px; }
+.service-request-panel table { min-width: 890px; }
+.service-client-list table { min-width: 1120px; }
+.service-request-panel td:nth-child(2),
+.service-client-list td:first-child { min-width: 220px; }
+.service-client-list td code { display: block; max-width: 240px; margin-top: 4px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; }
+.service-client-list td small { max-width: 280px; overflow-wrap: anywhere; }
+.service-decision-actions,
+.service-client-actions { display: flex; align-items: center; gap: 5px; min-width: max-content; }
+.service-decision-actions .compact-command { min-height: 30px; }
+.icon-button.warning { color: #765800; background: #fff8df; border-color: #dfc66d; }
+.icon-button.danger { color: #8b2929; background: #fff0f0; border-color: #dfa7a7; }
+.modal-backdrop { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 18px; background: rgb(12 20 17 / .65); backdrop-filter: blur(2px); }
+.service-confirm-dialog,
+.service-secret-dialog { width: min(520px, 100%); max-height: calc(100vh - 36px); overflow: auto; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 24px 70px rgb(0 0 0 / .28); }
+.service-confirm-dialog header,
+.service-secret-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px; border-bottom: 1px solid var(--line); }
+.service-confirm-dialog h2,
+.service-secret-dialog h2 { margin: 3px 0 0; font-size: 18px; letter-spacing: 0; }
+.service-confirm-dialog > p { margin: 0; padding: 14px 16px 0; color: var(--muted); font-size: 11px; }
+.service-confirm-dialog > label { display: grid; gap: 6px; padding: 14px 16px; font-size: 10px; font-weight: 700; }
+.service-confirm-dialog > .form-error,
+.service-confirm-dialog > .form-success { margin: 14px 16px 0; border: 1px solid currentColor; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); }
+.danger-command { background: #9c3434; border-color: #9c3434; }
+.danger-command:hover { background: #7d2929; }
+.service-secret-dialog { padding-bottom: 16px; }
+.service-secret-dialog > label { display: grid; gap: 6px; padding: 0 16px 12px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.service-secret-dialog > label > span { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; gap: 7px; }
+.service-secret-dialog code { min-height: 34px; padding: 9px; overflow: auto; color: var(--ink); font-size: 10px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 4px; white-space: nowrap; }
+.service-secret-dialog > small { display: block; padding: 0 16px 13px; color: var(--muted); font-size: 10px; }
+.service-secret-dialog > .primary-button { margin-left: 16px; }
+.credential-warning { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 9px; margin: 14px 16px; padding: 11px; color: #765800; font-size: 10px; font-weight: 700; background: #fff8df; border: 1px solid #dfc66d; border-radius: 5px; }
+
+@media (max-width: 1250px) {
+  .service-client-editor form { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .service-client-editor form { grid-template-columns: minmax(0, 1fr); }
+  .service-client-editor .primary-button { width: 100%; }
+  .service-client-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .service-client-summary > div:nth-child(2) { border-right: 0; }
+  .service-client-summary > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
+  .dialog-actions button { width: 100%; }
+}
+
+html[data-theme="dark"] .service-client-summary,
+html[data-theme="dark"] .service-confirm-dialog,
+html[data-theme="dark"] .service-secret-dialog { background: var(--surface); border-color: var(--line); }
+html[data-theme="dark"] .service-scope-list span { color: #b9ebd0; background: #17382c; border-color: #356b55; }
+html[data-theme="dark"] .icon-button.warning,
+html[data-theme="dark"] .credential-warning { color: #f4d87a; background: #403713; border-color: #806f2c; }
+html[data-theme="dark"] .icon-button.danger { color: #ffb9b9; background: #431f24; border-color: #82434b; }

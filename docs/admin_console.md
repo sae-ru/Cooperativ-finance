@@ -121,9 +121,29 @@ Admin action не перескакивает обязательную прове
 
 ## Service clients
 
-Для интеграции фиксируются owner organization, technical contact, scopes,
-network allowlist, credentials/certificates, rate limits, expiry и audit. Один
-service client не используется несколькими независимыми организациями.
+Внешняя программа не заводится как `User`: для неё используется отдельный
+`ServiceClient`, принадлежащий ровно одному кооперативу. В карточке фиксируются
+понятное имя, ответственный специалист и email, минимальные scopes, конкретные
+CIDR сети, число запросов в минуту, срок доступа, status и version. Один client
+не используется несколькими независимыми организациями и не получает права
+через человеческие `RoleAssignment`.
+
+Создание, изменение policy, ротация credential и возобновление выполняются через
+versioned заявку. Её создаёт постоянный `COOPERATIVE_ADMIN` или
+`SECURITY_ADMIN`, а одобряет другой персонально связанный постоянный
+`SECURITY_ADMIN` с TOTP step-up. Break-glass не даёт право управлять этим
+lifecycle. Новый secret показывается только один раз; повтор idempotent-ответа
+его не возвращает.
+
+`SECURITY_ADMIN` может немедленно приостановить или безвозвратно отозвать client.
+Обе команды отзывают все machine tokens, но не меняют `User`, роли и сессии
+людей. Возобновление после suspension снова требует независимого решения;
+revoked client не восстанавливается.
+
+В GUI это отдельная вкладка **Интеграции** с формой least privilege, очередью
+решений, TOTP-confirmation и одноразовым окном credentials. Read-only auditor
+видит lifecycle и owner scope, но не может получить или восстановить secret.
+Полный контракт: [implemented_slice_24.md](implemented_slice_24.md).
 
 ## Безопасность учётной записи
 

@@ -382,4 +382,21 @@ staging-import остаются отдельными последующими с
 - исходные identifiers не сохраняются в открытом виде; импорт не создаёт роли, логины, членства, паи или лимиты;
 - migration `0030`, совместимый OpenAPI, backend integration и frontend component tests.
 
-Следующий кодовый срез - service-client lifecycle. Управляемое объединение подтверждённых дубликатов остаётся отдельным срезом, потому что требует собственной evidence/decision/id-map процедуры.
+Service-client lifecycle реализован в Slice 24. Управляемое объединение
+подтверждённых дубликатов остаётся отдельным следующим срезом, потому что
+требует собственной evidence/decision/id-map процедуры.
+
+## Slice 24. Внешние программные интеграции
+
+Реализован production-контур service clients:
+
+- machine identity полностью отделена от `User`, `Member` и `Node`;
+- owner cooperative, named technical contact, exact scopes, CIDR allowlist, rate limit, expiry и version обязательны;
+- create/update/rotate/reactivate проходят permanent manager request и независимое permanent security decision с step-up;
+- секрет выдаётся один раз, хранится только как hash и не возвращается при idempotency replay;
+- machine token короткоживущий, server-side revocable, source-bound и не принимается human endpoints;
+- suspend/revoke немедленно отзывают machine tokens, не останавливая human sessions;
+- runtime tables имеют worker retention, migration `0031`, совместимый OpenAPI, backend/frontend tests, RU/EN GUI и demo rotation request.
+
+Доказательства и остаточные ограничения: [implemented_slice_24.md](implemented_slice_24.md).
+Следующий кодовый срез - управляемое объединение подтверждённых дубликатов.

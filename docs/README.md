@@ -96,6 +96,8 @@
 - [Реализованный Slice 20: локальная MFA и аварийный доступ](implemented_slice_20.md)
 - [Реализованный Slice 21: полный версионированный антифрод-контур](implemented_slice_21.md)
 - [Реализованный Slice 22: раздельный административный реестр](implemented_slice_22.md)
+- [Реализованный Slice 23: безопасный ввод участников](implemented_slice_23.md)
+- [Реализованный Slice 24: жизненный цикл внешних интеграций](implemented_slice_24.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)
@@ -108,4 +110,3 @@
 Изменение инварианта, формата подписи, предела ответственности или правила
 конфликта требует ADR, миграции или новой версии протокола и теста. История
 решений не переписывается задним числом.
-- [Реализованный Slice 23: безопасный ввод участников](implemented_slice_23.md)

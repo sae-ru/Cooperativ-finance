@@ -1,6 +1,6 @@
 """One-time separated-duty identity bootstrap and deterministic demo fixtures."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from sqlalchemy import select, text, update
@@ -19,11 +19,14 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     Membership,
     ParticipantAddress,
     RoleAssignment,
+    ServiceClient,
+    ServiceClientCredential,
+    ServiceClientRequest,
     UserAccount,
 )
 from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import read_text_secret
-from cooperative_clearing.shared.core.security import PasswordService
+from cooperative_clearing.shared.core.security import PasswordService, token_hash
 
 BOOTSTRAP_LOGINS = ("registrar", "security", "auditor")
 DEMO_MEMBER_LOGIN = "farmer"
@@ -388,6 +391,56 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
                 set_={"status": "ACTIVE", "cooperative_id": None},
             )
         )
+    now = datetime.now(UTC)
+    service_client_id = stable_id("service-client", "demo-catalog-bridge")
+    service_credential_id = stable_id("service-client-credential", "demo-catalog-bridge:initial")
+    demo_secret = f"ccs_{service_credential_id.hex}_demoServiceCredentialForLocalTestingOnly2026ABC"
+    service_client = insert(ServiceClient).values(
+        id=service_client_id,
+        client_code="svc_demo_catalog_bridge",
+        owner_cooperative_id=cooperative_id,
+        display_name="Demo catalog bridge",
+        technical_contact_name="Demo integration operator",
+        technical_contact_email="integration@example.test",
+        scopes=["catalog:read", "clearing:accounting:read"],
+        network_allowlist=["127.0.0.1/32"],
+        rate_limit_per_minute=60,
+        status="ACTIVE",
+        expires_at=now + timedelta(days=180),
+        registered_by_user_id=stable_id("bootstrap-user", "registrar"),
+        approved_by_user_id=stable_id("bootstrap-user", "security"),
+    )
+    await session.execute(service_client.on_conflict_do_nothing(index_elements=[ServiceClient.id]))
+    service_credential = insert(ServiceClientCredential).values(
+        id=service_credential_id,
+        service_client_id=service_client_id,
+        secret_hash=token_hash(demo_secret),
+        secret_prefix=demo_secret[:24],
+        status="ACTIVE",
+        issued_by_user_id=stable_id("bootstrap-user", "security"),
+        created_at=now,
+        expires_at=now + timedelta(days=180),
+    )
+    await session.execute(
+        service_credential.on_conflict_do_nothing(index_elements=[ServiceClientCredential.id])
+    )
+    service_request = insert(ServiceClientRequest).values(
+        id=stable_id("service-client-request", "demo-catalog-bridge:rotate"),
+        service_client_id=service_client_id,
+        owner_cooperative_id=cooperative_id,
+        operation="ROTATE",
+        proposed_config=None,
+        expected_client_version=1,
+        reason_code="DEMO_SECRET_ROTATION",
+        status="PENDING",
+        requested_by_user_id=stable_id("bootstrap-user", "registrar"),
+        created_at=now,
+        expires_at=now + timedelta(hours=24),
+    )
+    await session.execute(
+        service_request.on_conflict_do_nothing(index_elements=[ServiceClientRequest.id])
+    )
+
     import_batch_id = stable_id("member-import-batch", "demo-intake")
     import_rows = (
         (1, "Sofia Green", "READY", None, None, None),

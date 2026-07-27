@@ -1,6 +1,6 @@
 # Развёртывание
 
-Статус: реализованный deployment baseline Slices 0-16; до выполнения `production_readiness.md` не является production-ready.
+Статус: реализованный deployment baseline Slices 0-24; до выполнения `production_readiness.md` не является production-ready.
 
 ## Целевая топология локального узла
 
@@ -20,6 +20,14 @@ bundle и backup.
 | `migrate`, `init-node`, `bootstrap-identity` | одноразовые jobs без внешнего порта | нет |
 | `seed-demo` | только профиль `demo`, без внешнего порта | blob volume |
 | `postgres-test`, `migrate-test`, `backend-tests` | только явный профиль `test`, отдельная test DB | изолированы от runtime DB |
+
+Для service-client network allowlist source IP берётся только из доверенной
+proxy-границы. `api` не публикует host port и принимает HTTP только из internal
+`app` network; `gateway` обязан удалить входные forwarded headers и записать
+фактический адрес непосредственного сетевого peer. За внешним TLS reverse proxy allowlist видит адрес этого proxy; доверять исходному адресу клиента можно только после отдельного security review и настройки точного trusted real-IP профиля. Нельзя добавлять прямой `ports:` к `api` или ставить
+перед gateway proxy, которому разрешено передавать произвольный
+`X-Forwarded-For`, без отдельного security review. После изменения ingress
+выполняется positive/negative проверка с адресом внутри и вне allowlist.
 
 PostgreSQL и зашифрованный blob store являются обязательными частями хозяйственного состояния Slice 3. Метаданные и связи находятся в БД, содержимое доказательств находится в именованном `blob-data` volume. Согласованные backup/restore drill и контролируемые update/rollback реализованы операторскими scripts вне Compose. TLS lifecycle, непрерывный WAL archive и выпуск подписанного offline release bundle остаются обязательными задачами до pilot.
 

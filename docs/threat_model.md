@@ -263,3 +263,29 @@ limit, duplicate apply, conflicting certificate и release после finality.
 срабатываний, drift/adversarial/privacy review и обязательное декларирование
 связей. Необъяснимая итоговая «карма риска» и автоматическая санкция по сигналу
 по-прежнему запрещены.
+
+## Дополнение Slice 24: внешние программные интеграции
+
+| Угроза | Реализованный контроль | Остаточный риск |
+|---|---|---|
+| внешнюю программу заводят как человека с широкими ролями | отдельные `ServiceClient`, credential и token tables; machine token не проходит human dependencies | администратор вручную создаст лишний human account вне процедуры |
+| один человек незаметно подключает свою программу | permanent manager request, отдельный permanent security reviewer, personal member и TOTP step-up | сговор двух сотрудников или общая TOTP-учётная запись |
+| break-glass превращается в постоянный machine access | `RoleGrantSource.ASSIGNMENT` обязателен для request/decision/protective actor | неверно выданная постоянная роль |
+| secret утекает из БД, журнала или idempotency replay | хранится только hash/prefix, secret возвращается один раз и отсутствует в replay/audit/journal | screenshot, clipboard, лог внешней программы или плохое secret storage |
+| похищенный token используется из другой сети | token server-side revocable, source-IP bound, credential/client/owner recheck на каждом запросе | атакующий находится в разрешённой сети |
+| подделка `X-Forwarded-For` обходит allowlist | API доступен только через штатный gateway; forwarded IP считается доверенным только от изолированного proxy | ошибочная публикация API-порта или дополнительный недоверенный proxy |
+| allowlist случайно открывает весь Интернет | CIDR normalization и запрет IPv4/IPv6 `/0`; GUI требует явно заполнить пустой allowlist | слишком широкий, но не `/0`, утверждённый диапазон |
+| интеграция получает скрытые новые возможности | точный allowlist из двух scopes и `require_scope` на каждом runtime endpoint | будущий endpoint забудет scope enforcement |
+| каталог используется как SSRF/direct peer scanner | service API запрещает `DIRECT`, сохраняет bounded search и действующие federation policies | разрешённая indexed выдача агрегируется внешней программой |
+| бухгалтерская выгрузка чужого кооператива | token owner cooperative сравнивается с clearing cycle owner | чрезмерная глобальная human role читает admin metadata |
+| credential rotation оставляет старые sessions | active credential retires, все tokens client отзываются в одной transaction | внешняя программа продолжает хранить старый secret и создаёт шум входа |
+| защитный отзыв ломает работу людей | service transitions не изменяют `User`, role или human session | интеграция была единственным практическим способом выполнить процесс |
+| rate-limit таблицы или token history растут без границ | PostgreSQL minute buckets, worker retention 2/30 days и cleanup integration test | worker outage временно увеличивает объём таблиц |
+| PII технического контакта утекает в signed federation journal | contact остаётся в owner-scoped identity table и исключён из signed payload | authorised auditor или backup custodian видит contact data |
+
+Обязательные deployment checks: API container не публикует host port; только
+gateway находится в edge network; proxy очищает входные forwarded headers;
+allowlist соответствует реальному egress внешней программы; secret сохраняется в
+отдельном secret store; compromised-secret drill доказывает rotation/revoke и
+непрерывность human login. Эти проверки требуют независимого security review и
+не закрываются component/integration tests.

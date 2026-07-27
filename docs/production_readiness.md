@@ -220,11 +220,34 @@ monitoring drift, privacy/legal review и независимое adversarial т�
 отключение User атомарно отзывает активные сессии. Migration `0029`, generated
 OpenAPI и проверки описаны в [implemented_slice_22.md](implemented_slice_22.md).
 
-Отмечено только инженерное разделение сущностей. Юридические процедуры выхода,
-обучение реальных ролей, независимый security review, duplicate merge,
-service-client lifecycle и массовый импорт остаются открытыми production gates.
+Отмечено только инженерное разделение сущностей. Массовый импорт и
+service-client lifecycle впоследствии закрыты на code-level в Slice 23 и 24.
+Юридические процедуры выхода, обучение реальных ролей, независимый security
+review и duplicate merge остаются открытыми production gates.
 ## Текущее доказательство Slice 23
 
 Безопасный ввод участников реализован как проверяемый workflow: ручное создание требует явного решения при совпадении имени, а массовый CSV проходит staging, dry run, независимое утверждение и повторную проверку перед атомарным применением. Сервер проверяет cooperative scope, постоянные роли, optimistic version и idempotency; открытые identifiers и исходный CSV не сохраняются.
 
-Revision `0030_safe_member_intake`, OpenAPI, backend integration-тесты и component-тесты интерфейса входят в кодовое доказательство. Service-client lifecycle, процедура merge подтверждённых дубликатов, независимый security review, обучение операторов, целевая нагрузка и юридическое утверждение процедур остаются открытыми production gates.
+Revision `0030_safe_member_intake`, OpenAPI, backend integration-тесты и
+component-тесты интерфейса входят в кодовое доказательство. Service-client
+lifecycle впоследствии закрыт на code-level в Slice 24. Процедура merge
+подтверждённых дубликатов, независимый security review, обучение операторов,
+целевая нагрузка и юридическое утверждение процедур остаются открытыми
+production gates.
+
+## Текущее доказательство Slice 24
+
+Внешние программы отделены от человеческих учётных записей. Permanent manager
+создаёт versioned request, другой permanent `SECURITY_ADMIN` с персональным
+member и TOTP step-up принимает решение. Credentials выдаются один раз и
+хранятся как hash; machine tokens revocable/source-bound, проверяют owner,
+scope, network, expiry и PostgreSQL rate limit. Suspend/revoke не меняют human
+sessions. Revision `0031`, OpenAPI, runtime cleanup, demo, API и RU/EN GUI
+описаны в [implemented_slice_24.md](implemented_slice_24.md).
+
+Checkpoint подтверждён `207` backend-тестами, `170` frontend-тестами, production build, Ruff, strict mypy по `205` source files, симметрией `774` RU/EN keys, циклом миграции `0031 -> 0030 -> 0031`, `alembic check`, Compose network audit и живым `OPERATIONAL` Docker-узлом. Браузерная проверка RU/EN и light/dark не выявила console errors.
+
+Это code-level доказательство не закрывает независимый review proxy trust
+boundary, secret storage внешней программы, фактические allowlists, incident
+rotation drill, target-host capacity, обучение владельцев и юридическое
+утверждение подключений. Эти checkbox требуют подписанных внешних evidence.

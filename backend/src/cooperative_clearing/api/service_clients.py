@@ -213,23 +213,31 @@ async def decide_service_client_change(
     settings: SettingsDependency,
 ) -> ServiceClientDecisionEnvelope:
     async with database.session() as session:
-        await require_step_up(
-            session,
-            principal,
-            operation="SERVICE_CLIENT_CHANGE_DECISION",
-            request_id=_request_uuid(),
-        )
-        result = await ServiceClientService(settings).decide_request(
-            session,
-            principal=principal,
-            change_request_id=change_request_id,
-            approve=payload.approve,
-            reason_code=payload.reason_code,
-            expected_version=payload.expected_version,
-            idempotency_key=idempotency_key,
-            request_id=_request_uuid(),
-        )
-        await session.commit()
+        try:
+            await require_step_up(
+                session,
+                principal,
+                operation="SERVICE_CLIENT_CHANGE_DECISION",
+                request_id=_request_uuid(),
+            )
+            result = await ServiceClientService(settings).decide_request(
+                session,
+                principal=principal,
+                change_request_id=change_request_id,
+                approve=payload.approve,
+                reason_code=payload.reason_code,
+                expected_version=payload.expected_version,
+                idempotency_key=idempotency_key,
+                request_id=_request_uuid(),
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise DomainError(
+                code="SERVICE_CLIENT_CONFLICT",
+                message_key="errors.identity.service_client_conflict",
+                status_code=409,
+            ) from exc
     return ServiceClientDecisionEnvelope(
         data=ServiceClientDecisionResponse(**asdict(result)), request_id=get_request_id()
     )

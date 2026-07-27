@@ -186,3 +186,31 @@ acceptance criteria и tests. Если строка карты меняется,
 | Сохранение истории | доменные status transitions, optimistic version, без DELETE | transition policy tests и signed audit assertions |
 | Немедленное отключение входа | `User -> DISABLED` отзывает sessions в одной транзакции | issued-session revocation integration test |
 | Обратная совместимость API | single-scope inference только при одном доступном кооперативе | OpenAPI compatibility и legacy request test |
+
+## Slice 23 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Ручной duplicate review | exact identifier block, normalized-name candidates и explicit distinct decision | unit/API/component tests |
+| Безопасный массовый ввод | staging, bounded CSV, dry run, row report, independent `DATA_STEWARD` decision | parser and PostgreSQL integration tests |
+| Атомарное применение | advisory lock, repeat duplicate check и stale-preview rejection | concurrency/state-change integration tests |
+| Минимизация PII | no source CSV/plain identifiers, only hashes and safe row projection | database assertions |
+| Отсутствие скрытых полномочий | import creates no User, Membership, Role, shares or limits | end-to-end assertions |
+| Понятный RU/EN GUI | template, preview, result/reason labels and safe errors | locale/component/browser checks |
+
+## Slice 24 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Отдельная machine identity | `service_clients`, credentials/tokens и отдельная auth dependency | service token rejected by human endpoint integration test |
+| Один ответственный owner | mandatory cooperative/contact and owner-scoped reads/commands | scoped lifecycle integration and GUI tests |
+| Least privilege | exact two-scope allowlist, per-endpoint `require_scope`, no direct peer fanout | normalization, denial and OpenAPI tests |
+| Network/rate/expiry bounds | normalized CIDR without `/0`, source-bound token, DB minute bucket, max one year | unit and PostgreSQL token flow |
+| Независимое подключение | permanent manager request, different permanent security reviewer and TOTP step-up | explicit self-review `409` and successful independent decision |
+| Secret safety | high-entropy one-time response, hash-only storage, no replay secret | integration database and response assertions |
+| Немедленная защита | suspend/revoke credentials/tokens without changing human sessions | revocation end-to-end assertion |
+| Bounded runtime state | worker expiry plus 30-day token and 2-day rate-bucket retention | cleanup integration assertion |
+| Операторский интерфейс | separate Integrations tab, request queue, TOTP dialog, one-time credential dialog | 170-test frontend suite, RU/EN component tests |
+| Воспроизводимый demo | active catalog bridge and registrar rotation request without plaintext secret | repeated seed-demo PostgreSQL test |
+| Миграция и контракт | revision `0031`, generated backend/frontend OpenAPI and typed API client | downgrade/upgrade/check and compatibility gate |
+| Deployment trust boundary | gateway-only ingress and trusted forwarded source requirement | Compose inspection plus external security review remains open |

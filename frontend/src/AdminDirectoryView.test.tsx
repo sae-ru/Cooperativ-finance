@@ -7,6 +7,7 @@ import AdminDirectoryView from "./AdminDirectoryView";
 import * as admin from "./api/admin";
 import * as federation from "./api/federation";
 import * as system from "./api/system";
+import i18n from "./i18n";
 
 vi.mock("./api/admin", async (importOriginal) => ({
   ...await importOriginal<typeof import("./api/admin")>(),
@@ -22,6 +23,9 @@ vi.mock("./api/admin", async (importOriginal) => ({
   getMemberImports: vi.fn(),
   getMembers: vi.fn(),
   getMemberships: vi.fn(),
+  getSecurityState: vi.fn(),
+  getServiceClientRequests: vi.fn(),
+  getServiceClients: vi.fn(),
   getUsers: vi.fn(),
   previewMemberImport: vi.fn(),
   stageMemberImport: vi.fn(),
@@ -95,6 +99,7 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  void i18n.changeLanguage("ru");
   vi.mocked(admin.getCooperatives).mockResolvedValue([{
     id: cooperativeId,
     code: "demo-coop",
@@ -119,6 +124,18 @@ beforeEach(() => {
     normalized_name_match: false,
   });
   vi.mocked(admin.getMemberImports).mockResolvedValue([]);
+  vi.mocked(admin.getServiceClients).mockResolvedValue([]);
+  vi.mocked(admin.getServiceClientRequests).mockResolvedValue([]);
+  vi.mocked(admin.getSecurityState).mockResolvedValue({
+    totp_enabled: true,
+    totp_confirmed_at: "2026-07-27T08:00:00Z",
+    enrollment_pending: false,
+    enrollment_expires_at: null,
+    step_up_active: true,
+    step_up_method: "TOTP",
+    step_up_expires_at: "2026-07-27T12:00:00Z",
+    break_glass_grants: 0,
+  });
   vi.mocked(admin.getMemberImportRows).mockResolvedValue([]);
   vi.mocked(admin.getMemberships).mockResolvedValue([{
     id: "50000000-0000-0000-0000-000000000001",
@@ -218,6 +235,9 @@ describe("AdminDirectoryView", () => {
     expect(await screen.findByText("farmer")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Отключить вход" }));
     await waitFor(() => expect(admin.transitionUser).toHaveBeenCalledWith(expect.objectContaining({ login: "farmer" }), "DISABLED"));
+
+    await user.click(screen.getByRole("tab", { name: "Интеграции" }));
+    expect(await screen.findByRole("heading", { name: "Подключить внешнюю программу" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Узлы" }));
     expect(await screen.findByText("Локальный узел")).toBeInTheDocument();

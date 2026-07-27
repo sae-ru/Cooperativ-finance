@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   Building2,
+  Cable,
   CircleOff,
   Download,
   FileCheck2,
@@ -54,6 +55,7 @@ import { getFederationNodes } from "./api/federation";
 import { fetchSystemStatus } from "./api/system";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import ServiceClientsSection from "./ServiceClientsSection";
 
 const memberTransitions: Record<string, string[]> = {
   APPLICANT: ["PENDING_VERIFICATION", "REJECTED"],
@@ -92,7 +94,7 @@ const environmentNames: Record<string, string> = {
   prod: "Рабочий контур",
 };
 
-type Section = "organizations" | "members" | "memberships" | "imports" | "accounts" | "nodes";
+type Section = "organizations" | "members" | "memberships" | "imports" | "accounts" | "integrations" | "nodes";
 type RunAction = () => Promise<unknown>;
 
 function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
@@ -453,6 +455,7 @@ export default function AdminDirectoryView({
   const canReadAccounts = hasRole(principal, "SECURITY_ADMIN", "AUDITOR");
   const canReadImports = hasRole(principal, "MEMBER_REGISTRAR", "DATA_STEWARD", "AUDITOR");
   const canReadNodes = hasRole(principal, "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR");
+  const canReadIntegrations = hasRole(principal, "COOPERATIVE_ADMIN", "SECURITY_ADMIN", "AUDITOR");
   const [section, setSection] = useState<Section>("members");
   const [actionError, setActionError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -470,6 +473,7 @@ export default function AdminDirectoryView({
     ["memberships", "Членства", Link2, true],
     ["imports", t("admin.intake.tab"), FileUp, canReadImports],
     ["accounts", "Учетные записи", UserCog, canReadAccounts],
+    ["integrations", t("admin.integrations.tab"), Cable, canReadIntegrations],
     ["nodes", "Узлы", Network, canReadNodes],
   ] as const;
 
@@ -509,6 +513,7 @@ export default function AdminDirectoryView({
     {!currentLoading && !currentError && section === "memberships" ? <MembershipsSection data={memberships.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "imports" ? <ImportSection data={imports.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "accounts" ? <AccountsSection data={accounts.data ?? []} members={members.data ?? []} principal={principal} busy={busy} run={run} /> : null}
+    {!currentLoading && !currentError && section === "integrations" ? <ServiceClientsSection principal={principal} cooperatives={cooperatives.data ?? []} /> : null}
     {!currentLoading && !currentError && section === "nodes" ? <NodesSection localNode={system.data} externalNodes={nodes.data ?? []} onManageNodes={onManageNodes} /> : null}
   </div>;
 }

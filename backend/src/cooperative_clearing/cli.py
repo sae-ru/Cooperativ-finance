@@ -36,6 +36,9 @@ from cooperative_clearing.modules.identity.application.bootstrap import (
 from cooperative_clearing.modules.identity.application.bootstrap import (
     seed_demo_identity,
 )
+from cooperative_clearing.modules.identity.application.service_clients import (
+    cleanup_service_client_runtime_state,
+)
 from cooperative_clearing.modules.inventory.application.demo import (
     seed_demo_catalog,
     seed_demo_inventory,
@@ -169,6 +172,7 @@ async def run_worker(settings: Settings) -> None:
                         settings=settings,
                         batch_size=settings.federated_recovery_batch_size,
                     )
+                    service_runtime_cleanup = await cleanup_service_client_runtime_state(session)
                     dispatch = await dispatch_outbox_batch(
                         session,
                         instance_id=instance_id,
@@ -182,6 +186,20 @@ async def run_worker(settings: Settings) -> None:
                         release=settings.release,
                     )
                     await session.commit()
+                    if (
+                        service_runtime_cleanup.expired_tokens
+                        or service_runtime_cleanup.deleted_tokens
+                        or service_runtime_cleanup.deleted_rate_buckets
+                    ):
+                        logger.info(
+                            "service_client_runtime_cleanup",
+                            extra=event_fields(
+                                worker="outbox-worker",
+                                expired_tokens=service_runtime_cleanup.expired_tokens,
+                                deleted_tokens=service_runtime_cleanup.deleted_tokens,
+                                deleted_rate_buckets=(service_runtime_cleanup.deleted_rate_buckets),
+                            ),
+                        )
                     if recovered_clearing.attempted_cycles:
                         logger.info(
                             "federated_clearing_recovery_sweep",

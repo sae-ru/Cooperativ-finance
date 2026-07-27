@@ -230,7 +230,7 @@ services:
     tmpfs:
       - /tmp:size=32m,mode=1777
     networks:
-      - app
+      - web
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -253,6 +253,7 @@ services:
     networks:
       - edge
       - app
+      - web
     depends_on:
       api:
         condition: service_healthy
@@ -292,6 +293,8 @@ volumes:
 networks:
   edge:
   app:
+    internal: true
+  web:
     internal: true
   data:
     internal: true

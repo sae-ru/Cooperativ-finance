@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address, ip_network
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,6 +103,13 @@ class ServiceTokenResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ServiceRuntimeCleanupResult:
+    expired_tokens: int
+    deleted_tokens: int
+    deleted_rate_buckets: int
+
+
+@dataclass(frozen=True, slots=True)
 class ServicePrincipal:
     service_client_id: UUID
     token_id: UUID
@@ -177,6 +184,60 @@ def service_client_effective_status(client: ServiceClient, now: datetime | None 
     if client.status == ServiceClientStatus.ACTIVE.value and client.expires_at <= current:
         return "EXPIRED"
     return client.status
+
+
+async def cleanup_service_client_runtime_state(
+    session: AsyncSession,
+    *,
+    now: datetime | None = None,
+    token_retention: timedelta = timedelta(days=30),
+    rate_bucket_retention: timedelta = timedelta(days=2),
+) -> ServiceRuntimeCleanupResult:
+    current = now or datetime.now(UTC)
+    expired_token_ids = list(
+        (
+            await session.execute(
+                update(ServiceClientAccessToken)
+                .where(
+                    ServiceClientAccessToken.status == ServiceTokenStatus.ACTIVE.value,
+                    ServiceClientAccessToken.expires_at <= current,
+                )
+                .values(status=ServiceTokenStatus.EXPIRED.value)
+                .returning(ServiceClientAccessToken.id)
+            )
+        ).scalars()
+    )
+    deleted_token_ids = list(
+        (
+            await session.execute(
+                delete(ServiceClientAccessToken)
+                .where(
+                    ServiceClientAccessToken.status.in_(
+                        [
+                            ServiceTokenStatus.EXPIRED.value,
+                            ServiceTokenStatus.REVOKED.value,
+                        ]
+                    ),
+                    ServiceClientAccessToken.expires_at < current - token_retention,
+                )
+                .returning(ServiceClientAccessToken.id)
+            )
+        ).scalars()
+    )
+    deleted_rate_buckets = list(
+        (
+            await session.execute(
+                delete(ServiceClientRateBucket)
+                .where(ServiceClientRateBucket.window_started_at < current - rate_bucket_retention)
+                .returning(ServiceClientRateBucket.window_started_at)
+            )
+        ).scalars()
+    )
+    return ServiceRuntimeCleanupResult(
+        expired_tokens=len(expired_token_ids),
+        deleted_tokens=len(deleted_token_ids),
+        deleted_rate_buckets=len(deleted_rate_buckets),
+    )
 
 
 class ServiceClientService:

@@ -319,3 +319,21 @@ expired/released, apply receipt accepted и clearing reconciled.
 Открытый/временный пароль и TOTP seed не входят ни в payload, ни в evidence.
 Обычный audit дополнительно связывает событие с HTTP request id; каждое
 фактическое использование active break-glass создаёт `BREAK_GLASS_ACCESS_USED`.
+## События внешних интеграций Slice 24
+
+| Event type | Назначение |
+|---|---|
+| `identity.service_client_change_requested` | owner, operation, безопасная policy summary, срок заявки и персональный requester |
+| `identity.service_client_registered` | independently approved client, owner, scopes, network policy, expiry и credential id без secret |
+| `identity.service_client_policy_updated` | independently approved новая policy и новая version |
+| `identity.service_client_credential_rotated` | retirement прежнего credential, новый credential id и отзыв machine tokens без secret |
+| `identity.service_client_reactivated` | independently approved возврат suspended client в active state |
+| `identity.service_client_change_rejected` | независимое мотивированное отклонение заявки |
+| `identity.service_client_suspended` | немедленная защитная остановка и revocation действующих tokens |
+| `identity.service_client_revoked` | безвозвратный отзыв client, credentials и tokens |
+
+Lifecycle events подписываются node key и входят в общую hash-chain. Technical
+contact PII, credential secret, token и точный открытый authentication material
+не включаются в signed payload. Успешная и неуспешная machine authentication,
+token issuance и rate/network отказ дополнительно попадают в bounded audit с
+request id; эти записи не подменяют подписанное решение человека.

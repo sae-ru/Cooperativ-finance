@@ -17,6 +17,11 @@ from cooperative_clearing.modules.clearing.infrastructure.models import (
 from cooperative_clearing.modules.exchange.infrastructure.models import Obligation
 from cooperative_clearing.modules.federation.infrastructure.discovery_models import FederatedOffer
 from cooperative_clearing.modules.identity.application.bootstrap import stable_id
+from cooperative_clearing.modules.identity.infrastructure.models import (
+    ServiceClient,
+    ServiceClientCredential,
+    ServiceClientRequest,
+)
 from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.modules.node.application.status import GetSystemStatus
 from cooperative_clearing.modules.node.infrastructure.repository import NodeRepository
@@ -152,6 +157,32 @@ async def test_node_initialization_and_demo_seed_are_idempotent() -> None:
                 )
             )
             assert local_nails == 1
+            demo_service_client_id = stable_id("service-client", "demo-catalog-bridge")
+            demo_service_client = await session.get(ServiceClient, demo_service_client_id)
+            assert demo_service_client is not None
+            assert demo_service_client.client_code == "svc_demo_catalog_bridge"
+            assert demo_service_client.scopes == [
+                "catalog:read",
+                "clearing:accounting:read",
+            ]
+            demo_credential = await session.get(
+                ServiceClientCredential,
+                stable_id("service-client-credential", "demo-catalog-bridge:initial"),
+            )
+            assert demo_credential is not None
+            assert demo_credential.status == "ACTIVE"
+            assert len(demo_credential.secret_hash) == 64
+            assert not demo_credential.secret_hash.startswith("ccs_")
+            demo_service_request = await session.get(
+                ServiceClientRequest,
+                stable_id("service-client-request", "demo-catalog-bridge:rotate"),
+            )
+            assert demo_service_request is not None
+            assert demo_service_request.operation == "ROTATE"
+            assert demo_service_request.status == "PENDING"
+            assert demo_service_request.requested_by_user_id == stable_id(
+                "bootstrap-user", "registrar"
+            )
             repository = NodeRepository(session)
             await repository.record_worker_heartbeat(
                 worker_name="outbox-worker",

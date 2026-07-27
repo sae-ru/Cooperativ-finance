@@ -7,6 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from cooperative_clearing.main import create_app
+from cooperative_clearing.modules.identity.application.service_clients import (
+    cleanup_service_client_runtime_state,
+)
 from cooperative_clearing.modules.identity.infrastructure.models import (
     Cooperative,
     Member,
@@ -123,6 +126,15 @@ async def test_service_client_dual_control_token_scope_and_revocation() -> None:
                         approved_by_user_id=requester_user_id,
                         approved_at=datetime.now(UTC),
                     ),
+                    RoleAssignment(
+                        id=uuid4(),
+                        user_id=requester_user_id,
+                        role_code="SECURITY_ADMIN",
+                        cooperative_id=cooperative_id,
+                        status="ACTIVE",
+                        approved_by_user_id=security_user_id,
+                        approved_at=datetime.now(UTC),
+                    ),
                 ]
             )
             await session.commit()
@@ -132,6 +144,7 @@ async def test_service_client_dual_control_token_scope_and_revocation() -> None:
     with TestClient(create_app(settings), client=("127.0.0.1", 45000)) as client:
         requester_headers = login(client, requester_login)
         security_headers = login(client, security_login)
+        enable_step_up(client, requester_headers)
         enable_step_up(client, security_headers)
 
         request_payload = {
@@ -167,7 +180,8 @@ async def test_service_client_dual_control_token_scope_and_revocation() -> None:
                 "expected_version": 1,
             },
         )
-        assert own_decision.status_code == 403
+        assert own_decision.status_code == 409
+        assert own_decision.json()["error"]["code"] == "SERVICE_INDEPENDENT_REVIEW_REQUIRED"
 
         approved = client.post(
             f"/api/v1/admin/service-client-requests/{change_request_id}/decision",
@@ -186,6 +200,25 @@ async def test_service_client_dual_control_token_scope_and_revocation() -> None:
         assert client_code.startswith("svc_")
         assert client_secret.startswith("ccs_")
         assert client_secret not in approved.request.content.decode("utf-8")
+
+        duplicate_request = client.post(
+            "/api/v1/admin/service-client-requests",
+            headers={**requester_headers, "Idempotency-Key": str(uuid4())},
+            json=request_payload,
+        )
+        assert duplicate_request.status_code == 201, duplicate_request.text
+        duplicate_decision = client.post(
+            "/api/v1/admin/service-client-requests/"
+            f"{duplicate_request.json()['data']['object_id']}/decision",
+            headers={**security_headers, "Idempotency-Key": str(uuid4())},
+            json={
+                "approve": True,
+                "reason_code": "INDEPENDENT_SECURITY_REVIEW",
+                "expected_version": 1,
+            },
+        )
+        assert duplicate_decision.status_code == 409, duplicate_decision.text
+        assert duplicate_decision.json()["error"]["code"] == "SERVICE_CLIENT_CONFLICT"
 
         listed = client.get("/api/v1/admin/service-clients", headers=requester_headers)
         assert listed.status_code == 200, listed.text
@@ -267,5 +300,13 @@ async def test_service_client_dual_control_token_scope_and_revocation() -> None:
                 "identity.service_client_registered",
                 "identity.service_client_revoked",
             }.issubset(event_types)
+            cleanup = await cleanup_service_client_runtime_state(
+                session,
+                now=datetime.now(UTC) + timedelta(days=61),
+            )
+            assert cleanup.expired_tokens == 0
+            assert cleanup.deleted_tokens >= 1
+            assert cleanup.deleted_rate_buckets >= 1
+            await session.commit()
     finally:
         await database.dispose()

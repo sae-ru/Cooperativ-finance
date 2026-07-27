@@ -49,6 +49,29 @@ export function userErrorMessage(error: unknown, language?: string): string {
   ) {
     return translate("errors.memberImportInvalid");
   }
+  if (code === "SERVICE_INDEPENDENT_REVIEW_REQUIRED") {
+    return translate("errors.serviceIndependentReview");
+  }
+  if (code === "SERVICE_NETWORK_ALLOWLIST_INVALID") {
+    return translate("errors.serviceNetworkInvalid");
+  }
+  if (code === "SERVICE_SCOPES_INVALID" || code === "SERVICE_SCOPE_DENIED") {
+    return translate("errors.serviceScopeInvalid");
+  }
+  if (code === "SERVICE_EXPIRY_INVALID") return translate("errors.serviceExpiryInvalid");
+  if (code === "SERVICE_RATE_LIMIT_INVALID") return translate("errors.serviceRateInvalid");
+  if (code === "SERVICE_REQUEST_EXPIRED") return translate("errors.serviceRequestExpired");
+  if (code === "PERMANENT_SERVICE_CLIENT_ROLE_REQUIRED") {
+    return translate("errors.serviceRoleRequired");
+  }
+  if (
+    code === "SERVICE_CLIENT_INACTIVE"
+    || code === "SERVICE_CLIENT_NOT_ACTIVE"
+    || code === "SERVICE_CLIENT_REVOKED"
+    || code === "SERVICE_CLIENT_EXPIRED"
+  ) {
+    return translate("errors.serviceClientInactive");
+  }
   if (code === "STEP_UP_REQUIRED") return translate("errors.stepUpRequired");
   if (code === "TOTP_NOT_ENROLLED") return translate("errors.totpNotEnrolled");
   if (code === "TOTP_INVALID_OR_REPLAYED") return translate("errors.totpInvalid");
