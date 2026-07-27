@@ -4,11 +4,13 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from cooperative_clearing.modules.identity.domain.types import (
     AssignmentStatus,
     CooperativeStatus,
+    MemberImportRowStatus,
+    MemberImportStatus,
     MembershipStatus,
     MemberStatus,
     RoleCode,
@@ -100,6 +102,102 @@ class MemberCreateRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=200)
     identifier_type: str | None = Field(default=None, max_length=40)
     identifier_value: SecretStr | None = None
+    duplicate_resolution_code: str | None = Field(
+        default=None, min_length=2, max_length=100, pattern=r"^[A-Za-z0-9_.-]+$"
+    )
+
+
+class MemberDuplicateCheckRequest(BaseModel):
+    cooperative_id: UUID
+    display_name: str = Field(min_length=2, max_length=200)
+    identifier_type: str | None = Field(default=None, max_length=40)
+    identifier_value: SecretStr | None = None
+
+
+class MemberDuplicateCandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    member_id: UUID
+    display_name: str
+    registered_by_cooperative_id: UUID | None
+    status: MemberStatus
+    match_basis: Literal["EXACT_IDENTIFIER", "NORMALIZED_NAME"]
+
+
+class MemberDuplicateCheckResponse(BaseModel):
+    candidates: list[MemberDuplicateCandidateResponse]
+    exact_identifier_match: bool
+    normalized_name_match: bool
+
+
+class MemberDuplicateCheckEnvelope(BaseModel):
+    data: MemberDuplicateCheckResponse
+    request_id: str
+
+
+class MemberImportCreateRequest(BaseModel):
+    cooperative_id: UUID
+    source_name: str = Field(min_length=1, max_length=200)
+    csv_text: SecretStr
+
+    @field_validator("csv_text")
+    @classmethod
+    def csv_text_size(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value().encode("utf-8")) > 1_000_000:
+            raise ValueError("CSV payload exceeds one megabyte")
+        return value
+
+
+class MemberImportCommandRequest(BaseModel):
+    expected_version: int = Field(ge=1)
+
+
+class MemberImportDecisionRequest(MemberImportCommandRequest):
+    approve: bool
+    reason_code: str = Field(
+        min_length=2, max_length=100, pattern=r"^[A-Za-z0-9_.-]+$"
+    )
+
+
+class MemberImportBatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    cooperative_id: UUID
+    source_name: str
+    source_sha256: str
+    status: MemberImportStatus
+    row_count: int
+    ready_count: int
+    invalid_count: int
+    duplicate_count: int
+    applied_count: int
+    created_by_user_id: UUID
+    reviewed_by_user_id: UUID | None
+    decision_reason_code: str | None
+    created_at: datetime
+    previewed_at: datetime | None
+    reviewed_at: datetime | None
+    applied_at: datetime | None
+    updated_at: datetime
+    version: int
+
+
+class MemberImportRowResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    batch_id: UUID
+    row_number: int
+    display_name: str
+    identifier_type: str | None
+    status: MemberImportRowStatus
+    error_code: str | None
+    match_basis: str | None
+    candidate_member_id: UUID | None
+    created_member_id: UUID | None
+    created_at: datetime
+    applied_at: datetime | None
 
 
 class MemberTransitionRequest(BaseModel):

@@ -27,6 +27,14 @@ from cooperative_clearing.api.identity_schemas import (
     CooperativeResponse,
     CooperativeTransitionRequest,
     MemberCreateRequest,
+    MemberDuplicateCheckEnvelope,
+    MemberDuplicateCheckRequest,
+    MemberDuplicateCheckResponse,
+    MemberImportBatchResponse,
+    MemberImportCommandRequest,
+    MemberImportCreateRequest,
+    MemberImportDecisionRequest,
+    MemberImportRowResponse,
     MemberResponse,
     MembershipCreateRequest,
     MembershipResponse,
@@ -51,6 +59,11 @@ from cooperative_clearing.modules.identity.application.admin import (
     IdentityAdminService,
     admin_overview,
 )
+from cooperative_clearing.modules.identity.application.intake import (
+    IntakeCommandResult,
+    MemberIntakeService,
+    find_member_duplicate_candidates,
+)
 from cooperative_clearing.modules.identity.application.security import (
     RECOVERY_CONTROL_ROLES,
     IdentitySecurityService,
@@ -71,6 +84,8 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     BreakGlassGrant,
     Cooperative,
     Member,
+    MemberImportBatch,
+    MemberImportRow,
     Membership,
     RoleAssignment,
     UserAccount,
@@ -166,6 +181,16 @@ class MemberCollection(BaseModel):
     request_id: str
 
 
+class MemberImportBatchCollection(BaseModel):
+    data: list[MemberImportBatchResponse]
+    request_id: str
+
+
+class MemberImportRowCollection(BaseModel):
+    data: list[MemberImportRowResponse]
+    request_id: str
+
+
 class MembershipCollection(BaseModel):
     data: list[MembershipResponse]
     request_id: str
@@ -195,7 +220,9 @@ class ReasonRequest(BaseModel):
     reason_code: str = Field(min_length=2, max_length=100)
 
 
-def _command(result: CommandResult | SecurityCommandResult) -> CommandEnvelope:
+def _command(
+    result: CommandResult | SecurityCommandResult | IntakeCommandResult,
+) -> CommandEnvelope:
     return CommandEnvelope(
         data=ApiCommandResult(
             event_id=result.event_id,
@@ -364,6 +391,7 @@ async def create_member(
                 display_name=payload.display_name,
                 identifier_type=payload.identifier_type,
                 identifier_value=identifier_value,
+                duplicate_resolution_code=payload.duplicate_resolution_code,
                 request_id=_request_uuid(),
             )
             await session.commit()
@@ -371,6 +399,42 @@ async def create_member(
             await session.rollback()
             raise _map_integrity_error(exc) from exc
     return _command(result)
+
+
+@router.post("/members/duplicate-check", response_model=MemberDuplicateCheckEnvelope)
+async def check_member_duplicates(
+    payload: MemberDuplicateCheckRequest,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> MemberDuplicateCheckEnvelope:
+    require_role(
+        principal,
+        {RoleCode.MEMBER_REGISTRAR, RoleCode.DATA_STEWARD},
+        payload.cooperative_id,
+    )
+    identifier_value = (
+        payload.identifier_value.get_secret_value() if payload.identifier_value else None
+    )
+    async with database.session() as session:
+        candidates = await find_member_duplicate_candidates(
+            session,
+            cooperative_id=payload.cooperative_id,
+            display_name=payload.display_name,
+            identifier_type=payload.identifier_type,
+            identifier_value=identifier_value,
+        )
+    return MemberDuplicateCheckEnvelope(
+        data=MemberDuplicateCheckResponse(
+            candidates=candidates,
+            exact_identifier_match=any(
+                item.match_basis == "EXACT_IDENTIFIER" for item in candidates
+            ),
+            normalized_name_match=any(
+                item.match_basis == "NORMALIZED_NAME" for item in candidates
+            ),
+        ),
+        request_id=get_request_id(),
+    )
 
 
 @router.post("/members/{member_id}/transitions", response_model=CommandEnvelope)
@@ -403,6 +467,191 @@ async def transition_member(
             request_id=_request_uuid(),
         )
         await session.commit()
+    return _command(result)
+
+
+@router.get("/imports", response_model=MemberImportBatchCollection)
+async def list_member_imports(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    cooperative_id: Annotated[UUID | None, Query()] = None,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> MemberImportBatchCollection:
+    import_roles = {RoleCode.MEMBER_REGISTRAR, RoleCode.DATA_STEWARD, RoleCode.AUDITOR}
+    require_role(principal, import_roles, cooperative_id)
+    statement = (
+        select(MemberImportBatch)
+        .order_by(MemberImportBatch.created_at.desc(), MemberImportBatch.id)
+        .limit(limit)
+    )
+    cooperative_ids = _cooperative_read_scope(principal)
+    if cooperative_ids is not None:
+        statement = statement.where(MemberImportBatch.cooperative_id.in_(cooperative_ids))
+    if cooperative_id is not None:
+        statement = statement.where(MemberImportBatch.cooperative_id == cooperative_id)
+    async with database.session() as session:
+        result = await session.execute(statement)
+        items = list(result.scalars())
+    return MemberImportBatchCollection(data=items, request_id=get_request_id())
+
+
+@router.get("/imports/{batch_id}/rows", response_model=MemberImportRowCollection)
+async def list_member_import_rows(
+    batch_id: UUID,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> MemberImportRowCollection:
+    import_roles = {RoleCode.MEMBER_REGISTRAR, RoleCode.DATA_STEWARD, RoleCode.AUDITOR}
+    async with database.session() as session:
+        batch = await session.get(MemberImportBatch, batch_id)
+        if batch is None:
+            raise DomainError(
+                code="MEMBER_IMPORT_NOT_FOUND",
+                message_key="errors.identity.member_import_not_found",
+                status_code=404,
+            )
+        require_role(principal, import_roles, batch.cooperative_id)
+        result = await session.execute(
+            select(MemberImportRow)
+            .where(MemberImportRow.batch_id == batch.id)
+            .order_by(MemberImportRow.row_number, MemberImportRow.id)
+        )
+        items = list(result.scalars())
+    return MemberImportRowCollection(data=items, request_id=get_request_id())
+
+
+@router.post("/imports", response_model=CommandEnvelope, status_code=201)
+async def stage_member_import(
+    payload: MemberImportCreateRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    require_permanent_role(principal, {RoleCode.MEMBER_REGISTRAR}, payload.cooperative_id)
+    async with database.session() as session:
+        try:
+            result = await MemberIntakeService().stage_import(
+                session,
+                principal=principal,
+                cooperative_id=payload.cooperative_id,
+                source_name=payload.source_name,
+                csv_text=payload.csv_text.get_secret_value(),
+                idempotency_key=idempotency_key,
+                request_id=_request_uuid(),
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _map_integrity_error(exc) from exc
+    return _command(result)
+
+
+@router.post(
+    "/imports/{batch_id}/dry-run",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def preview_member_import(
+    batch_id: UUID,
+    payload: MemberImportCommandRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    async with database.session() as session:
+        batch = await session.get(MemberImportBatch, batch_id)
+        if batch is None:
+            raise DomainError(
+                code="MEMBER_IMPORT_NOT_FOUND",
+                message_key="errors.identity.member_import_not_found",
+                status_code=404,
+            )
+        require_permanent_role(
+            principal, {RoleCode.MEMBER_REGISTRAR}, batch.cooperative_id
+        )
+        result = await MemberIntakeService().preview_import(
+            session,
+            principal=principal,
+            batch_id=batch_id,
+            expected_version=payload.expected_version,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
+
+@router.post(
+    "/imports/{batch_id}/decision",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def decide_member_import(
+    batch_id: UUID,
+    payload: MemberImportDecisionRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    async with database.session() as session:
+        batch = await session.get(MemberImportBatch, batch_id)
+        if batch is None:
+            raise DomainError(
+                code="MEMBER_IMPORT_NOT_FOUND",
+                message_key="errors.identity.member_import_not_found",
+                status_code=404,
+            )
+        require_permanent_role(principal, {RoleCode.DATA_STEWARD}, batch.cooperative_id)
+        result = await MemberIntakeService().decide_import(
+            session,
+            principal=principal,
+            batch_id=batch_id,
+            approve=payload.approve,
+            reason_code=payload.reason_code,
+            expected_version=payload.expected_version,
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+        await session.commit()
+    return _command(result)
+
+
+@router.post(
+    "/imports/{batch_id}/apply",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def apply_member_import(
+    batch_id: UUID,
+    payload: MemberImportCommandRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> CommandEnvelope:
+    async with database.session() as session:
+        batch = await session.get(MemberImportBatch, batch_id)
+        if batch is None:
+            raise DomainError(
+                code="MEMBER_IMPORT_NOT_FOUND",
+                message_key="errors.identity.member_import_not_found",
+                status_code=404,
+            )
+        require_permanent_role(
+            principal, {RoleCode.MEMBER_REGISTRAR}, batch.cooperative_id
+        )
+        try:
+            result = await MemberIntakeService().apply_import(
+                session,
+                principal=principal,
+                batch_id=batch_id,
+                expected_version=payload.expected_version,
+                idempotency_key=idempotency_key,
+                request_id=_request_uuid(),
+            )
+            await session.commit()
+        except IntegrityError as exc:
+            await session.rollback()
+            raise _map_integrity_error(exc) from exc
     return _command(result)
 
 

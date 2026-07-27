@@ -370,3 +370,8 @@ Transition request содержит target status, reason, expected version и
 idempotency key. Отключение User немедленно отзывает его active sessions;
 self-disable отклоняется. `cooperative_id` при создании Member может быть опущен
 только совместимым старым клиентом регистратора с ровно одним доступным scope.
+## Безопасный ввод участников Slice 23
+
+`POST /api/v1/admin/members/duplicate-check` возвращает кандидатов по точному хешу identifier и нормализованному имени в разрешённом cooperative scope. `POST /api/v1/admin/members` принимает необязательный `duplicate_resolution_code`; совпадение имени без явного решения отклоняется.
+
+Массовый workflow использует `/api/v1/admin/imports`, `/{batch_id}/rows`, `/{batch_id}/dry-run`, `/{batch_id}/decision` и `/{batch_id}/apply`. Создание, dry run и применение требуют постоянной роли `MEMBER_REGISTRAR`; решение требует постоянной роли `DATA_STEWARD` и другого пользователя. Все команды используют `Idempotency-Key` и `expected_version`. Устаревший отчёт возвращает `MEMBER_IMPORT_PREVIEW_STALE` и не создаёт ни одной строки.

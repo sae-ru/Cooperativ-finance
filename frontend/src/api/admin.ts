@@ -74,6 +74,57 @@ export type Member = {
   version: number;
 };
 
+export type MemberDuplicateCandidate = {
+  member_id: string;
+  display_name: string;
+  registered_by_cooperative_id: string | null;
+  status: string;
+  match_basis: "EXACT_IDENTIFIER" | "NORMALIZED_NAME";
+};
+
+export type MemberDuplicateCheck = {
+  candidates: MemberDuplicateCandidate[];
+  exact_identifier_match: boolean;
+  normalized_name_match: boolean;
+};
+
+export type MemberImportBatch = {
+  id: string;
+  cooperative_id: string;
+  source_name: string;
+  source_sha256: string;
+  status: "STAGED" | "PREVIEWED" | "APPROVED" | "REJECTED" | "APPLIED";
+  row_count: number;
+  ready_count: number;
+  invalid_count: number;
+  duplicate_count: number;
+  applied_count: number;
+  created_by_user_id: string;
+  reviewed_by_user_id: string | null;
+  decision_reason_code: string | null;
+  created_at: string;
+  previewed_at: string | null;
+  reviewed_at: string | null;
+  applied_at: string | null;
+  updated_at: string;
+  version: number;
+};
+
+export type MemberImportRow = {
+  id: string;
+  batch_id: string;
+  row_number: number;
+  display_name: string;
+  identifier_type: string | null;
+  status: "STAGED" | "READY" | "INVALID" | "DUPLICATE" | "APPLIED";
+  error_code: string | null;
+  match_basis: string | null;
+  candidate_member_id: string | null;
+  created_member_id: string | null;
+  created_at: string;
+  applied_at: string | null;
+};
+
 export type Membership = {
   id: string;
   cooperative_id: string;
@@ -273,6 +324,10 @@ export const getCooperatives = () =>
   request<Cooperative[]>("/api/v1/admin/cooperatives");
 export const getMembers = () => request<Member[]>("/api/v1/admin/members?limit=500");
 export const getMemberships = () => request<Membership[]>("/api/v1/admin/memberships");
+export const getMemberImports = () =>
+  request<MemberImportBatch[]>("/api/v1/admin/imports?limit=500");
+export const getMemberImportRows = (batchId: string) =>
+  request<MemberImportRow[]>(`/api/v1/admin/imports/${batchId}/rows`);
 export const getUsers = () => request<UserAccount[]>("/api/v1/admin/users");
 export const getRoles = () => request<RoleAssignment[]>("/api/v1/admin/roles");
 export const getSessions = () => request<ServerSession[]>("/api/v1/admin/sessions");
@@ -298,17 +353,78 @@ export const transitionCooperative = (cooperative: Cooperative, targetStatus: Co
       })
     },
   );
+export const checkMemberDuplicates = (payload: {
+  cooperative_id: string;
+  display_name: string;
+  identifier_type?: string;
+  identifier_value?: string;
+}) =>
+  request<MemberDuplicateCheck>("/api/v1/admin/members/duplicate-check", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
 export const createMember = (payload: {
   cooperative_id: string;
   display_name: string;
   identifier_type?: string;
   identifier_value?: string;
+  duplicate_resolution_code?: string;
 }) =>
   request<{ event_id: string; object_id: string }>("/api/v1/admin/members", {
     method: "POST",
     headers: commandHeaders(),
     body: JSON.stringify(payload)
   });
+
+export const stageMemberImport = (payload: {
+  cooperative_id: string;
+  source_name: string;
+  csv_text: string;
+}) =>
+  request<{ event_id: string; object_id: string }>("/api/v1/admin/imports", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const previewMemberImport = (batch: MemberImportBatch) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/imports/${batch.id}/dry-run`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ expected_version: batch.version }),
+    },
+  );
+
+export const decideMemberImport = (
+  batch: MemberImportBatch,
+  approve: boolean,
+  reasonCode: string,
+) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/imports/${batch.id}/decision`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        approve,
+        reason_code: reasonCode,
+        expected_version: batch.version,
+      }),
+    },
+  );
+
+export const applyMemberImport = (batch: MemberImportBatch) =>
+  request<{ event_id: string; object_id: string }>(
+    `/api/v1/admin/imports/${batch.id}/apply`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({ expected_version: batch.version }),
+    },
+  );
 
 export const transitionMember = (member: Member, targetStatus: string) =>
   request<{ event_id: string; object_id: string }>(

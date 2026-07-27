@@ -165,6 +165,112 @@ class UserAccount(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
 
+class MemberImportBatch(Base):
+    __tablename__ = "member_import_batches"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('STAGED','PREVIEWED','APPROVED','REJECTED','APPLIED')",
+            name="status_allowed",
+        ),
+        CheckConstraint("row_count >= 1", name="row_count_positive"),
+        CheckConstraint(
+            "ready_count >= 0 AND invalid_count >= 0 AND duplicate_count >= 0 "
+            "AND applied_count >= 0",
+            name="counts_nonnegative",
+        ),
+        CheckConstraint(
+            "ready_count + invalid_count + duplicate_count <= row_count",
+            name="preview_counts_bounded",
+        ),
+        CheckConstraint("applied_count <= ready_count", name="applied_count_bounded"),
+        CheckConstraint(
+            "reviewed_by_user_id IS NULL OR reviewed_by_user_id <> created_by_user_id",
+            name="independent_reviewer",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "ix_member_import_batches_cooperative_status_created",
+            "cooperative_id",
+            "status",
+            "created_at",
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    ready_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    invalid_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    duplicate_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    applied_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decision_reason_code: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    previewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class MemberImportRow(Base):
+    __tablename__ = "member_import_rows"
+    __table_args__ = (
+        UniqueConstraint("batch_id", "row_number", name="uq_member_import_row_number"),
+        CheckConstraint("row_number >= 1", name="row_number_positive"),
+        CheckConstraint(
+            "status IN ('STAGED','READY','INVALID','DUPLICATE','APPLIED')",
+            name="status_allowed",
+        ),
+        Index("ix_member_import_rows_batch_status", "batch_id", "status", "row_number"),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    batch_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.member_import_batches.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    display_name: Mapped[str] = mapped_column(Text(), nullable=False)
+    identifier_type: Mapped[str | None] = mapped_column(Text())
+    identifier_hash: Mapped[str | None] = mapped_column(String(64))
+    source_row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    match_basis: Mapped[str | None] = mapped_column(String(40))
+    candidate_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    created_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ParticipantAddress(Base):
     __tablename__ = "participant_addresses"
     __table_args__ = (

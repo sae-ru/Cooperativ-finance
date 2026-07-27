@@ -1,33 +1,50 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   BadgeCheck,
   Building2,
   CircleOff,
-  KeyRound,
+  Download,
+  FileCheck2,
+  FileSearch,
+  FileUp,
   Link2,
   Network,
   Plus,
   RefreshCw,
+  Upload,
   UserCog,
   Users,
+  XCircle,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   type Cooperative,
   type Member,
+  type MemberDuplicateCheck,
+  type MemberImportBatch,
+  type MemberImportRow,
   type Membership,
   type Principal,
   type RoleCode,
   type UserAccount,
+  applyMemberImport,
+  checkMemberDuplicates,
   createCooperative,
   createMember,
   createMembership,
+  decideMemberImport,
   createUser,
   getCooperatives,
+  getMemberImportRows,
+  getMemberImports,
   getMembers,
   getMemberships,
   getUsers,
+  previewMemberImport,
+  stageMemberImport,
   transitionCooperative,
   transitionMember,
   transitionMembership,
@@ -75,7 +92,7 @@ const environmentNames: Record<string, string> = {
   prod: "Рабочий контур",
 };
 
-type Section = "organizations" | "members" | "memberships" | "accounts" | "nodes";
+type Section = "organizations" | "members" | "memberships" | "imports" | "accounts" | "nodes";
 type RunAction = () => Promise<unknown>;
 
 function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
@@ -144,12 +161,15 @@ function MembersSection({
   busy: boolean;
   run: (action: RunAction) => void;
 }) {
+  const { t } = useTranslation();
   const canCreate = hasRole(principal, "MEMBER_REGISTRAR");
   const canTransition = hasRole(principal, "MEMBER_REGISTRAR", "RISK_ADMIN");
   const allowedCooperatives = cooperatives.filter((cooperative) => cooperative.status === "ACTIVE" && principal.roles.some((grant) => grant.cooperative_id === null || grant.cooperative_id === cooperative.id));
   const [cooperativeId, setCooperativeId] = useState(allowedCooperatives[0]?.id ?? "");
   const [displayName, setDisplayName] = useState("");
   const [identifier, setIdentifier] = useState("");
+  const [duplicateReview, setDuplicateReview] = useState<MemberDuplicateCheck | null>(null);
+  const [distinctConfirmed, setDistinctConfirmed] = useState(false);
   const [search, setSearch] = useState("");
   const visible = useMemo(() => data.filter((item) => item.display_name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())), [data, search]);
   const defaultCooperativeId = allowedCooperatives[0]?.id ?? "";
@@ -160,34 +180,57 @@ function MembersSection({
     }
   }, [cooperativeId, defaultCooperativeId]);
 
+  function resetDuplicateReview() {
+    setDuplicateReview(null);
+    setDistinctConfirmed(false);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     run(async () => {
-      await createMember({
+      const payload = {
         cooperative_id: cooperativeId,
         display_name: displayName,
         ...(identifier ? { identifier_type: "EXTERNAL_REFERENCE", identifier_value: identifier } : {}),
+      };
+      const review = await checkMemberDuplicates(payload);
+      setDuplicateReview(review);
+      if (review.exact_identifier_match) return;
+      if (review.normalized_name_match && !distinctConfirmed) return;
+      await createMember({
+        ...payload,
+        ...(review.normalized_name_match
+          ? { duplicate_resolution_code: "DISTINCT_PERSON_CONFIRMED" }
+          : {}),
       });
       setDisplayName("");
       setIdentifier("");
+      resetDuplicateReview();
     });
   }
 
   return <>
     {canCreate ? <section className="action-band registry-command"><form onSubmit={submit}>
-      <label>Организация<select value={cooperativeId} onChange={(event) => setCooperativeId(event.target.value)} required><option value="">Выберите</option>{allowedCooperatives.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
-      <label>Имя участника<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required /></label>
-      <label>Внешний идентификатор<input value={identifier} onChange={(event) => setIdentifier(event.target.value)} /></label>
-      <button className="primary-button" type="submit" disabled={busy || !cooperativeId}><Plus size={17} /><span>Добавить участника</span></button>
-    </form></section> : null}
+      <label>Организация<select value={cooperativeId} onChange={(event) => { setCooperativeId(event.target.value); resetDuplicateReview(); }} required><option value="">Выберите</option>{allowedCooperatives.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+      <label>Имя участника<input value={displayName} onChange={(event) => { setDisplayName(event.target.value); resetDuplicateReview(); }} required /></label>
+      <label>Внешний идентификатор<input value={identifier} onChange={(event) => { setIdentifier(event.target.value); resetDuplicateReview(); }} /></label>
+      <button className="primary-button" type="submit" disabled={busy || !cooperativeId}><FileSearch size={17} /><span>{duplicateReview?.normalized_name_match && distinctConfirmed ? t("admin.intake.addDistinctMember") : t("admin.intake.checkAndAdd")}</span></button>
+    </form>
+      {duplicateReview?.candidates.length ? <div className={`duplicate-review ${duplicateReview.exact_identifier_match ? "blocking" : "warning"}`} role="alert">
+        <AlertTriangle size={20} />
+        <div><strong>{duplicateReview.exact_identifier_match ? t("admin.intake.identifierAlreadyUsed") : t("admin.intake.similarMembersFound")}</strong>
+          <div className="duplicate-candidates">{duplicateReview.candidates.map((candidate) => <span key={`${candidate.member_id}:${candidate.match_basis}`}><b data-i18n-ignore="true">{candidate.display_name}</b><small>{candidate.match_basis === "EXACT_IDENTIFIER" ? t("admin.intake.exactIdentifier") : t("admin.intake.sameName")}</small></span>)}</div>
+          {!duplicateReview.exact_identifier_match ? <label className="duplicate-confirm"><input type="checkbox" checked={distinctConfirmed} onChange={(event) => setDistinctConfirmed(event.target.checked)} />{t("admin.intake.confirmDistinctPerson")}</label> : null}
+        </div>
+      </div> : duplicateReview ? <div className="duplicate-review clear" role="status"><FileCheck2 size={20} /><strong>{t("admin.intake.noDuplicates")}</strong></div> : null}
+    </section> : null}
     <section className="panel"><div className="panel-heading access-heading"><h2>Участники</h2><label>Поиск по имени<input value={search} onChange={(event) => setSearch(event.target.value)} /></label><span>{visible.length} из {data.length}</span></div>
       <div className="table-wrap"><table><thead><tr><th>Имя</th><th>Организация регистрации</th><th>Статус</th><th>Создан</th><th>Действие</th></tr></thead><tbody>{visible.map((item) => <tr key={item.id}>
-        <td><strong>{item.display_name}</strong><small>v{item.version}</small></td><td>{cooperatives.find((cooperative) => cooperative.id === item.registered_by_cooperative_id)?.name ?? "Наследованная запись"}</td><td><Status value={item.status} /></td><td>{formatLocalDateTime(item.created_at)}</td>
+        <td><strong data-i18n-ignore="true">{item.display_name}</strong><small>v{item.version}</small></td><td>{cooperatives.find((cooperative) => cooperative.id === item.registered_by_cooperative_id)?.name ?? "Наследованная запись"}</td><td><Status value={item.status} /></td><td>{formatLocalDateTime(item.created_at)}</td>
         <td>{canTransition && (memberTransitions[item.status]?.length ?? 0) > 0 ? <select aria-label={`Новый статус ${item.display_name}`} defaultValue="" disabled={busy} onChange={(event) => { const target = event.target.value; event.target.value = ""; if (target) run(() => transitionMember(item, target)); }}><option value="">Изменить</option>{memberTransitions[item.status]?.map((target) => <option value={target} key={target}>{statusNames[target] ?? target}</option>)}</select> : "—"}</td>
       </tr>)}</tbody></table></div>{!visible.length ? <Empty text="Участники не найдены" /> : null}</section>
   </>;
 }
-
 function MembershipsSection({
   data,
   members,
@@ -284,6 +327,104 @@ function AccountsSection({
   </>;
 }
 
+function ImportSection({
+  data,
+  members,
+  cooperatives,
+  principal,
+  busy,
+  run,
+}: {
+  data: MemberImportBatch[];
+  members: Member[];
+  cooperatives: Cooperative[];
+  principal: Principal;
+  busy: boolean;
+  run: (action: RunAction) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const canStage = hasRole(principal, "MEMBER_REGISTRAR");
+  const canReview = hasRole(principal, "DATA_STEWARD");
+  const canApply = hasRole(principal, "MEMBER_REGISTRAR");
+  const allowedCooperatives = cooperatives.filter((cooperative) => cooperative.status === "ACTIVE" && principal.roles.some((grant) => grant.cooperative_id === null || grant.cooperative_id === cooperative.id));
+  const [cooperativeId, setCooperativeId] = useState(allowedCooperatives[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState(data[0]?.id ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileKey, setFileKey] = useState(0);
+  const [fileError, setFileError] = useState("");
+  const selected = data.find((item) => item.id === selectedId) ?? data[0];
+  const rows = useQuery({
+    queryKey: ["member-import-rows", selected?.id],
+    queryFn: () => getMemberImportRows(selected!.id),
+    enabled: Boolean(selected),
+  });
+
+  useEffect(() => {
+    if ((!selectedId || !data.some((item) => item.id === selectedId)) && data[0]) {
+      setSelectedId(data[0].id);
+    }
+  }, [data, selectedId]);
+
+  function chooseFile(next: File | null) {
+    setFile(next);
+    setFileError(next && next.size > 1_000_000 ? t("admin.intake.fileTooLarge") : "");
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!file || fileError) return;
+    run(async () => {
+      await stageMemberImport({
+        cooperative_id: cooperativeId,
+        source_name: file.name,
+        csv_text: await file.text(),
+      });
+      setFile(null);
+      setFileKey((value) => value + 1);
+    });
+  }
+
+  function downloadTemplate() {
+    const exampleName = i18n.language.startsWith("ru") ? "Новый участник" : "New member";
+    const content = `display_name,identifier_type,identifier_value\n${exampleName},EXTERNAL_REFERENCE,member-001\n`;
+    const url = URL.createObjectURL(new Blob(["\ufeff", content], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "member-import-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importStatus(value: string) {
+    return <span className={`status status-${value.toLowerCase()}`}>{t(`admin.intake.status.${value}`, { defaultValue: value })}</span>;
+  }
+
+  const selectedRows = rows.data ?? [];
+  return <>
+    {canStage ? <section className="action-band registry-command import-command"><form onSubmit={submit}>
+      <label>{t("admin.intake.cooperative")}<select value={cooperativeId} onChange={(event) => setCooperativeId(event.target.value)} required><option value="">{t("admin.intake.chooseCooperative")}</option>{allowedCooperatives.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
+      <label className="import-file"><span>{t("admin.intake.csvFile")}</span><input key={fileKey} type="file" accept=".csv,text/csv,text/plain" onChange={(event) => chooseFile(event.target.files?.[0] ?? null)} required /><small>{file?.name ?? t("admin.intake.noFile")}</small></label>
+      <button className="icon-button" type="button" title={t("admin.intake.downloadTemplate")} aria-label={t("admin.intake.downloadTemplate")} onClick={downloadTemplate}><Download size={18} /></button>
+      <button className="primary-button" type="submit" disabled={busy || !cooperativeId || !file || Boolean(fileError)}><Upload size={17} /><span>{t("admin.intake.stage")}</span></button>
+    </form>{fileError ? <p className="form-error" role="alert">{fileError}</p> : null}</section> : null}
+    <div className="import-workspace">
+      <section className="panel"><div className="panel-heading"><h2>{t("admin.intake.batches")}</h2><span>{data.length}</span></div>
+        <div className="table-wrap"><table><thead><tr><th>{t("admin.intake.file")}</th><th>{t("admin.intake.statusLabel")}</th><th>{t("admin.intake.rows")}</th><th>{t("admin.intake.created")}</th></tr></thead><tbody>{data.map((item) => <tr className={selected?.id === item.id ? "selected-row" : ""} key={item.id}><td><button className="table-link" onClick={() => setSelectedId(item.id)}><strong data-i18n-ignore="true">{item.source_name}</strong><small>{cooperatives.find((cooperative) => cooperative.id === item.cooperative_id)?.name ?? item.cooperative_id}</small></button></td><td>{importStatus(item.status)}</td><td>{item.row_count}</td><td>{formatLocalDateTime(item.created_at)}</td></tr>)}</tbody></table></div>{!data.length ? <Empty text={t("admin.intake.noBatches")} /> : null}
+      </section>
+      <section className="panel import-detail"><div className="panel-heading"><h2>{selected ? selected.source_name : t("admin.intake.preview")}</h2>{selected ? importStatus(selected.status) : null}</div>
+        {selected ? <><dl className="import-summary"><div><dt>{t("admin.intake.ready")}</dt><dd>{selected.ready_count}</dd></div><div><dt>{t("admin.intake.duplicates")}</dt><dd>{selected.duplicate_count}</dd></div><div><dt>{t("admin.intake.errors")}</dt><dd>{selected.invalid_count}</dd></div><div><dt>{t("admin.intake.applied")}</dt><dd>{selected.applied_count}</dd></div></dl>
+          <div className="import-actions">
+            {canStage && ["STAGED", "PREVIEWED"].includes(selected.status) ? <button className="compact-command" disabled={busy} onClick={() => run(() => previewMemberImport(selected))}><FileSearch size={16} />{selected.status === "STAGED" ? t("admin.intake.dryRun") : t("admin.intake.refreshDryRun")}</button> : null}
+            {canReview && selected.status === "PREVIEWED" && selected.created_by_user_id !== principal.user_id ? <><button className="compact-command approve" disabled={busy || selected.ready_count < 1} onClick={() => run(() => decideMemberImport(selected, true, "INDEPENDENT_REVIEW"))}><FileCheck2 size={16} />{t("admin.intake.approve")}</button><button className="compact-command" disabled={busy} onClick={() => run(() => decideMemberImport(selected, false, "REJECTED_BY_STEWARD"))}><XCircle size={16} />{t("admin.intake.reject")}</button></> : null}
+            {canReview && selected.status === "PREVIEWED" && selected.created_by_user_id === principal.user_id ? <span className="independent-note"><AlertTriangle size={15} />{t("admin.intake.anotherReviewer")}</span> : null}
+            {canApply && selected.status === "APPROVED" ? <button className="primary-button" disabled={busy} onClick={() => run(() => applyMemberImport(selected))}><FileCheck2 size={16} />{t("admin.intake.apply")}</button> : null}
+          </div>
+          {rows.isPending ? <div className="state" role="status"><RefreshCw className="spin" size={20} />{t("admin.intake.loadingRows")}</div> : rows.isError ? <ErrorLine error={rows.error} /> : <div className="table-wrap"><table><thead><tr><th>#</th><th>{t("admin.intake.memberName")}</th><th>{t("admin.intake.identifierType")}</th><th>{t("admin.intake.result")}</th><th>{t("admin.intake.match")}</th></tr></thead><tbody>{selectedRows.map((row: MemberImportRow) => <tr key={row.id}><td>{row.row_number}</td><td><strong data-i18n-ignore="true">{row.display_name}</strong></td><td>{row.identifier_type ?? "—"}</td><td>{importStatus(row.status)}{row.error_code ? <small>{t(`admin.intake.rowError.${row.error_code}`, { defaultValue: row.error_code })}</small> : null}</td><td>{row.candidate_member_id ? <span data-i18n-ignore="true">{members.find((member) => member.id === row.candidate_member_id)?.display_name ?? row.candidate_member_id}</span> : row.match_basis ? t(`admin.intake.matchBasis.${row.match_basis}`, { defaultValue: row.match_basis }) : "—"}</td></tr>)}</tbody></table></div>}
+        </> : <Empty text={t("admin.intake.selectBatch")} />}
+      </section>
+    </div>
+  </>;
+}
 function NodesSection({
   localNode,
   externalNodes,
@@ -307,8 +448,10 @@ export default function AdminDirectoryView({
   principal: Principal;
   onManageNodes: () => void;
 }) {
+  const { t } = useTranslation();
   const client = useQueryClient();
   const canReadAccounts = hasRole(principal, "SECURITY_ADMIN", "AUDITOR");
+  const canReadImports = hasRole(principal, "MEMBER_REGISTRAR", "DATA_STEWARD", "AUDITOR");
   const canReadNodes = hasRole(principal, "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR");
   const [section, setSection] = useState<Section>("members");
   const [actionError, setActionError] = useState<unknown>(null);
@@ -316,6 +459,7 @@ export default function AdminDirectoryView({
   const cooperatives = useQuery({ queryKey: ["cooperatives"], queryFn: getCooperatives });
   const members = useQuery({ queryKey: ["members"], queryFn: getMembers });
   const memberships = useQuery({ queryKey: ["memberships"], queryFn: getMemberships });
+  const imports = useQuery({ queryKey: ["member-imports"], queryFn: getMemberImports, enabled: canReadImports });
   const accounts = useQuery({ queryKey: ["users"], queryFn: getUsers, enabled: canReadAccounts });
   const system = useQuery({ queryKey: ["system-status"], queryFn: () => fetchSystemStatus(), enabled: canReadNodes });
   const nodes = useQuery({ queryKey: ["federation", "nodes"], queryFn: getFederationNodes, enabled: canReadNodes });
@@ -324,6 +468,7 @@ export default function AdminDirectoryView({
     ["organizations", "Организации", Building2, true],
     ["members", "Участники", Users, true],
     ["memberships", "Членства", Link2, true],
+    ["imports", t("admin.intake.tab"), FileUp, canReadImports],
     ["accounts", "Учетные записи", UserCog, canReadAccounts],
     ["nodes", "Узлы", Network, canReadNodes],
   ] as const;
@@ -333,6 +478,8 @@ export default function AdminDirectoryView({
       client.invalidateQueries({ queryKey: ["cooperatives"] }),
       client.invalidateQueries({ queryKey: ["members"] }),
       client.invalidateQueries({ queryKey: ["memberships"] }),
+      client.invalidateQueries({ queryKey: ["member-imports"] }),
+      client.invalidateQueries({ queryKey: ["member-import-rows"] }),
       client.invalidateQueries({ queryKey: ["users"] }),
       client.invalidateQueries({ queryKey: ["sessions"] }),
       client.invalidateQueries({ queryKey: ["admin-overview"] }),
@@ -347,8 +494,8 @@ export default function AdminDirectoryView({
 
   const baseLoading = cooperatives.isPending || members.isPending || memberships.isPending;
   const baseError = cooperatives.error ?? members.error ?? memberships.error;
-  const currentError = section === "accounts" ? accounts.error : section === "nodes" ? system.error ?? nodes.error : baseError;
-  const currentLoading = baseLoading || (section === "accounts" && canReadAccounts && accounts.isPending) || (section === "nodes" && canReadNodes && (system.isPending || nodes.isPending));
+  const currentError = section === "imports" ? imports.error : section === "accounts" ? accounts.error : section === "nodes" ? system.error ?? nodes.error : baseError;
+  const currentLoading = baseLoading || (section === "imports" && canReadImports && imports.isPending) || (section === "accounts" && canReadAccounts && accounts.isPending) || (section === "nodes" && canReadNodes && (system.isPending || nodes.isPending));
 
   return <div className="view-stack admin-directory">
     <header className="view-header"><div><span className="eyebrow">Администрирование</span><h1>Реестры системы</h1><p>Люди, организации, доступ и узлы</p></div>
@@ -360,6 +507,7 @@ export default function AdminDirectoryView({
     {!currentLoading && !currentError && section === "organizations" ? <OrganizationsSection data={cooperatives.data ?? []} canManage={canManageOrganizations} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "members" ? <MembersSection data={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "memberships" ? <MembershipsSection data={memberships.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
+    {!currentLoading && !currentError && section === "imports" ? <ImportSection data={imports.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "accounts" ? <AccountsSection data={accounts.data ?? []} members={members.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "nodes" ? <NodesSection localNode={system.data} externalNodes={nodes.data ?? []} onManageNodes={onManageNodes} /> : null}
   </div>;

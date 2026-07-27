@@ -372,3 +372,14 @@ restore drill. Цель: один реальный товарный процес
 Готово: администратор не смешивает хозяйственного участника, его организационную
 связь, login и технический узел. Duplicate merge, service clients и массовый
 staging-import остаются отдельными последующими срезами.
+## Slice 23. Безопасный ввод участников
+
+Реализован production-срез ручной duplicate review и массового staging-import:
+
+- ручная регистрация проверяет точный identifier и нормализованное имя, не выполняет silent merge;
+- CSV проходит staging, dry run, построчный отчёт, независимое решение `DATA_STEWARD` и применение `MEMBER_REGISTRAR`;
+- применение повторно проверяет дубликаты под cooperative advisory lock и атомарно останавливает устаревший preview;
+- исходные identifiers не сохраняются в открытом виде; импорт не создаёт роли, логины, членства, паи или лимиты;
+- migration `0030`, совместимый OpenAPI, backend integration и frontend component tests.
+
+Следующий кодовый срез - service-client lifecycle. Управляемое объединение подтверждённых дубликатов остаётся отдельным срезом, потому что требует собственной evidence/decision/id-map процедуры.

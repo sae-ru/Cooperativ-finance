@@ -14,6 +14,10 @@ from cooperative_clearing.modules.audit.infrastructure.repository import (
     IdempotencyRepository,
     request_payload_hash,
 )
+from cooperative_clearing.modules.identity.application.intake import (
+    acquire_member_intake_lock,
+    find_member_duplicate_candidates,
+)
 from cooperative_clearing.modules.identity.domain.types import (
     PRIVILEGED_ROLES,
     AssignmentStatus,
@@ -149,7 +153,8 @@ class IdentityAdminService:
         display_name: str,
         identifier_type: str | None,
         identifier_value: str | None,
-        request_id: UUID | None,
+        duplicate_resolution_code: str | None = None,
+        request_id: UUID | None = None,
     ) -> CommandResult:
         if (identifier_type is None) != (identifier_value is None):
             raise DomainError(
@@ -157,12 +162,22 @@ class IdentityAdminService:
                 message_key="errors.identity.member_identifier_incomplete",
                 status_code=422,
             )
+        normalized_identifier_type = identifier_type.strip().upper() if identifier_type else None
         value_hash = private_value_hash(identifier_value) if identifier_value else None
+        if duplicate_resolution_code is not None:
+            duplicate_resolution_code = duplicate_resolution_code.strip().upper()
+            if not 2 <= len(duplicate_resolution_code) <= 100:
+                raise DomainError(
+                    code="DUPLICATE_RESOLUTION_CODE_INVALID",
+                    message_key="errors.identity.duplicate_resolution_code_invalid",
+                    status_code=422,
+                )
         safe_payload = {
             "cooperative_id": cooperative_id,
             "display_name": display_name.strip(),
-            "identifier_type": identifier_type,
+            "identifier_type": normalized_identifier_type,
             "identifier_hash": value_hash,
+            "duplicate_resolution_code": duplicate_resolution_code,
         }
         record, replay = await self._begin(
             session, principal, "MEMBER_CREATE", idempotency_key, safe_payload
@@ -178,21 +193,32 @@ class IdentityAdminService:
                 message_key="errors.identity.cooperative_not_active",
                 status_code=409,
             )
-        if identifier_type and value_hash:
-            duplicate = await session.scalar(
-                select(func.count())
-                .select_from(MemberIdentifier)
-                .where(
-                    MemberIdentifier.identifier_type == identifier_type,
-                    MemberIdentifier.value_hash == value_hash,
-                )
+        await acquire_member_intake_lock(session, cooperative_id)
+        duplicate_candidates = await find_member_duplicate_candidates(
+            session,
+            cooperative_id=cooperative_id,
+            display_name=display_name,
+            identifier_type=normalized_identifier_type,
+            identifier_value=identifier_value,
+        )
+        if any(candidate.match_basis == "EXACT_IDENTIFIER" for candidate in duplicate_candidates):
+            raise DomainError(
+                code="MEMBER_IDENTIFIER_EXISTS",
+                message_key="errors.identity.member_identifier_exists",
+                status_code=409,
             )
-            if duplicate:
-                raise DomainError(
-                    code="MEMBER_IDENTIFIER_EXISTS",
-                    message_key="errors.identity.member_identifier_exists",
-                    status_code=409,
-                )
+        name_candidates = [
+            candidate
+            for candidate in duplicate_candidates
+            if candidate.match_basis == "NORMALIZED_NAME"
+        ]
+        if name_candidates and not duplicate_resolution_code:
+            raise DomainError(
+                code="MEMBER_DUPLICATE_REVIEW_REQUIRED",
+                message_key="errors.identity.member_duplicate_review_required",
+                parameters={"candidate_count": len(name_candidates)},
+                status_code=409,
+            )
         member = Member(
             id=uuid4(),
             display_name=display_name.strip(),
@@ -200,12 +226,12 @@ class IdentityAdminService:
             status="APPLICANT",
         )
         session.add(member)
-        if identifier_type and value_hash:
+        if normalized_identifier_type and value_hash:
             session.add(
                 MemberIdentifier(
                     id=uuid4(),
                     member_id=member.id,
-                    identifier_type=identifier_type,
+                    identifier_type=normalized_identifier_type,
                     value_hash=value_hash,
                 )
             )
@@ -216,7 +242,14 @@ class IdentityAdminService:
             actor_user_id=principal.user_id,
             outcome="SUCCESS",
             request_id=request_id,
-            payload={"status": "APPLICANT", "identifier_type": identifier_type or "NONE"},
+            reason_code=duplicate_resolution_code,
+            payload={
+                "status": "APPLICANT",
+                "identifier_type": normalized_identifier_type or "NONE",
+                "duplicate_candidate_ids": [
+                    str(candidate.member_id) for candidate in name_candidates
+                ],
+            },
         )
         return self._complete(record, event_id, member.id)
 

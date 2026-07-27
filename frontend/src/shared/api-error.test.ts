@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AdminApiError } from "../api/admin";
+import i18n from "../i18n";
 import { userErrorMessage } from "./api-error";
 
 describe("userErrorMessage", () => {
@@ -45,5 +46,53 @@ describe("userErrorMessage", () => {
     expect(userErrorMessage(new Error("database-password-leaked"), "ru")).toBe(
       "Не удалось выполнить действие. Проверьте данные и повторите попытку.",
     );
+  });
+  it("maps validation, authorization, capacity, and availability failures to safe messages", () => {
+    const cases: Array<[string, number, string]> = [
+      ["MEMBER_IMPORT_PREVIEW_STALE", 409, "errors.memberImportPreviewStale"],
+      ["MEMBER_IMPORT_INDEPENDENT_REVIEW_REQUIRED", 409, "errors.memberImportIndependentReview"],
+      ["MEMBER_DUPLICATE_REVIEW_REQUIRED", 409, "errors.memberDuplicateReviewRequired"],
+      ["MEMBER_IDENTIFIER_EXISTS", 409, "errors.memberIdentifierExists"],
+      ["MEMBER_IMPORT_CSV_INVALID", 422, "errors.memberImportInvalid"],
+      ["STEP_UP_REQUIRED", 403, "errors.stepUpRequired"],
+      ["TOTP_NOT_ENROLLED", 409, "errors.totpNotEnrolled"],
+      ["TOTP_INVALID_OR_REPLAYED", 422, "errors.totpInvalid"],
+      ["TOTP_TEMPORARILY_LOCKED", 429, "errors.totpLocked"],
+      ["INDEPENDENT_APPROVAL_REQUIRED", 409, "errors.independentApprovalRequired"],
+      ["PERSONAL_ACTOR_REQUIRED", 403, "errors.personalSecurityActorRequired"],
+      ["PERMANENT_SECURITY_ROLE_REQUIRED", 403, "errors.personalSecurityActorRequired"],
+      ["AUTHENTICATION_FAILED", 401, "errors.authenticationFailed"],
+      ["QUANTITY_INVALID", 422, "errors.quantityInvalid"],
+      ["EVIDENCE_SIZE_INVALID", 422, "errors.evidenceSizeInvalid"],
+      ["EVIDENCE_TYPE_INVALID", 422, "errors.evidenceTypeInvalid"],
+      ["EVIDENCE_REQUIRED", 422, "errors.evidenceRequired"],
+      ["SESSION_REVOKED", 401, "errors.sessionExpired"],
+      ["MEMBER_NOT_FOUND", 404, "errors.notFound"],
+      ["VERSION_CONFLICT", 409, "errors.conflict"],
+      ["PAYLOAD_TOO_LARGE", 413, "errors.evidenceSizeInvalid"],
+      ["RATE_LIMIT_EXCEEDED", 429, "errors.limitExceeded"],
+      ["BALANCE_INSUFFICIENT", 422, "errors.insufficient"],
+      ["OFFER_EXPIRED", 422, "errors.expired"],
+      ["ACCOUNT_FROZEN", 422, "errors.locked"],
+      ["FIELD_REQUIRED", 422, "errors.required"],
+      ["FIELD_INVALID", 422, "errors.invalidValue"],
+      ["PEER_DOWN", 400, "errors.unavailable"],
+      ["UNKNOWN_FAILURE", 500, "errors.serverUnavailable"],
+    ];
+
+    for (const [code, status, key] of cases) {
+      const message = userErrorMessage(new AdminApiError(code, "request-secret", status), "en");
+      expect(message, code).toBe(i18n.getFixedT("en")(key));
+      expect(message).not.toContain(code);
+      expect(message).not.toContain("request-secret");
+    }
+  });
+
+  it("distinguishes transport failures from malformed and unknown values", () => {
+    expect(userErrorMessage(new TypeError("offline"), "en")).toBe(i18n.getFixedT("en")("errors.network"));
+    expect(userErrorMessage(null, "en")).toBe(i18n.getFixedT("en")("errors.generic"));
+    expect(userErrorMessage({ code: 12, status: "bad" }, "en")).toBe(i18n.getFixedT("en")("errors.generic"));
+    expect(userErrorMessage(new AdminApiError("UNKNOWN_CLIENT_FAILURE", "request-unknown", 400), "en"))
+      .toBe(i18n.getFixedT("en")("errors.generic"));
   });
 });

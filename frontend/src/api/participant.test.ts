@@ -4,10 +4,15 @@ import { login, logout } from "./admin";
 import {
   archiveParticipantAddress,
   createParticipantAddress,
+  getOfferImage,
   getParticipantAddresses,
+  getParticipantDashboard,
+  materializePurchaseDeal,
+  revokeOwnOffer,
   updateParticipantAddress,
   type ParticipantAddress,
   type ParticipantAddressDraft,
+  type ParticipantOffer,
 } from "./participant";
 
 function response(body: object | null, status = 200): Response {
@@ -81,5 +86,28 @@ describe("participant address API client", () => {
       expected_version: 3,
     });
     expect(JSON.parse(String(archiveRequest.body))).toEqual({ expected_version: 3 });
+  });
+  it("reads the dashboard and executes offer, deal, and image operations", async () => {
+    const command = { event_id: "event-1", object_id: "object-1", replayed: false };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ data: { cooperative_count: 1 } }))
+      .mockResolvedValueOnce(response({ data: command }))
+      .mockResolvedValueOnce(response({ data: command }))
+      .mockResolvedValueOnce(new Response("image-bytes", { status: 200, headers: { "Content-Type": "image/jpeg" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const offer = { offer_id: "offer-1", offer_version: 4 } as ParticipantOffer;
+
+    expect((await getParticipantDashboard()).cooperative_count).toBe(1);
+    await revokeOwnOffer(offer, "No stock");
+    await materializePurchaseDeal("intent-1");
+    const image = await getOfferImage("record-1");
+
+    expect(image.type).toBe("image/jpeg");
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/v1/participant/dashboard",
+      "/api/v1/federation/offers/revoke",
+      "/api/v1/federation/purchase-intents/intent-1/materialize-deal",
+      "/api/v1/federation/catalog/offers/record-1/image",
+    ]);
   });
 });

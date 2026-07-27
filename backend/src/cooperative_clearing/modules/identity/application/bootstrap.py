@@ -7,10 +7,15 @@ from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cooperative_clearing.modules.audit.infrastructure.repository import AuditRepository
+from cooperative_clearing.modules.audit.infrastructure.repository import (
+    AuditRepository,
+    request_payload_hash,
+)
 from cooperative_clearing.modules.identity.infrastructure.models import (
     Cooperative,
     Member,
+    MemberImportBatch,
+    MemberImportRow,
     Membership,
     ParticipantAddress,
     RoleAssignment,
@@ -160,6 +165,7 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
         member_statement = insert(Member).values(
             id=member_id,
             display_name=display_name,
+            registered_by_cooperative_id=cooperative_id,
             status=status,
         )
         await session.execute(
@@ -167,6 +173,7 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
                 index_elements=[Member.id],
                 set_={
                     "display_name": member_statement.excluded.display_name,
+                    "registered_by_cooperative_id": cooperative_id,
                     "status": member_statement.excluded.status,
                     "updated_at": datetime.now(UTC),
                 },
@@ -380,4 +387,56 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
                 index_elements=[RoleAssignment.id],
                 set_={"status": "ACTIVE", "cooperative_id": None},
             )
+        )
+    import_batch_id = stable_id("member-import-batch", "demo-intake")
+    import_rows = (
+        (1, "Sofia Green", "READY", None, None, None),
+        (
+            2,
+            "Anna Petrova",
+            "DUPLICATE",
+            "DUPLICATE_EXISTING_NAME",
+            "NORMALIZED_NAME",
+            stable_id("member", "demo-member-anna"),
+        ),
+        (3, "X", "INVALID", "IMPORT_ROW_NAME_INVALID", None, None),
+    )
+    source_sha256 = request_payload_hash(
+        [{"row_number": row[0], "display_name": row[1]} for row in import_rows]
+    )
+    import_batch = insert(MemberImportBatch).values(
+        id=import_batch_id,
+        cooperative_id=cooperative_id,
+        source_name="demo-member-intake.csv",
+        source_sha256=source_sha256,
+        status="PREVIEWED",
+        row_count=len(import_rows),
+        ready_count=1,
+        invalid_count=1,
+        duplicate_count=1,
+        applied_count=0,
+        created_by_user_id=stable_id("bootstrap-user", "registrar"),
+        previewed_at=datetime.now(UTC),
+    )
+    await session.execute(
+        import_batch.on_conflict_do_nothing(index_elements=[MemberImportBatch.id])
+    )
+    for row_number, display_name, status, error_code, match_basis, candidate_id in import_rows:
+        import_row = insert(MemberImportRow).values(
+            id=stable_id("member-import-row", f"demo-intake:{row_number}"),
+            batch_id=import_batch_id,
+            row_number=row_number,
+            display_name=display_name,
+            identifier_type=None,
+            identifier_hash=None,
+            source_row_hash=request_payload_hash(
+                {"row_number": row_number, "display_name": display_name}
+            ),
+            status=status,
+            error_code=error_code,
+            match_basis=match_basis,
+            candidate_member_id=candidate_id,
+        )
+        await session.execute(
+            import_row.on_conflict_do_nothing(index_elements=[MemberImportRow.id])
         )

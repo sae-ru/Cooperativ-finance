@@ -62,7 +62,7 @@ async def test_protected_operational_snapshot_and_metrics() -> None:
         snapshot = client.get("/api/v1/operations/snapshot", headers=headers)
         assert snapshot.status_code == 200
         data = snapshot.json()["data"]
-        assert data["schema_revision"] == "0029_identity_registry_scope"
+        assert data["schema_revision"] == "0030_safe_member_intake"
         assert data["signed_events"] >= 0
         assert data["active_sessions"] >= 1
         assert data["outbox_quarantined"] >= 0

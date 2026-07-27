@@ -8,6 +8,7 @@ import * as admin from "./api/admin";
 import * as federation from "./api/federation";
 import * as systemApi from "./api/system";
 import type { SystemStatus } from "./api/system";
+import i18n from "./i18n";
 import { useSystemStatus } from "./features/system/use-system-status";
 
 vi.mock("./api/admin", async () => {
@@ -88,8 +89,10 @@ function renderApp() {
 }
 
 describe("AdminApp", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("ru");
     window.sessionStorage.clear();
+    window.localStorage.clear();
     vi.clearAllMocks();
     vi.mocked(useSystemStatus).mockReturnValue({
       isPending: false,
@@ -125,6 +128,13 @@ describe("AdminApp", () => {
       version: 1
     }]);
     vi.mocked(admin.getMemberships).mockResolvedValue([]);
+    vi.mocked(admin.checkMemberDuplicates).mockResolvedValue({
+      candidates: [],
+      exact_identifier_match: false,
+      normalized_name_match: false,
+    });
+    vi.mocked(admin.getMemberImports).mockResolvedValue([]);
+    vi.mocked(admin.getMemberImportRows).mockResolvedValue([]);
     vi.mocked(admin.getUsers).mockResolvedValue([
       {
         id: securitySession.principal.user_id,
@@ -347,7 +357,7 @@ describe("AdminApp", () => {
     renderApp();
     await user.click(await screen.findByRole("button", { name: "Администрирование" }));
     await user.type(await screen.findByLabelText("Имя участника"), "Новый участник");
-    await user.click(screen.getByRole("button", { name: "Добавить участника" }));
+    await user.click(screen.getByRole("button", { name: "Проверить и добавить" }));
     await user.selectOptions(screen.getByLabelText("Новый статус Анна Петрова"), "PENDING_VERIFICATION");
     await user.click(screen.getByRole("tab", { name: "Членства" }));
     await user.selectOptions(screen.getByLabelText("Участник"), "40000000-0000-0000-0000-000000000001");

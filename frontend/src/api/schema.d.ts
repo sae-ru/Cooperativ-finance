@@ -143,6 +143,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Member Imports */
+        get: operations["list_member_imports_api_v1_admin_imports_get"];
+        put?: never;
+        /** Stage Member Import */
+        post: operations["stage_member_import_api_v1_admin_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/imports/{batch_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Member Import */
+        post: operations["apply_member_import_api_v1_admin_imports__batch_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/imports/{batch_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Member Import */
+        post: operations["decide_member_import_api_v1_admin_imports__batch_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/imports/{batch_id}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Member Import */
+        post: operations["preview_member_import_api_v1_admin_imports__batch_id__dry_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/imports/{batch_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Member Import Rows */
+        get: operations["list_member_import_rows_api_v1_admin_imports__batch_id__rows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/members": {
         parameters: {
             query?: never;
@@ -155,6 +241,23 @@ export interface paths {
         put?: never;
         /** Create Member */
         post: operations["create_member_api_v1_admin_members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/members/duplicate-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Member Duplicates */
+        post: operations["check_member_duplicates_api_v1_admin_members_duplicate_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8453,11 +8556,203 @@ export interface components {
             cooperative_id?: string | null;
             /** Display Name */
             display_name: string;
+            /** Duplicate Resolution Code */
+            duplicate_resolution_code?: string | null;
             /** Identifier Type */
             identifier_type?: string | null;
             /** Identifier Value */
             identifier_value?: string | null;
         };
+        /** MemberDuplicateCandidateResponse */
+        MemberDuplicateCandidateResponse: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Match Basis
+             * @enum {string}
+             */
+            match_basis: "EXACT_IDENTIFIER" | "NORMALIZED_NAME";
+            /**
+             * Member Id
+             * Format: uuid
+             */
+            member_id: string;
+            /** Registered By Cooperative Id */
+            registered_by_cooperative_id: string | null;
+            status: components["schemas"]["MemberStatus"];
+        };
+        /** MemberDuplicateCheckEnvelope */
+        MemberDuplicateCheckEnvelope: {
+            data: components["schemas"]["MemberDuplicateCheckResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberDuplicateCheckRequest */
+        MemberDuplicateCheckRequest: {
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Identifier Type */
+            identifier_type?: string | null;
+            /** Identifier Value */
+            identifier_value?: string | null;
+        };
+        /** MemberDuplicateCheckResponse */
+        MemberDuplicateCheckResponse: {
+            /** Candidates */
+            candidates: components["schemas"]["MemberDuplicateCandidateResponse"][];
+            /** Exact Identifier Match */
+            exact_identifier_match: boolean;
+            /** Normalized Name Match */
+            normalized_name_match: boolean;
+        };
+        /** MemberImportBatchCollection */
+        MemberImportBatchCollection: {
+            /** Data */
+            data: components["schemas"]["MemberImportBatchResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberImportBatchResponse */
+        MemberImportBatchResponse: {
+            /** Applied At */
+            applied_at: string | null;
+            /** Applied Count */
+            applied_count: number;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Decision Reason Code */
+            decision_reason_code: string | null;
+            /** Duplicate Count */
+            duplicate_count: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Invalid Count */
+            invalid_count: number;
+            /** Previewed At */
+            previewed_at: string | null;
+            /** Ready Count */
+            ready_count: number;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /** Reviewed By User Id */
+            reviewed_by_user_id: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Source Name */
+            source_name: string;
+            /** Source Sha256 */
+            source_sha256: string;
+            status: components["schemas"]["MemberImportStatus"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** MemberImportCommandRequest */
+        MemberImportCommandRequest: {
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** MemberImportCreateRequest */
+        MemberImportCreateRequest: {
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Csv Text
+             * Format: password
+             */
+            csv_text: string;
+            /** Source Name */
+            source_name: string;
+        };
+        /** MemberImportDecisionRequest */
+        MemberImportDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** MemberImportRowCollection */
+        MemberImportRowCollection: {
+            /** Data */
+            data: components["schemas"]["MemberImportRowResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberImportRowResponse */
+        MemberImportRowResponse: {
+            /** Applied At */
+            applied_at: string | null;
+            /**
+             * Batch Id
+             * Format: uuid
+             */
+            batch_id: string;
+            /** Candidate Member Id */
+            candidate_member_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created Member Id */
+            created_member_id: string | null;
+            /** Display Name */
+            display_name: string;
+            /** Error Code */
+            error_code: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Identifier Type */
+            identifier_type: string | null;
+            /** Match Basis */
+            match_basis: string | null;
+            /** Row Number */
+            row_number: number;
+            status: components["schemas"]["MemberImportRowStatus"];
+        };
+        /**
+         * MemberImportRowStatus
+         * @enum {string}
+         */
+        MemberImportRowStatus: "STAGED" | "READY" | "INVALID" | "DUPLICATE" | "APPLIED";
+        /**
+         * MemberImportStatus
+         * @enum {string}
+         */
+        MemberImportStatus: "STAGED" | "PREVIEWED" | "APPROVED" | "REJECTED" | "APPLIED";
         /** MemberResponse */
         MemberResponse: {
             /**
@@ -14172,6 +14467,215 @@ export interface operations {
             };
         };
     };
+    list_member_imports_api_v1_admin_imports_get: {
+        parameters: {
+            query?: {
+                cooperative_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberImportBatchCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stage_member_import_api_v1_admin_imports_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberImportCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_member_import_api_v1_admin_imports__batch_id__apply_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberImportCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_member_import_api_v1_admin_imports__batch_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberImportDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_member_import_api_v1_admin_imports__batch_id__dry_run_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberImportCommandRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_member_import_rows_api_v1_admin_imports__batch_id__rows_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberImportRowCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_members_api_v1_admin_members_get: {
         parameters: {
             query?: {
@@ -14226,6 +14730,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_member_duplicates_api_v1_admin_members_duplicate_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberDuplicateCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDuplicateCheckEnvelope"];
                 };
             };
             /** @description Validation Error */

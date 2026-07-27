@@ -603,3 +603,8 @@ Cooperative, Membership и User используют собственный `sta
 timestamps. Завершение membership сохраняет `ended_at`; отключение User не
 удаляет запись и связанные события. Технический Node остаётся в модуле federation
 и не связывается с User или Member общей строкой «клиента».
+## Расширение идентификации Slice 23
+
+`identity.member_import_batches` хранит cooperative scope, имя и SHA-256 источника, lifecycle `STAGED|PREVIEWED|APPROVED|REJECTED|APPLIED`, счётчики, автора, независимого проверяющего, причину решения, timestamps и optimistic version.
+
+`identity.member_import_rows` хранит номер строки, display name, тип и хеш identifier, хеш безопасного представления исходной строки, результат `STAGED|READY|INVALID|DUPLICATE|APPLIED`, код ошибки, основание совпадения, candidate member и created member. Открытое значение identifier и исходный CSV не сохраняются. Revision: `0030_safe_member_intake`.

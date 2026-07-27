@@ -223,3 +223,8 @@ OpenAPI и проверки описаны в [implemented_slice_22.md](implemen
 Отмечено только инженерное разделение сущностей. Юридические процедуры выхода,
 обучение реальных ролей, независимый security review, duplicate merge,
 service-client lifecycle и массовый импорт остаются открытыми production gates.
+## Текущее доказательство Slice 23
+
+Безопасный ввод участников реализован как проверяемый workflow: ручное создание требует явного решения при совпадении имени, а массовый CSV проходит staging, dry run, независимое утверждение и повторную проверку перед атомарным применением. Сервер проверяет cooperative scope, постоянные роли, optimistic version и idempotency; открытые identifiers и исходный CSV не сохраняются.
+
+Revision `0030_safe_member_intake`, OpenAPI, backend integration-тесты и component-тесты интерфейса входят в кодовое доказательство. Service-client lifecycle, процедура merge подтверждённых дубликатов, независимый security review, обучение операторов, целевая нагрузка и юридическое утверждение процедур остаются открытыми production gates.

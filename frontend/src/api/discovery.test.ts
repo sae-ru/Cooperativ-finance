@@ -3,9 +3,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cancelPurchase,
   commitPurchase,
+  createPurchaseIntent,
+  getMyLogisticsQuotes,
+  getMyOffers,
+  getPurchaseIntents,
+  getReservationReceipts,
+  publishLogisticsQuote,
+  publishOffer,
   reservePurchase,
+  revokeOffer,
   searchCatalog,
+  verifyOffer,
+  type FederatedOffer,
+  type LogisticsQuoteDraft,
+  type OfferDraft,
   type PurchaseIntent,
+  type SearchCandidate,
 } from "./discovery";
 
 describe("discovery API", () => {
@@ -109,5 +122,68 @@ describe("discovery API", () => {
         Boolean(new Headers(call[1]?.headers).get("Idempotency-Key")),
       ),
     ).toBe(true);
+  });
+  it("covers offer, logistics, verification, intent, receipt, and revoke contracts", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify({ data: { event_id: "event-1", object_id: "object-1", replayed: false } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const offerDraft = {
+      kind: "PRODUCT",
+      product_code: "NAILS.100MM",
+      description: "Steel nails",
+      quantity_available: "100",
+      unit_code: "PCS",
+      minimum_batch: "10",
+      origin_region: "NORTH",
+      pickup_address_text: "Farm road 1",
+      pickup_contact_name: "Seller",
+      pickup_contact_phone: "+10000000000",
+      pickup_instructions: "",
+      unit_price: "0.10",
+      available_until: "2026-08-01T00:00:00Z",
+      image_evidence_id: null,
+    } satisfies OfferDraft;
+    const logisticsDraft = {
+      offer_record_id: "offer-record-1",
+      destination_region: "SOUTH",
+      capacity: "100",
+      transport_cost: "5.00",
+      handling_cost: "0",
+      delivery_from: "2026-07-29T00:00:00Z",
+      delivery_until: "2026-07-30T00:00:00Z",
+      liability_limit: "50.00",
+      valid_until: "2026-07-28T00:00:00Z",
+    } satisfies LogisticsQuoteDraft;
+    const offer = { record_id: "offer-record-1", offer_id: "offer-1", offer_version: 2 } as FederatedOffer;
+    const candidate = {
+      offer,
+      quote: { record_id: "quote-record-1", destination_region: "SOUTH" },
+      landed_cost: "15.00",
+    } as SearchCandidate;
+
+    await publishOffer(offerDraft, "member-1");
+    await publishOffer({ ...offerDraft, unit_code: "KG", pickup_instructions: "Call first" }, "member-1");
+    await publishLogisticsQuote(logisticsDraft, "carrier-1");
+    await publishLogisticsQuote({ ...logisticsDraft, handling_cost: "2.00" }, "carrier-1");
+    await getMyLogisticsQuotes();
+    await verifyOffer(offer.record_id);
+    await getPurchaseIntents();
+    await getReservationReceipts("intent-1");
+    expect(() => createPurchaseIntent({ ...candidate, quote: null }, "10", { address_text: "Road 2", contact_name: "Buyer", contact_phone: "+1222", instructions: "" }))
+      .toThrow("LOGISTICS_QUOTE_REQUIRED");
+    await createPurchaseIntent(candidate, "10", { address_text: "Road 2", contact_name: "Buyer", contact_phone: "+1222", instructions: "Gate 3" });
+    await getMyOffers();
+    await revokeOffer(offer, "Sold out");
+
+    expect(fetchMock).toHaveBeenCalledTimes(11);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).unit_scale).toBe(0);
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).unit_scale).toBe(3);
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body)).cost_components).toEqual({ transport: "5.00" });
+    expect(JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body)).cost_components).toEqual({ transport: "5.00", handling: "2.00" });
+    expect(fetchMock.mock.calls.map((call) => call[0])).toContain("/api/v1/federation/offers/revoke");
   });
 });

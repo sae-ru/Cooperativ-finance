@@ -6,7 +6,6 @@ type ApiErrorShape = {
   status: number;
 };
 
-
 function asApiError(error: unknown): ApiErrorShape | null {
   if (typeof error !== "object" || error === null) return null;
   const candidate = error as Partial<ApiErrorShape>;
@@ -27,6 +26,29 @@ export function userErrorMessage(error: unknown, language?: string): string {
 
   const code = apiError.code.toUpperCase();
 
+  if (code === "MEMBER_IMPORT_PREVIEW_STALE") {
+    return translate("errors.memberImportPreviewStale");
+  }
+  if (code === "MEMBER_IMPORT_INDEPENDENT_REVIEW_REQUIRED") {
+    return translate("errors.memberImportIndependentReview");
+  }
+  if (code === "MEMBER_DUPLICATE_REVIEW_REQUIRED") {
+    return translate("errors.memberDuplicateReviewRequired");
+  }
+  if (code === "MEMBER_IDENTIFIER_EXISTS") {
+    return translate("errors.memberIdentifierExists");
+  }
+  if (
+    code.startsWith("MEMBER_IMPORT_")
+    && (
+      code.includes("FILE")
+      || code.includes("CSV")
+      || code.includes("HEADER")
+      || code.includes("ROW")
+    )
+  ) {
+    return translate("errors.memberImportInvalid");
+  }
   if (code === "STEP_UP_REQUIRED") return translate("errors.stepUpRequired");
   if (code === "TOTP_NOT_ENROLLED") return translate("errors.totpNotEnrolled");
   if (code === "TOTP_INVALID_OR_REPLAYED") return translate("errors.totpInvalid");

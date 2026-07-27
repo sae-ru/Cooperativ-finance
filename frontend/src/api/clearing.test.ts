@@ -5,6 +5,7 @@ import {
   collectClearingCycle,
   createClearingCycle,
   finalizeClearingCycle,
+  freezeClearingInput,
   getClearingAccountingExport,
   getClearingApprovals,
   getClearingCycles,
@@ -15,6 +16,9 @@ import {
   getClearingPositions,
   getClearingProof,
   getClearingStatements,
+  markClearingReady,
+  previewClearingCycle,
+  reconcileClearingCycle,
   verifyClearingProof,
   type ClearingCycle,
 } from "./clearing";
@@ -89,6 +93,10 @@ describe("local clearing API", () => {
     await approveClearingPreview(cycle);
     await finalizeClearingCycle(cycle);
     await verifyClearingProof({ proof_hash: `sha256:${"c".repeat(64)}` });
+    await freezeClearingInput(cycle);
+    await previewClearingCycle(cycle);
+    await markClearingReady(cycle);
+    await reconcileClearingCycle(cycle);
 
     const calls = fetchMock.mock.calls;
     expect(JSON.parse(String((calls[1]![1] as RequestInit).body))).toEqual({

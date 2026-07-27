@@ -35,6 +35,22 @@ class UserStatus(StrEnum):
     DISABLED = "DISABLED"
 
 
+class MemberImportStatus(StrEnum):
+    STAGED = "STAGED"
+    PREVIEWED = "PREVIEWED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    APPLIED = "APPLIED"
+
+
+class MemberImportRowStatus(StrEnum):
+    STAGED = "STAGED"
+    READY = "READY"
+    INVALID = "INVALID"
+    DUPLICATE = "DUPLICATE"
+    APPLIED = "APPLIED"
+
+
 class AssignmentStatus(StrEnum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     ACTIVE = "ACTIVE"
