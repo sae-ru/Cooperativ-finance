@@ -3315,6 +3315,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/custody-continuity-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Custody Continuity Candidates */
+        get: operations["list_custody_continuity_candidates_api_v1_inventory_custody_continuity_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/custody-continuity-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Custody Continuity Cases */
+        get: operations["list_custody_continuity_cases_api_v1_inventory_custody_continuity_cases_get"];
+        put?: never;
+        /** Request Custody Continuity */
+        post: operations["request_custody_continuity_api_v1_inventory_custody_continuity_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/candidate-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Custody Continuity Candidate */
+        post: operations["decide_custody_continuity_candidate_api_v1_inventory_custody_continuity_cases__continuity_case_id__candidate_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Custody Continuity */
+        post: operations["decide_custody_continuity_api_v1_inventory_custody_continuity_cases__continuity_case_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/items/{item_id}/attest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attest Custody Continuity Item */
+        post: operations["attest_custody_continuity_item_api_v1_inventory_custody_continuity_cases__continuity_case_id__items__item_id__attest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/custody-continuity-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Custody Continuity Sources */
+        get: operations["list_custody_continuity_sources_api_v1_inventory_custody_continuity_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/custody-transfers": {
         parameters: {
             query?: never;
@@ -6998,6 +7101,309 @@ export interface components {
             /** Expected Lot Version */
             expected_lot_version: number;
         };
+        /** CustodyContinuityAttestRequest */
+        CustodyContinuityAttestRequest: {
+            /** Actual Quantity */
+            actual_quantity: number | string;
+            /** Condition Notes */
+            condition_notes: string;
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Expected Case Version */
+            expected_case_version: number;
+            /** Expected Item Version */
+            expected_item_version: number;
+        };
+        /** CustodyContinuityCandidateCollection */
+        CustodyContinuityCandidateCollection: {
+            /** Data */
+            data: components["schemas"]["CustodyContinuityCandidateResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** CustodyContinuityCandidateDecisionRequest */
+        CustodyContinuityCandidateDecisionRequest: {
+            /** Accept */
+            accept: boolean;
+            /** Evidence Ids */
+            evidence_ids?: string[];
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** CustodyContinuityCandidateResponse */
+        CustodyContinuityCandidateResponse: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Member Id
+             * Format: uuid
+             */
+            member_id: string;
+            /**
+             * Role Assignment Id
+             * Format: uuid
+             */
+            role_assignment_id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+        };
+        /** CustodyContinuityCaseCollection */
+        CustodyContinuityCaseCollection: {
+            /** Data */
+            data: components["schemas"]["CustodyContinuityCaseResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** CustodyContinuityCaseResponse */
+        CustodyContinuityCaseResponse: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Accepted By User Id */
+            accepted_by_user_id: string | null;
+            /** Blocked Reasons */
+            blocked_reasons: string[];
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: string | null;
+            /** Decision Reason Code */
+            decision_reason_code: string | null;
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /** Handover Place */
+            handover_place: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Inventory Completed At */
+            inventory_completed_at: string | null;
+            /** Items */
+            items: components["schemas"]["CustodyContinuityItemResponse"][];
+            /**
+             * Member Continuity Case Id
+             * Format: uuid
+             */
+            member_continuity_case_id: string;
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /**
+             * Source Assignment Id
+             * Format: uuid
+             */
+            source_assignment_id: string;
+            /** Source Assignment Version */
+            source_assignment_version: number;
+            /**
+             * Source Member Id
+             * Format: uuid
+             */
+            source_member_id: string;
+            /** Source Member Name */
+            source_member_name: string;
+            status: components["schemas"]["CustodyContinuityStatus"];
+            /** Target Assignment Id */
+            target_assignment_id: string | null;
+            /**
+             * Target Member Id
+             * Format: uuid
+             */
+            target_member_id: string;
+            /** Target Member Name */
+            target_member_name: string;
+            /**
+             * Target Role Assignment Id
+             * Format: uuid
+             */
+            target_role_assignment_id: string;
+            /**
+             * Temporary Valid Until
+             * Format: date-time
+             */
+            temporary_valid_until: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /**
+             * Warehouse Id
+             * Format: uuid
+             */
+            warehouse_id: string;
+            /** Warehouse Name */
+            warehouse_name: string;
+        };
+        /** CustodyContinuityCommandEnvelope */
+        CustodyContinuityCommandEnvelope: {
+            data: components["schemas"]["CustodyContinuityCommandResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** CustodyContinuityCommandResponse */
+        CustodyContinuityCommandResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /** Replayed */
+            replayed: boolean;
+            status: components["schemas"]["CustodyContinuityStatus"];
+        };
+        /** CustodyContinuityCreateRequest */
+        CustodyContinuityCreateRequest: {
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /** Expected Source Assignment Version */
+            expected_source_assignment_version: number;
+            /** Handover Place */
+            handover_place: string;
+            /**
+             * Member Continuity Case Id
+             * Format: uuid
+             */
+            member_continuity_case_id: string;
+            /**
+             * Source Assignment Id
+             * Format: uuid
+             */
+            source_assignment_id: string;
+            /**
+             * Target Role Assignment Id
+             * Format: uuid
+             */
+            target_role_assignment_id: string;
+            /**
+             * Temporary Valid Until
+             * Format: date-time
+             */
+            temporary_valid_until: string;
+        };
+        /** CustodyContinuityDecisionRequest */
+        CustodyContinuityDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** CustodyContinuityItemResponse */
+        CustodyContinuityItemResponse: {
+            /** Actual Quantity */
+            actual_quantity: string | null;
+            /** Attested At */
+            attested_at: string | null;
+            /** Attested By User Id */
+            attested_by_user_id: string | null;
+            /** Condition Notes */
+            condition_notes: string | null;
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Expected Quantity */
+            expected_quantity: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Lot Number */
+            lot_number: string;
+            /** Lot Version */
+            lot_version: number;
+            /** Product Name */
+            product_name: string;
+            status: components["schemas"]["CustodyContinuityItemStatus"];
+            /** Unit Symbol */
+            unit_symbol: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CustodyContinuityItemStatus
+         * @enum {string}
+         */
+        CustodyContinuityItemStatus: "PENDING" | "MATCH" | "DISCREPANCY";
+        /** CustodyContinuitySourceCollection */
+        CustodyContinuitySourceCollection: {
+            /** Data */
+            data: components["schemas"]["CustodyContinuitySourceResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** CustodyContinuitySourceResponse */
+        CustodyContinuitySourceResponse: {
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Lot Count */
+            lot_count: number;
+            /**
+             * Member Continuity Case Id
+             * Format: uuid
+             */
+            member_continuity_case_id: string;
+            /**
+             * Source Assignment Id
+             * Format: uuid
+             */
+            source_assignment_id: string;
+            /** Source Assignment Version */
+            source_assignment_version: number;
+            /**
+             * Source Member Id
+             * Format: uuid
+             */
+            source_member_id: string;
+            /** Source Member Name */
+            source_member_name: string;
+            /**
+             * Warehouse Id
+             * Format: uuid
+             */
+            warehouse_id: string;
+            /** Warehouse Name */
+            warehouse_name: string;
+        };
+        /**
+         * CustodyContinuityStatus
+         * @enum {string}
+         */
+        CustodyContinuityStatus: "INVENTORY_PENDING" | "PENDING_APPROVAL" | "PENDING_ACCEPTANCE" | "ACCEPTED" | "REJECTED" | "BLOCKED";
         /** CustodyOfferRequest */
         CustodyOfferRequest: {
             /** Evidence Ids */
@@ -8533,6 +8939,8 @@ export interface components {
         };
         /** LotResponse */
         LotResponse: {
+            /** Continuity Hold Case Id */
+            continuity_hold_case_id: string | null;
             /**
              * Cooperative Id
              * Format: uuid
@@ -22240,6 +22648,225 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Collection_InventoryCustodianResponse_"];
+                };
+            };
+        };
+    };
+    list_custody_continuity_candidates_api_v1_inventory_custody_continuity_candidates_get: {
+        parameters: {
+            query: {
+                cooperative_id: string;
+                warehouse_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCandidateCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_custody_continuity_cases_api_v1_inventory_custody_continuity_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCaseCollection"];
+                };
+            };
+        };
+    };
+    request_custody_continuity_api_v1_inventory_custody_continuity_cases_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustodyContinuityCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_custody_continuity_candidate_api_v1_inventory_custody_continuity_cases__continuity_case_id__candidate_decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                continuity_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustodyContinuityCandidateDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_custody_continuity_api_v1_inventory_custody_continuity_cases__continuity_case_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                continuity_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustodyContinuityDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attest_custody_continuity_item_api_v1_inventory_custody_continuity_cases__continuity_case_id__items__item_id__attest_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                continuity_case_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustodyContinuityAttestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuityCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_custody_continuity_sources_api_v1_inventory_custody_continuity_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyContinuitySourceCollection"];
                 };
             };
         };

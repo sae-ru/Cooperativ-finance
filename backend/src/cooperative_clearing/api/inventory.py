@@ -242,6 +242,7 @@ class LotResponse(BaseModel):
     status: str
     received_by_member_id: UUID
     custodian_assignment_id: UUID
+    continuity_hold_case_id: UUID | None
     registered_event_id: UUID
     verified_event_id: UUID | None
     created_at: datetime

@@ -12,6 +12,9 @@ from cooperative_clearing.api.antifraud import router as antifraud_router
 from cooperative_clearing.api.auth import router as auth_router
 from cooperative_clearing.api.clearing import router as clearing_router
 from cooperative_clearing.api.crisis import router as crisis_router
+from cooperative_clearing.api.custody_continuity import (
+    router as custody_continuity_router,
+)
 from cooperative_clearing.api.discovery import router as discovery_router
 from cooperative_clearing.api.errors import register_error_handlers
 from cooperative_clearing.api.exchange import router as exchange_router
@@ -87,6 +90,7 @@ def create_app(settings: Settings | None = None, *, manage_runtime: bool = True)
     app.include_router(antifraud_router)
     app.include_router(clearing_router)
     app.include_router(crisis_router)
+    app.include_router(custody_continuity_router)
     app.include_router(discovery_router)
     app.include_router(exchange_router)
     app.include_router(federation_router)

@@ -88,6 +88,7 @@ const lot: inventory.InventoryLot = {
   status: "VERIFIED",
   received_by_member_id: recipient.member_id,
   custodian_assignment_id: "80000000-0000-0000-0000-000000000001",
+  continuity_hold_case_id: null,
   registered_event_id: "60000000-0000-0000-0000-000000000004",
   verified_event_id: "60000000-0000-0000-0000-000000000005",
   created_at: "2026-07-20T10:00:00Z",

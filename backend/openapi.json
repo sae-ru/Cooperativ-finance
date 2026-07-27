@@ -4780,6 +4780,734 @@
         "title": "CustodyAcceptRequest",
         "type": "object"
       },
+      "CustodyContinuityAttestRequest": {
+        "properties": {
+          "actual_quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Actual Quantity"
+          },
+          "condition_notes": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Condition Notes",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_case_version": {
+            "minimum": 1.0,
+            "title": "Expected Case Version",
+            "type": "integer"
+          },
+          "expected_item_version": {
+            "minimum": 1.0,
+            "title": "Expected Item Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "actual_quantity",
+          "condition_notes",
+          "evidence_ids",
+          "expected_case_version",
+          "expected_item_version"
+        ],
+        "title": "CustodyContinuityAttestRequest",
+        "type": "object"
+      },
+      "CustodyContinuityCandidateCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CustodyContinuityCandidateResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "CustodyContinuityCandidateCollection",
+        "type": "object"
+      },
+      "CustodyContinuityCandidateDecisionRequest": {
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          },
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accept",
+          "expected_version",
+          "reason_code"
+        ],
+        "title": "CustodyContinuityCandidateDecisionRequest",
+        "type": "object"
+      },
+      "CustodyContinuityCandidateResponse": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "member_id": {
+            "format": "uuid",
+            "title": "Member Id",
+            "type": "string"
+          },
+          "role_assignment_id": {
+            "format": "uuid",
+            "title": "Role Assignment Id",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_assignment_id",
+          "user_id",
+          "member_id",
+          "display_name"
+        ],
+        "title": "CustodyContinuityCandidateResponse",
+        "type": "object"
+      },
+      "CustodyContinuityCaseCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CustodyContinuityCaseResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "CustodyContinuityCaseCollection",
+        "type": "object"
+      },
+      "CustodyContinuityCaseResponse": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "accepted_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted By User Id"
+          },
+          "blocked_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocked Reasons",
+            "type": "array"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "decision_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason Code"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "handover_place": {
+            "title": "Handover Place",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "inventory_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Completed At"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustodyContinuityItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "member_continuity_case_id": {
+            "format": "uuid",
+            "title": "Member Continuity Case Id",
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "source_assignment_id": {
+            "format": "uuid",
+            "title": "Source Assignment Id",
+            "type": "string"
+          },
+          "source_assignment_version": {
+            "title": "Source Assignment Version",
+            "type": "integer"
+          },
+          "source_member_id": {
+            "format": "uuid",
+            "title": "Source Member Id",
+            "type": "string"
+          },
+          "source_member_name": {
+            "title": "Source Member Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CustodyContinuityStatus"
+          },
+          "target_assignment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Assignment Id"
+          },
+          "target_member_id": {
+            "format": "uuid",
+            "title": "Target Member Id",
+            "type": "string"
+          },
+          "target_member_name": {
+            "title": "Target Member Name",
+            "type": "string"
+          },
+          "target_role_assignment_id": {
+            "format": "uuid",
+            "title": "Target Role Assignment Id",
+            "type": "string"
+          },
+          "temporary_valid_until": {
+            "format": "date-time",
+            "title": "Temporary Valid Until",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warehouse_id": {
+            "format": "uuid",
+            "title": "Warehouse Id",
+            "type": "string"
+          },
+          "warehouse_name": {
+            "title": "Warehouse Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "member_continuity_case_id",
+          "source_member_id",
+          "source_member_name",
+          "warehouse_id",
+          "warehouse_name",
+          "source_assignment_id",
+          "source_assignment_version",
+          "target_member_id",
+          "target_member_name",
+          "target_role_assignment_id",
+          "target_assignment_id",
+          "handover_place",
+          "temporary_valid_until",
+          "evidence_refs",
+          "blocked_reasons",
+          "status",
+          "requested_by_user_id",
+          "decided_by_user_id",
+          "accepted_by_user_id",
+          "decision_reason_code",
+          "created_at",
+          "inventory_completed_at",
+          "decided_at",
+          "accepted_at",
+          "updated_at",
+          "version",
+          "items"
+        ],
+        "title": "CustodyContinuityCaseResponse",
+        "type": "object"
+      },
+      "CustodyContinuityCommandEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CustodyContinuityCommandResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "CustodyContinuityCommandEnvelope",
+        "type": "object"
+      },
+      "CustodyContinuityCommandResponse": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CustodyContinuityStatus"
+          }
+        },
+        "required": [
+          "event_id",
+          "object_id",
+          "status",
+          "replayed"
+        ],
+        "title": "CustodyContinuityCommandResponse",
+        "type": "object"
+      },
+      "CustodyContinuityCreateRequest": {
+        "properties": {
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expected_source_assignment_version": {
+            "minimum": 1.0,
+            "title": "Expected Source Assignment Version",
+            "type": "integer"
+          },
+          "handover_place": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Handover Place",
+            "type": "string"
+          },
+          "member_continuity_case_id": {
+            "format": "uuid",
+            "title": "Member Continuity Case Id",
+            "type": "string"
+          },
+          "source_assignment_id": {
+            "format": "uuid",
+            "title": "Source Assignment Id",
+            "type": "string"
+          },
+          "target_role_assignment_id": {
+            "format": "uuid",
+            "title": "Target Role Assignment Id",
+            "type": "string"
+          },
+          "temporary_valid_until": {
+            "format": "date-time",
+            "title": "Temporary Valid Until",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member_continuity_case_id",
+          "source_assignment_id",
+          "expected_source_assignment_version",
+          "target_role_assignment_id",
+          "handover_place",
+          "temporary_valid_until",
+          "evidence_refs"
+        ],
+        "title": "CustodyContinuityCreateRequest",
+        "type": "object"
+      },
+      "CustodyContinuityDecisionRequest": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve",
+          "expected_version",
+          "reason_code"
+        ],
+        "title": "CustodyContinuityDecisionRequest",
+        "type": "object"
+      },
+      "CustodyContinuityItemResponse": {
+        "properties": {
+          "actual_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Quantity"
+          },
+          "attested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attested At"
+          },
+          "attested_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attested By User Id"
+          },
+          "condition_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Notes"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Expected Quantity",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "lot_number": {
+            "title": "Lot Number",
+            "type": "string"
+          },
+          "lot_version": {
+            "title": "Lot Version",
+            "type": "integer"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CustodyContinuityItemStatus"
+          },
+          "unit_symbol": {
+            "title": "Unit Symbol",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "lot_id",
+          "lot_number",
+          "product_name",
+          "unit_symbol",
+          "lot_version",
+          "expected_quantity",
+          "actual_quantity",
+          "status",
+          "condition_notes",
+          "evidence_ids",
+          "attested_by_user_id",
+          "attested_at",
+          "version"
+        ],
+        "title": "CustodyContinuityItemResponse",
+        "type": "object"
+      },
+      "CustodyContinuityItemStatus": {
+        "enum": [
+          "PENDING",
+          "MATCH",
+          "DISCREPANCY"
+        ],
+        "title": "CustodyContinuityItemStatus",
+        "type": "string"
+      },
+      "CustodyContinuitySourceCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CustodyContinuitySourceResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "CustodyContinuitySourceCollection",
+        "type": "object"
+      },
+      "CustodyContinuitySourceResponse": {
+        "properties": {
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "lot_count": {
+            "title": "Lot Count",
+            "type": "integer"
+          },
+          "member_continuity_case_id": {
+            "format": "uuid",
+            "title": "Member Continuity Case Id",
+            "type": "string"
+          },
+          "source_assignment_id": {
+            "format": "uuid",
+            "title": "Source Assignment Id",
+            "type": "string"
+          },
+          "source_assignment_version": {
+            "title": "Source Assignment Version",
+            "type": "integer"
+          },
+          "source_member_id": {
+            "format": "uuid",
+            "title": "Source Member Id",
+            "type": "string"
+          },
+          "source_member_name": {
+            "title": "Source Member Name",
+            "type": "string"
+          },
+          "warehouse_id": {
+            "format": "uuid",
+            "title": "Warehouse Id",
+            "type": "string"
+          },
+          "warehouse_name": {
+            "title": "Warehouse Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "member_continuity_case_id",
+          "cooperative_id",
+          "source_assignment_id",
+          "source_assignment_version",
+          "source_member_id",
+          "source_member_name",
+          "warehouse_id",
+          "warehouse_name",
+          "lot_count"
+        ],
+        "title": "CustodyContinuitySourceResponse",
+        "type": "object"
+      },
+      "CustodyContinuityStatus": {
+        "enum": [
+          "INVENTORY_PENDING",
+          "PENDING_APPROVAL",
+          "PENDING_ACCEPTANCE",
+          "ACCEPTED",
+          "REJECTED",
+          "BLOCKED"
+        ],
+        "title": "CustodyContinuityStatus",
+        "type": "string"
+      },
       "CustodyOfferRequest": {
         "properties": {
           "evidence_ids": {
@@ -8513,6 +9241,18 @@
       },
       "LotResponse": {
         "properties": {
+          "continuity_hold_case_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Continuity Hold Case Id"
+          },
           "cooperative_id": {
             "format": "uuid",
             "title": "Cooperative Id",
@@ -8658,6 +9398,7 @@
           "status",
           "received_by_member_id",
           "custodian_assignment_id",
+          "continuity_hold_case_id",
           "registered_event_id",
           "verified_event_id",
           "created_at",
@@ -36369,6 +37110,390 @@
         "summary": "List Inventory Custodians",
         "tags": [
           "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-candidates": {
+      "get": {
+        "operationId": "list_custody_continuity_candidates_api_v1_inventory_custody_continuity_candidates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cooperative_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cooperative Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "warehouse_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Warehouse Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCandidateCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Custody Continuity Candidates",
+        "tags": [
+          "custody-continuity"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-cases": {
+      "get": {
+        "operationId": "list_custody_continuity_cases_api_v1_inventory_custody_continuity_cases_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCaseCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Custody Continuity Cases",
+        "tags": [
+          "custody-continuity"
+        ]
+      },
+      "post": {
+        "operationId": "request_custody_continuity_api_v1_inventory_custody_continuity_cases_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustodyContinuityCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Custody Continuity",
+        "tags": [
+          "custody-continuity"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/candidate-decision": {
+      "post": {
+        "operationId": "decide_custody_continuity_candidate_api_v1_inventory_custody_continuity_cases__continuity_case_id__candidate_decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "continuity_case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Continuity Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustodyContinuityCandidateDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Custody Continuity Candidate",
+        "tags": [
+          "custody-continuity"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/decision": {
+      "post": {
+        "operationId": "decide_custody_continuity_api_v1_inventory_custody_continuity_cases__continuity_case_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "continuity_case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Continuity Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustodyContinuityDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Custody Continuity",
+        "tags": [
+          "custody-continuity"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-cases/{continuity_case_id}/items/{item_id}/attest": {
+      "post": {
+        "operationId": "attest_custody_continuity_item_api_v1_inventory_custody_continuity_cases__continuity_case_id__items__item_id__attest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "continuity_case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Continuity Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustodyContinuityAttestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Attest Custody Continuity Item",
+        "tags": [
+          "custody-continuity"
+        ]
+      }
+    },
+    "/api/v1/inventory/custody-continuity-sources": {
+      "get": {
+        "operationId": "list_custody_continuity_sources_api_v1_inventory_custody_continuity_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyContinuitySourceCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Custody Continuity Sources",
+        "tags": [
+          "custody-continuity"
         ]
       }
     },

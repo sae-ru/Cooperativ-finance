@@ -254,3 +254,7 @@ exact frontend mirror и отсутствие несовместимостей �
 Unit-тесты покрывают нормализацию входа и reference groups, fail-closed разбор снимка, blockers по отсутствию, версии и статусу Member/User/Membership, постоянство персональных ролей, cooperative scope, idempotent replay и формирование case view. PostgreSQL integration проходит полный lifecycle создания, немедленного отзыва сеансов, независимого решения, событий, аудита и повторного idempotency response.
 
 Обязательный gate включает migration cycle `0032 -> 0033 -> 0032 -> 0033`, `alembic check`, равенство backend/frontend OpenAPI, RU/EN XML symmetry, component tests административного экрана, production PWA build и браузерную проверку обоих языков и темы. Для корректной трассировки async SQLAlchemy через greenlet coverage запускается с `concurrency = ["greenlet", "thread"]`.
+
+## Проверки Slice 27
+
+Модульные тесты проверяют сроки, ссылки на основания, постоянные роли, количество и fail-closed blockers. PostgreSQL integration проходит цепочку исходное назначение -> containment -> hold -> независимый пересчет -> одобрение -> личная приемка и отдельно доказывает блокировку обычной складской команды. Frontend-тесты проверяют RU/EN, ролевые действия, обязательные акты и optimistic versions. Миграционный gate включает минимальные права runtime-роли и цикл `0033 <-> 0034`.

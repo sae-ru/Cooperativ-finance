@@ -215,6 +215,11 @@ class InventoryLot(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("risk.responsibility_assignments.id", ondelete="RESTRICT"),
     )
+    continuity_hold_case_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("assets.custody_continuity_cases.id", ondelete="RESTRICT"),
+        index=True,
+    )
     registered_event_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
     )
@@ -366,6 +371,153 @@ class InventoryDiscrepancy(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class CustodyContinuityCase(Base):
+    __tablename__ = "custody_continuity_cases"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('INVENTORY_PENDING','PENDING_APPROVAL','PENDING_ACCEPTANCE',"
+            "'ACCEPTED','REJECTED','BLOCKED')",
+            name="status_allowed",
+        ),
+        CheckConstraint("source_assignment_version >= 1", name="source_version_positive"),
+        CheckConstraint("target_member_id <> source_member_id", name="different_target_member"),
+        CheckConstraint(
+            "jsonb_typeof(evidence_refs) = 'array' AND jsonb_array_length(evidence_refs) >= 1",
+            name="evidence_nonempty_array",
+        ),
+        CheckConstraint("jsonb_typeof(blocked_reasons) = 'array'", name="blockers_array"),
+        CheckConstraint("temporary_valid_until > created_at", name="temporary_period_valid"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "ix_custody_continuity_cases_cooperative_status_created",
+            "cooperative_id",
+            "status",
+            "created_at",
+        ),
+        Index(
+            "uq_custody_continuity_cases_open_source",
+            "source_assignment_id",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('INVENTORY_PENDING','PENDING_APPROVAL','PENDING_ACCEPTANCE','BLOCKED')"
+            ),
+        ),
+        {"schema": "assets"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    member_continuity_case_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.member_continuity_cases.id", ondelete="RESTRICT"),
+    )
+    source_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    warehouse_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assets.warehouses.id", ondelete="RESTRICT")
+    )
+    source_assignment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("risk.responsibility_assignments.id", ondelete="RESTRICT"),
+    )
+    source_assignment_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    target_role_assignment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    target_assignment_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("risk.responsibility_assignments.id", ondelete="RESTRICT"),
+    )
+    handover_place: Mapped[str] = mapped_column(String(500), nullable=False)
+    temporary_valid_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    evidence_refs: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    blocked_reasons: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    accepted_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decision_reason_code: Mapped[str | None] = mapped_column(String(100))
+    requested_event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
+    )
+    decided_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
+    )
+    accepted_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    inventory_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class CustodyContinuityItem(Base):
+    __tablename__ = "custody_continuity_items"
+    __table_args__ = (
+        UniqueConstraint("case_id", "lot_id", name="uq_custody_continuity_item_lot"),
+        CheckConstraint("lot_version >= 1", name="lot_version_positive"),
+        CheckConstraint("expected_quantity >= 0", name="expected_quantity_nonnegative"),
+        CheckConstraint(
+            "actual_quantity IS NULL OR actual_quantity >= 0",
+            name="actual_quantity_nonnegative",
+        ),
+        CheckConstraint(
+            "status IN ('PENDING','MATCH','DISCREPANCY')",
+            name="status_allowed",
+        ),
+        CheckConstraint("jsonb_typeof(evidence_ids) = 'array'", name="evidence_array"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("ix_custody_continuity_items_case_status", "case_id", "status", "lot_id"),
+        {"schema": "assets"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    case_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("assets.custody_continuity_cases.id", ondelete="RESTRICT"),
+    )
+    lot_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assets.inventory_lots.id", ondelete="RESTRICT")
+    )
+    lot_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    expected_quantity: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    actual_quantity: Mapped[Decimal | None] = mapped_column(Numeric(38, 12))
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    condition_notes: Mapped[str | None] = mapped_column(String(1000))
+    evidence_ids: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    attested_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
+    )
+    attested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
 
 class CustodyTransfer(Base):

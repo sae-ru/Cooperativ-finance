@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Download,
   FilePlus2,
+  HeartPulse,
   PackageCheck,
   PackagePlus,
   Printer,
@@ -17,8 +18,10 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
-import { AdminApiError, type Principal, type RoleCode } from "./api/admin";
+import { AdminApiError, type Principal, type RoleCode } from "./api/admin";import CustodyContinuitySection from "./CustodyContinuitySection";
+
 import {
   acceptCustody,
   attestLot,
@@ -52,7 +55,7 @@ import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./inventory.css";
 
-type Section = "lots" | "receive" | "control" | "custody" | "catalog";
+type Section = "lots" | "receive" | "control" | "custody" | "continuity" | "catalog";
 
 const evidenceAccept = "application/pdf,image/jpeg,image/png,image/webp,text/plain";
 
@@ -379,6 +382,7 @@ function CatalogView({ cooperativeId, units, onDone }: { cooperativeId: string; 
 }
 
 export default function InventoryView({ principal }: { principal: Principal }) {
+  const { t } = useTranslation();
   const client = useQueryClient();
   const units = useQuery({ queryKey: ["inventory", "units"], queryFn: getUnits });
   const products = useQuery({ queryKey: ["inventory", "products"], queryFn: getProducts });
@@ -395,13 +399,14 @@ export default function InventoryView({ principal }: { principal: Principal }) {
     if (hasRole(principal, "WAREHOUSE_CUSTODIAN")) result.push("receive");
     if (hasRole(principal, "INVENTORY_CONTROLLER", "AUDITOR")) result.push("control");
     if (hasRole(principal, "WAREHOUSE_CUSTODIAN", "LOGISTICS_OPERATOR", "INVENTORY_CONTROLLER", "AUDITOR", "RISK_ADMIN", "SECURITY_ADMIN")) result.push("custody");
+    if (hasRole(principal, "WAREHOUSE_CUSTODIAN", "INVENTORY_CONTROLLER", "AUDITOR", "COOPERATIVE_ADMIN", "SECURITY_ADMIN")) result.push("continuity");
     if (hasRole(principal, "DATA_STEWARD", "COOPERATIVE_ADMIN")) result.push("catalog");
     return result;
   }, [principal]);
   const [section, setSection] = useState<Section>(available[0] ?? "lots");
   const [act, setAct] = useState<ReceiptAct | null>(null);
   const printAct = useMutation({ mutationFn: getReceiptAct, onSuccess: setAct });
-  const nav = [["lots", "Партии", Boxes], ["receive", "Приемка", PackagePlus], ["control", "Контроль", ClipboardCheck], ["custody", "Хранение", ArrowRightLeft], ["catalog", "Справочники", WarehouseIcon]] as const;
+  const nav = [["lots", "Партии", Boxes], ["receive", "Приемка", PackagePlus], ["control", "Контроль", ClipboardCheck], ["custody", "Хранение", ArrowRightLeft], ["continuity", t("inventory.continuity.tab"), HeartPulse], ["catalog", "Справочники", WarehouseIcon]] as const;
   if (queries.some((query) => query.isPending)) return <div className="state"><RefreshCw className="spin" size={24} /><span>Загрузка склада</span></div>;
   const failed = queries.find((query) => query.isError);
   if (failed) return <div className="state error"><AlertTriangle size={24} /><strong>{errorText(failed.error)}</strong></div>;
@@ -410,10 +415,11 @@ export default function InventoryView({ principal }: { principal: Principal }) {
   return <div className="view-stack inventory-view">
     <header className="view-header"><div><span className="eyebrow">Физический контур</span><h1>Склад и ответственность</h1><p>Приемка, независимый контроль и непрерывная цепочка хранения</p></div><div className="section-tabs">{nav.filter(([key]) => available.includes(key)).map(([key, label, Icon]) => <button className={section === key ? "active" : ""} onClick={() => setSection(key)} key={key}><Icon size={16} /><span>{label}</span></button>)}</div></header>
     <section className="metric-grid responsibility-metrics" aria-label="Состояние запасов"><article className="metric"><Boxes size={18} /><span>Партии</span><strong>{lotData.length}</strong></article><article className="metric"><ClipboardCheck size={18} /><span>Ждут контроля</span><strong>{lotData.filter((item) => item.status === "PENDING_VERIFICATION").length}</strong></article><article className="metric"><AlertTriangle size={18} /><span>Расхождения</span><strong>{discrepancies.data?.filter((item) => item.status === "OPEN").length ?? 0}</strong></article><article className="metric"><ArrowRightLeft size={18} /><span>В передаче</span><strong>{transfers.data?.filter((item) => item.status === "OFFERED").length ?? 0}</strong></article></section>
-    {section === "lots" ? <section className="panel"><div className="panel-heading"><h2>Реестр партий</h2><span>{lotData.length}</span></div><div className="table-wrap"><table className="inventory-table"><thead><tr><th>Статус</th><th>Партия и товар</th><th>Склад</th><th>Количество</th><th>Ответственный</th><th>Акт</th></tr></thead><tbody>{lotData.map((lot) => <tr key={lot.id}><td><StatusPill value={lot.status} /><small>{formatLocalDateTime(lot.updated_at)}</small></td><td><strong>{lot.lot_number}</strong><small>{productData.find((item) => item.id === lot.product_id)?.name ?? lot.product_id}</small></td><td><strong>{warehouseData.find((item) => item.id === lot.warehouse_id)?.name ?? lot.warehouse_id}</strong><small>{lot.storage_conditions}</small></td><td><strong>{displayQuantity(lot.current_quantity ?? lot.declared_quantity, units.data?.find((item) => item.id === lot.unit_id)?.decimal_scale ?? 12)}</strong><small>заявлено {displayQuantity(lot.declared_quantity, units.data?.find((item) => item.id === lot.unit_id)?.decimal_scale ?? 12)}</small></td><td><strong>{custodianData.find((item) => item.assignment_id === lot.custodian_assignment_id)?.display_name ?? "—"}</strong><small>{lot.custodian_assignment_id}</small></td><td><button className="icon-button" title="Открыть акт" onClick={() => printAct.mutate(lot.id)}><Printer size={16} /></button></td></tr>)}</tbody></table></div></section> : null}
+    {section === "lots" ? <section className="panel"><div className="panel-heading"><h2>Реестр партий</h2><span>{lotData.length}</span></div><div className="table-wrap"><table className="inventory-table"><thead><tr><th>Статус</th><th>Партия и товар</th><th>Склад</th><th>Количество</th><th>Ответственный</th><th>Акт</th></tr></thead><tbody>{lotData.map((lot) => <tr key={lot.id}><td><StatusPill value={lot.status} /><small>{formatLocalDateTime(lot.updated_at)}</small>{lot.continuity_hold_case_id ? <small className="continuity-hold-label">{t("inventory.continuity.lotHeld")}</small> : null}</td><td><strong>{lot.lot_number}</strong><small>{productData.find((item) => item.id === lot.product_id)?.name ?? lot.product_id}</small></td><td><strong>{warehouseData.find((item) => item.id === lot.warehouse_id)?.name ?? lot.warehouse_id}</strong><small>{lot.storage_conditions}</small></td><td><strong>{displayQuantity(lot.current_quantity ?? lot.declared_quantity, units.data?.find((item) => item.id === lot.unit_id)?.decimal_scale ?? 12)}</strong><small>заявлено {displayQuantity(lot.declared_quantity, units.data?.find((item) => item.id === lot.unit_id)?.decimal_scale ?? 12)}</small></td><td><strong>{custodianData.find((item) => item.assignment_id === lot.custodian_assignment_id)?.display_name ?? "—"}</strong><small>{lot.custodian_assignment_id}</small></td><td><button className="icon-button" title="Открыть акт" onClick={() => printAct.mutate(lot.id)}><Printer size={16} /></button></td></tr>)}</tbody></table></div></section> : null}
     {section === "receive" ? <ReceiveForm principal={principal} products={productData} units={units.data ?? []} warehouses={warehouseData} members={members.data ?? []} custodians={custodianData} onDone={refresh} /> : null}
     {section === "control" ? <ControlForm lots={lotData} products={productData} onDone={refresh} /> : null}
     {section === "custody" ? <CustodyView principal={principal} lots={lotData} warehouses={warehouseData} custodians={custodianData} transfers={transfers.data ?? []} onDone={refresh} /> : null}
+    {section === "continuity" ? <CustodyContinuitySection principal={principal} /> : null}
     {section === "catalog" ? <CatalogView cooperativeId={cooperativeId} units={units.data ?? []} onDone={refresh} /> : null}
     {printAct.isError ? <div className="state error"><AlertTriangle size={22} /><strong>{errorText(printAct.error)}</strong></div> : null}
     {act ? <ReceiptDialog act={act} onClose={() => setAct(null)} /> : null}

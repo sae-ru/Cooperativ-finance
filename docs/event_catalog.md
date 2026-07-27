@@ -352,3 +352,15 @@ request id; эти записи не подменяют подписанное �
 | `identity.member_continuity_blocked` | версия, состояние или состав связанных записей изменились; доступ остаётся остановлен |
 
 События подписываются node key, входят в hash-chain и outbox. Payload содержит безопасную evidence reference, идентификаторы, версии, статусы и агрегированные количества, но не тело заявления, адреса или иные персональные данные.
+
+## События аварийной передачи хранения Slice 27
+
+- `responsibility.custody_continuity_started` фиксирует основание, исходного и целевого участника, склад и число партий.
+- `responsibility.custody_hold_applied|custody_hold_released` фиксируют удержание каждой партии.
+- `inventory.emergency_count_attested|inventory.emergency_count_discrepancy` фиксируют именованный пересчет и content-addressed evidence.
+- `responsibility.temporary_custodian_approved|custody_continuity_rejected` фиксируют независимое решение.
+- `responsibility.emergency_custody_accepted|temporary_custodian_declined` фиксируют личное решение кандидата.
+- `responsibility.emergency_custody_transferred` фиксирует атомарную смену назначения каждой партии.
+- `responsibility.custody_continuity_blocked` фиксирует fail-closed причины изменения состояния.
+
+Все события подписываются node key, входят в hash-chain и outbox; audit связывает их с персональным пользователем и request id.

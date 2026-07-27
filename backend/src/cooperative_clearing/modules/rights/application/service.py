@@ -521,6 +521,8 @@ class CommodityRightsService:
         lot = await session.get(InventoryLot, redemption.lot_id, with_for_update=True)
         if lot is None or lot.status != LotStatus.VERIFIED.value or lot.current_quantity is None:
             raise rights_error("LOT_NOT_AVAILABLE", 409)
+        if lot.continuity_hold_case_id is not None:
+            raise rights_error("LOT_CUSTODY_CONTINUITY_HELD", 409)
         if (
             lot.warehouse_id != redemption.warehouse_id
             or lot.custodian_assignment_id != redemption.custodian_assignment_id

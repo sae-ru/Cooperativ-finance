@@ -249,6 +249,7 @@ class InventoryService:
         lot = await session.get(InventoryLot, lot_id, with_for_update=True)
         if lot is None:
             raise inventory_error("LOT_NOT_FOUND", 404)
+        self._ensure_no_continuity_hold(lot)
         ensure_can_attest(LotStatus(lot.status))
         self._version(lot.version, expected_version)
         if lot.received_by_user_id == principal.user_id:
@@ -436,6 +437,7 @@ class InventoryService:
         lot = await session.get(InventoryLot, lot_id, with_for_update=True)
         if lot is None:
             raise inventory_error("LOT_NOT_FOUND", 404)
+        self._ensure_no_continuity_hold(lot)
         ensure_can_record_discrepancy(LotStatus(lot.status))
         self._version(lot.version, expected_version)
         expected = lot.current_quantity
@@ -558,6 +560,7 @@ class InventoryService:
         lot = await session.get(InventoryLot, lot_id, with_for_update=True)
         if lot is None:
             raise inventory_error("LOT_NOT_FOUND", 404)
+        self._ensure_no_continuity_hold(lot)
         ensure_can_offer_custody(LotStatus(lot.status))
         self._version(lot.version, expected_version)
         from_responsibility, from_role = await self._custody_assignment(
@@ -672,6 +675,7 @@ class InventoryService:
         lot = await session.get(InventoryLot, transfer.lot_id, with_for_update=True)
         if lot is None:
             raise inventory_error("LOT_NOT_FOUND", 404)
+        self._ensure_no_continuity_hold(lot)
         self._version(lot.version, expected_lot_version)
         if lot.custodian_assignment_id != transfer.from_assignment_id:
             raise inventory_error("CUSTODY_SOURCE_CHANGED", 409)
@@ -820,6 +824,11 @@ class InventoryService:
                 for item in evidence
             ]
         )
+
+    @staticmethod
+    def _ensure_no_continuity_hold(lot: InventoryLot) -> None:
+        if lot.continuity_hold_case_id is not None:
+            raise inventory_error("LOT_CUSTODY_CONTINUITY_HELD", 409)
 
     @staticmethod
     def _version(current: int, expected: int) -> None:

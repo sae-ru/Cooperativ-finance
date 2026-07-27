@@ -39,6 +39,9 @@ from cooperative_clearing.modules.identity.application.bootstrap import (
 from cooperative_clearing.modules.identity.application.service_clients import (
     cleanup_service_client_runtime_state,
 )
+from cooperative_clearing.modules.inventory.application.custody_continuity_demo import (
+    seed_demo_custody_continuity,
+)
 from cooperative_clearing.modules.inventory.application.demo import (
     seed_demo_catalog,
     seed_demo_inventory,
@@ -115,6 +118,11 @@ async def seed_demo(settings: Settings) -> None:
                 catalog=catalog,
                 custody_a_id=custody_a_id,
                 custody_b_id=custody_b_id,
+            )
+            await seed_demo_custody_continuity(
+                session,
+                settings,
+                catalog=catalog,
             )
             await seed_demo_rights(
                 session,

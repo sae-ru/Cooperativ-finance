@@ -96,6 +96,7 @@ export type InventoryLot = {
   status: string;
   received_by_member_id: string;
   custodian_assignment_id: string;
+  continuity_hold_case_id: string | null;
   registered_event_id: string;
   verified_event_id: string | null;
   created_at: string;

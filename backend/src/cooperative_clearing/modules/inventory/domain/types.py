@@ -37,6 +37,21 @@ class CustodyStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class CustodyContinuityStatus(StrEnum):
+    INVENTORY_PENDING = "INVENTORY_PENDING"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    PENDING_ACCEPTANCE = "PENDING_ACCEPTANCE"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    BLOCKED = "BLOCKED"
+
+
+class CustodyContinuityItemStatus(StrEnum):
+    PENDING = "PENDING"
+    MATCH = "MATCH"
+    DISCREPANCY = "DISCREPANCY"
+
+
 class EvidenceStatus(StrEnum):
     PENDING = "PENDING"
     READY = "READY"

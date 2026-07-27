@@ -243,3 +243,16 @@ acceptance criteria и tests. Если строка карты меняется,
 | Воспроизводимый demo | `Svetlana Morozova`, suspended membership, pending exit case | repeated seed и live Docker inspection |
 | Миграция и контракт | revision `0033`, OpenAPI и typed frontend schema | downgrade/upgrade/check и snapshot gates |
 | Юридическое наследование/расчёты | намеренно не заявлены как закрытые | ADR-0013, OD-038 и external legal gate |
+
+## Slice 27 trace
+
+| Требование | Реализация и доказательство |
+|---|---|
+| Заблокировать ключи умершего/недееспособного | подтвержденный Slice 26 `DEATH_OR_INCAPACITY`; только contained source |
+| Провести инвентаризацию | per-lot item, независимый контролер, обязательное evidence |
+| Два независимых подтверждения | отдельный `SECURITY_ADMIN` с TOTP и личная приемка кандидатом |
+| Прежний ответственный до приемки | `custodian_assignment_id` не меняется до candidate acceptance; integration test |
+| Не допустить анонимный комитет | requester, counter, approver и accepter записаны персонально в case, event и audit |
+| Остановить операции на время | `continuity_hold_case_id` блокирует контроль, расхождение, передачу и погашение права |
+| Не наследовать роль и репутацию | создается новое временное назначение; исходная роль, паи и репутация не переносятся |
+| Юридическая собственность и наследники | намеренно не заявлены закрытыми; OD-019, OD-033, OD-038 |

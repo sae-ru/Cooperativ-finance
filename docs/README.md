@@ -100,6 +100,7 @@
 - [Реализованный Slice 24: жизненный цикл внешних интеграций](implemented_slice_24.md)
 - [Реализованный Slice 25: безопасное объединение дубликатов](implemented_slice_25.md)
 - [Реализованный Slice 26: контролируемый выход и преемственность](implemented_slice_26.md)
+- [Реализованный Slice 27: аварийная непрерывность физического хранения](implemented_slice_27.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

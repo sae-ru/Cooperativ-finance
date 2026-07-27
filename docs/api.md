@@ -432,3 +432,9 @@ Request содержит cooperative, source/survivor UUID, версии обе�
 | `POST` | `/api/v1/admin/member-continuity-cases/{continuity_case_id}/decision` | независимое TOTP-защищённое решение |
 
 Создание разрешено только постоянной персональной роли `MEMBER_REGISTRAR`, `COOPERATIVE_ADMIN` или `SECURITY_ADMIN`. Решение принимает другой постоянный персональный `SECURITY_ADMIN`; временное полномочие и собственное дело отклоняются. Mutating requests используют `Idempotency-Key`, expected version и request id. `409` означает self-review, stale state либо fail-closed блокировку; машинный код преобразуется GUI в понятное RU/EN сообщение.
+
+## Аварийная передача хранения Slice 27
+
+`GET /api/v1/inventory/custody-continuity-cases` возвращает scoped дела и строки пересчета. `GET /custody-continuity-sources` показывает только подтвержденные случаи смерти или недееспособности с активным складским назначением и партиями. `GET /custody-continuity-candidates` требует постоянную административную роль и исключает уже ответственных за склад.
+
+Команды создания, пересчета, защищенного решения и личной приемки описаны в [implemented_slice_27.md](implemented_slice_27.md). Все команды версионированы и идемпотентны; решение `SECURITY_ADMIN` требует step-up. HTTP `201` означает сохраненное подписанное событие, а `BLOCKED` является успешным fail-closed результатом, а не скрытой серверной ошибкой.

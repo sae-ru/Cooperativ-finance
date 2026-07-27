@@ -7,6 +7,11 @@ describe("LanguageBoundary translator", () => {
   it("renders Russian labels for machine values without changing identifiers", () => {
     const translate = createTranslator(getPhraseMap("ru"), getValueMap("ru"));
 
+    expect(translate("Emergency continuity warehouse, receiving desk"))
+      .toBe("Склад аварийной преемственности, зона приёмки");
+    expect(translate("Dry room")).toBe("Сухое помещение");
+
+
     expect(translate("ACTIVE")).toBe("Действует");
     expect(translate("WARNING · LOW")).toBe("Предупреждение · Низкий");
     expect(translate("Статус: AUTH_LOGIN · SUCCESS")).toBe("Статус: Вход · Успешно");
@@ -22,6 +27,9 @@ describe("LanguageBoundary translator", () => {
 
   it("renders English labels for legacy Russian text and machine values", () => {
     const translate = createTranslator(getPhraseMap("en"), getValueMap("en"));
+
+    expect(translate("Капуста свежая · DEMO-EMERGENCY-001"))
+      .toBe("Fresh cabbage · DEMO-EMERGENCY-001");
 
     expect(translate("Администратор безопасности узла")).toBe("Node security administrator");
     expect(translate("AUTHORIZATION_DENIED · DENIED")).toBe("Authorization denied · Denied");

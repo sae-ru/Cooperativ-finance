@@ -628,3 +628,9 @@ timestamps. Завершение membership сохраняет `ended_at`; от�
 Revision `0033_member_continuity` создаёт `identity.member_continuity_cases`. Запись хранит cooperative/member scope, тип `VOLUNTARY_EXIT|DEATH_OR_INCAPACITY`, lifecycle `PENDING_REVIEW|CONFIRMED|REJECTED|BLOCKED`, requester/decider, evidence reference, versioned snapshot затронутых Member/User/Membership, сгруппированную сводку внешних ссылок, blockers, timestamps и optimistic version.
 
 `MemberStatus` расширен значениями `EXIT_PENDING`, `DECEASED_OR_INCAPACITATED`, `SUCCESSION_REVIEW` и `CLOSED`. Partial unique index допускает только одно незавершённое дело на участника. Экономические FK не перенаправляются: запись дела является контуром остановки и доказательства, а не универсальным succession mapping. Downgrade fail-closed запрещён при наличии continuity cases или новых статусов.
+
+## Модель аварийной передачи хранения Slice 27
+
+Revision `0034_custody_continuity` создает `assets.custody_continuity_cases`, `assets.custody_continuity_items` и nullable FK `assets.inventory_lots.continuity_hold_case_id`. Case связывает подтвержденный `MemberContinuityCase`, исходное и временное назначения, склад, участников каждого решения, срок, доказательства, blockers и версии. Item фиксирует снимок версии и количества партии, фактический пересчет и доказательство.
+
+Partial unique index запрещает параллельные незавершенные дела на одно исходное назначение. Hold является частью самой партии и блокирует обычные мутации. История не удаляется, а downgrade fail-closed запрещен после появления дел.

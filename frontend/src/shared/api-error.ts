@@ -70,7 +70,32 @@ export function userErrorMessage(error: unknown, language?: string): string {
   ) {
     return translate("errors.memberContinuityBlocked");
   }
-  if (code === "MEMBER_MERGE_INDEPENDENT_REVIEW_REQUIRED") {
+  if (code === "INDEPENDENT_CUSTODY_INVENTORY_REQUIRED") {
+    return translate("errors.custodyContinuityIndependentInventory");
+  }
+  if (code === "INDEPENDENT_CUSTODY_APPROVER_REQUIRED") {
+    return translate("errors.custodyContinuityIndependentApproval");
+  }
+  if (code === "CUSTODY_CONTINUITY_TARGET_REQUIRED") {
+    return translate("errors.custodyContinuityTarget");
+  }
+  if (code === "LOT_CUSTODY_CONTINUITY_HELD") {
+    return translate("errors.custodyContinuityHeld");
+  }
+  if (
+    code === "CUSTODY_CONTINUITY_EVIDENCE_INVALID" ||
+    code === "CUSTODY_CONTINUITY_EXPIRY_INVALID" ||
+    code === "CUSTODY_CONTINUITY_PLACE_INVALID" ||
+    code === "CUSTODY_CONTINUITY_CONDITION_INVALID"
+  ) {
+    return translate("errors.custodyContinuityEvidence");
+  }
+  if (
+    code.startsWith("CUSTODY_CONTINUITY_") ||
+    code.startsWith("CUSTODY_SOURCE_")
+  ) {
+    return translate("errors.custodyContinuityBlocked");
+  }  if (code === "MEMBER_MERGE_INDEPENDENT_REVIEW_REQUIRED") {
     return translate("errors.memberMergeIndependentReview");
   }
   if (code === "MEMBER_MERGE_CROSS_COOPERATIVE_UNSUPPORTED") {
