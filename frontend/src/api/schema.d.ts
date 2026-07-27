@@ -385,6 +385,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/service-client-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Service Client Requests */
+        get: operations["list_service_client_requests_api_v1_admin_service_client_requests_get"];
+        put?: never;
+        /** Request Service Client Change */
+        post: operations["request_service_client_change_api_v1_admin_service_client_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/service-client-requests/{change_request_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Service Client Change */
+        post: operations["decide_service_client_change_api_v1_admin_service_client_requests__change_request_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/service-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Service Clients */
+        get: operations["list_service_clients_api_v1_admin_service_clients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/service-clients/{service_client_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Service Client */
+        post: operations["revoke_service_client_api_v1_admin_service_clients__service_client_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/service-clients/{service_client_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend Service Client */
+        post: operations["suspend_service_client_api_v1_admin_service_clients__service_client_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/sessions": {
         parameters: {
             query?: never;
@@ -3963,6 +4049,74 @@ export interface paths {
         put?: never;
         /** Decide Related Link */
         post: operations["decide_related_link_api_v1_risk_related_links__link_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service-auth/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue Service Token */
+        post: operations["issue_service_token_api_v1_service_auth_token_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service/catalog/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Catalog Search */
+        post: operations["service_catalog_search_api_v1_service_catalog_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service/clearing/cycles/{cycle_id}/accounting-export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Service Accounting Export */
+        get: operations["service_accounting_export_api_v1_service_clearing_cycles__cycle_id__accounting_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Service Context */
+        get: operations["service_context_api_v1_service_context_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11685,6 +11839,333 @@ export interface components {
             /** Totp Enabled */
             totp_enabled: boolean;
         };
+        /** ServiceClientChangeRequest */
+        ServiceClientChangeRequest: {
+            config?: components["schemas"]["ServiceClientConfigRequest"] | null;
+            /** Expected Client Version */
+            expected_client_version?: number | null;
+            operation: components["schemas"]["ServiceClientRequestOperation"];
+            /**
+             * Owner Cooperative Id
+             * Format: uuid
+             */
+            owner_cooperative_id: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Service Client Id */
+            service_client_id?: string | null;
+        };
+        /** ServiceClientCollection */
+        ServiceClientCollection: {
+            /** Data */
+            data: components["schemas"]["ServiceClientResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ServiceClientCommandEnvelope */
+        ServiceClientCommandEnvelope: {
+            data: components["schemas"]["ServiceClientCommandResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ServiceClientCommandResponse */
+        ServiceClientCommandResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /** ServiceClientConfigRequest */
+        ServiceClientConfigRequest: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Network Allowlist */
+            network_allowlist: string[];
+            /** Rate Limit Per Minute */
+            rate_limit_per_minute: number;
+            /** Scopes */
+            scopes: components["schemas"]["ServiceScope"][];
+            /** Technical Contact Email */
+            technical_contact_email: string;
+            /** Technical Contact Name */
+            technical_contact_name: string;
+        };
+        /** ServiceClientDecisionEnvelope */
+        ServiceClientDecisionEnvelope: {
+            data: components["schemas"]["ServiceClientDecisionResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ServiceClientDecisionRequest */
+        ServiceClientDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** ServiceClientDecisionResponse */
+        ServiceClientDecisionResponse: {
+            /** Client Code */
+            client_code: string | null;
+            /** Credential Expires At */
+            credential_expires_at: string | null;
+            /** Credential Secret */
+            credential_secret: string | null;
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+            /** Service Client Id */
+            service_client_id: string | null;
+        };
+        /** ServiceClientProtectiveRequest */
+        ServiceClientProtectiveRequest: {
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** ServiceClientRequestCollection */
+        ServiceClientRequestCollection: {
+            /** Data */
+            data: components["schemas"]["ServiceClientRequestResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /**
+         * ServiceClientRequestOperation
+         * @enum {string}
+         */
+        ServiceClientRequestOperation: "CREATE" | "UPDATE" | "ROTATE" | "REACTIVATE";
+        /** ServiceClientRequestResponse */
+        ServiceClientRequestResponse: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: string | null;
+            /** Decision Reason Code */
+            decision_reason_code: string | null;
+            /** Expected Client Version */
+            expected_client_version: number | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Issued Credential Id */
+            issued_credential_id: string | null;
+            operation: components["schemas"]["ServiceClientRequestOperation"];
+            /**
+             * Owner Cooperative Id
+             * Format: uuid
+             */
+            owner_cooperative_id: string;
+            /** Proposed Config */
+            proposed_config: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /** Service Client Id */
+            service_client_id: string | null;
+            status: components["schemas"]["ServiceClientRequestStatus"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * ServiceClientRequestStatus
+         * @enum {string}
+         */
+        ServiceClientRequestStatus: "PENDING" | "APPROVED" | "REJECTED";
+        /** ServiceClientResponse */
+        ServiceClientResponse: {
+            /**
+             * Approved By User Id
+             * Format: uuid
+             */
+            approved_by_user_id: string;
+            /** Client Code */
+            client_code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Effective Status
+             * @enum {string}
+             */
+            effective_status: "ACTIVE" | "SUSPENDED" | "REVOKED" | "EXPIRED";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Network Allowlist */
+            network_allowlist: string[];
+            /**
+             * Owner Cooperative Id
+             * Format: uuid
+             */
+            owner_cooperative_id: string;
+            /** Rate Limit Per Minute */
+            rate_limit_per_minute: number;
+            /**
+             * Registered By User Id
+             * Format: uuid
+             */
+            registered_by_user_id: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Scopes */
+            scopes: components["schemas"]["ServiceScope"][];
+            status: components["schemas"]["ServiceClientStatus"];
+            /** Suspended At */
+            suspended_at: string | null;
+            /** Technical Contact Email */
+            technical_contact_email: string;
+            /** Technical Contact Name */
+            technical_contact_name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * ServiceClientStatus
+         * @enum {string}
+         */
+        ServiceClientStatus: "ACTIVE" | "SUSPENDED" | "REVOKED";
+        /** ServiceContextEnvelope */
+        ServiceContextEnvelope: {
+            data: components["schemas"]["ServiceContextResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ServiceContextResponse */
+        ServiceContextResponse: {
+            /** Client Id */
+            client_id: string;
+            /**
+             * Owner Cooperative Id
+             * Format: uuid
+             */
+            owner_cooperative_id: string;
+            /** Scopes */
+            scopes: components["schemas"]["ServiceScope"][];
+            /**
+             * Service Client Id
+             * Format: uuid
+             */
+            service_client_id: string;
+            /** Source Ip */
+            source_ip: string;
+        };
+        /**
+         * ServiceScope
+         * @enum {string}
+         */
+        ServiceScope: "catalog:read" | "clearing:accounting:read";
+        /** ServiceTokenEnvelope */
+        ServiceTokenEnvelope: {
+            data: components["schemas"]["ServiceTokenResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** ServiceTokenRequest */
+        ServiceTokenRequest: {
+            /** Client Id */
+            client_id: string;
+            /**
+             * Client Secret
+             * Format: password
+             */
+            client_secret: string;
+        };
+        /** ServiceTokenResponse */
+        ServiceTokenResponse: {
+            /**
+             * Access Expires At
+             * Format: date-time
+             */
+            access_expires_at: string;
+            /** Access Token */
+            access_token: string;
+            /** Client Id */
+            client_id: string;
+            /**
+             * Owner Cooperative Id
+             * Format: uuid
+             */
+            owner_cooperative_id: string;
+            /** Scopes */
+            scopes: components["schemas"]["ServiceScope"][];
+            /**
+             * Service Client Id
+             * Format: uuid
+             */
+            service_client_id: string;
+            /**
+             * Token Type
+             * @default Bearer
+             * @constant
+             */
+            token_type: "Bearer";
+        };
         /** SessionAdminResponse */
         SessionAdminResponse: {
             /**
@@ -15041,6 +15522,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_service_client_requests_api_v1_admin_service_client_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientRequestCollection"];
+                };
+            };
+        };
+    };
+    request_service_client_change_api_v1_admin_service_client_requests_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceClientChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_service_client_change_api_v1_admin_service_client_requests__change_request_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                change_request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceClientDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientDecisionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_service_clients_api_v1_admin_service_clients_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientCollection"];
+                };
+            };
+        };
+    };
+    revoke_service_client_api_v1_admin_service_clients__service_client_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                service_client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceClientProtectiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspend_service_client_api_v1_admin_service_clients__service_client_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                service_client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceClientProtectiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceClientCommandEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -22898,6 +23565,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_service_token_api_v1_service_auth_token_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceTokenEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_catalog_search_api_v1_service_catalog_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_accounting_export_api_v1_service_clearing_cycles__cycle_id__accounting_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cycle_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectEnvelope_AccountingExportResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_context_api_v1_service_context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceContextEnvelope"];
                 };
             };
         };

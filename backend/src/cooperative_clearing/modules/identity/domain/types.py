@@ -51,6 +51,42 @@ class MemberImportRowStatus(StrEnum):
     APPLIED = "APPLIED"
 
 
+class ServiceClientStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    REVOKED = "REVOKED"
+
+
+class ServiceClientRequestOperation(StrEnum):
+    CREATE = "CREATE"
+    UPDATE = "UPDATE"
+    ROTATE = "ROTATE"
+    REACTIVATE = "REACTIVATE"
+
+
+class ServiceClientRequestStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class ServiceCredentialStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    RETIRED = "RETIRED"
+    REVOKED = "REVOKED"
+
+
+class ServiceTokenStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    REVOKED = "REVOKED"
+    EXPIRED = "EXPIRED"
+
+
+class ServiceScope(StrEnum):
+    CATALOG_READ = "catalog:read"
+    CLEARING_ACCOUNTING_READ = "clearing:accounting:read"
+
+
 class AssignmentStatus(StrEnum):
     PENDING_APPROVAL = "PENDING_APPROVAL"
     ACTIVE = "ACTIVE"
@@ -132,12 +168,8 @@ MEMBERSHIP_TRANSITIONS: dict[MembershipStatus, frozenset[MembershipStatus]] = {
     MembershipStatus.PENDING: frozenset(
         {MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.ENDED}
     ),
-    MembershipStatus.ACTIVE: frozenset(
-        {MembershipStatus.SUSPENDED, MembershipStatus.ENDED}
-    ),
-    MembershipStatus.SUSPENDED: frozenset(
-        {MembershipStatus.ACTIVE, MembershipStatus.ENDED}
-    ),
+    MembershipStatus.ACTIVE: frozenset({MembershipStatus.SUSPENDED, MembershipStatus.ENDED}),
+    MembershipStatus.SUSPENDED: frozenset({MembershipStatus.ACTIVE, MembershipStatus.ENDED}),
     MembershipStatus.ENDED: frozenset(),
 }
 
@@ -252,9 +284,7 @@ def ensure_member_transition(current: MemberStatus, target: MemberStatus) -> Non
         )
 
 
-def ensure_cooperative_transition(
-    current: CooperativeStatus, target: CooperativeStatus
-) -> None:
+def ensure_cooperative_transition(current: CooperativeStatus, target: CooperativeStatus) -> None:
     if target not in COOPERATIVE_TRANSITIONS[current]:
         raise DomainError(
             code="COOPERATIVE_STATUS_TRANSITION_INVALID",
@@ -264,9 +294,7 @@ def ensure_cooperative_transition(
         )
 
 
-def ensure_membership_transition(
-    current: MembershipStatus, target: MembershipStatus
-) -> None:
+def ensure_membership_transition(current: MembershipStatus, target: MembershipStatus) -> None:
     if target not in MEMBERSHIP_TRANSITIONS[current]:
         raise DomainError(
             code="MEMBERSHIP_STATUS_TRANSITION_INVALID",

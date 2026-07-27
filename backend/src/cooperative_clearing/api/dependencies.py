@@ -7,9 +7,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from cooperative_clearing.modules.audit.infrastructure.repository import AuditRepository
 from cooperative_clearing.modules.identity.application.authentication import AuthenticationService
+from cooperative_clearing.modules.identity.application.service_clients import (
+    ServiceClientService,
+    ServicePrincipal,
+)
 from cooperative_clearing.modules.identity.domain.types import Principal
 from cooperative_clearing.shared.core.config import Settings
-from cooperative_clearing.shared.domain.errors import ServiceNotReadyError
+from cooperative_clearing.shared.domain.errors import DomainError, ServiceNotReadyError
 from cooperative_clearing.shared.infrastructure.database import Database
 
 
@@ -70,3 +74,39 @@ async def get_principal(
 
 
 PrincipalDependency = Annotated[Principal, Depends(get_principal)]
+
+
+async def get_service_principal(
+    request: Request,
+    settings: SettingsDependency,
+    database: DatabaseDependency,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> ServicePrincipal:
+    if credentials is None or credentials.scheme.casefold() != "bearer":
+        raise DomainError(
+            code="SERVICE_AUTHENTICATION_REQUIRED",
+            message_key="errors.identity.service_authentication_required",
+            status_code=401,
+        )
+    if request.client is None:
+        raise DomainError(
+            code="SERVICE_NETWORK_DENIED",
+            message_key="errors.identity.service_network_denied",
+            status_code=403,
+        )
+    async with database.session() as session:
+        try:
+            principal = await ServiceClientService(settings).principal_for_access(
+                session,
+                access_token=credentials.credentials,
+                source_ip=request.client.host,
+            )
+            await session.commit()
+        except DomainError:
+            await session.commit()
+            raise
+    request.state.service_principal = principal
+    return principal
+
+
+ServicePrincipalDependency = Annotated[ServicePrincipal, Depends(get_service_principal)]

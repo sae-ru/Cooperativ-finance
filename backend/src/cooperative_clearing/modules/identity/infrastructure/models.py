@@ -16,6 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -564,3 +565,203 @@ class BreakGlassGrant(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class ServiceClient(Base):
+    __tablename__ = "service_clients"
+    __table_args__ = (
+        CheckConstraint("status IN ('ACTIVE','SUSPENDED','REVOKED')", name="status_allowed"),
+        CheckConstraint("rate_limit_per_minute BETWEEN 1 AND 6000", name="rate_limit_bounded"),
+        CheckConstraint(
+            "jsonb_typeof(scopes) = 'array' AND jsonb_array_length(scopes) >= 1",
+            name="scopes_nonempty_array",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(network_allowlist) = 'array' "
+            "AND jsonb_array_length(network_allowlist) >= 1",
+            name="network_allowlist_nonempty_array",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("ix_service_clients_owner_status", "owner_cooperative_id", "status", "created_at"),
+        Index(
+            "uq_service_clients_owner_name_live",
+            "owner_cooperative_id",
+            text("lower(display_name)"),
+            unique=True,
+            postgresql_where=text("status <> 'REVOKED'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    client_code: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
+    owner_cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    technical_contact_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    technical_contact_email: Mapped[str] = mapped_column(String(254), nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    network_allowlist: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    rate_limit_per_minute: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    registered_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    approved_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class ServiceClientCredential(Base):
+    __tablename__ = "service_client_credentials"
+    __table_args__ = (
+        CheckConstraint("status IN ('ACTIVE','RETIRED','REVOKED')", name="status_allowed"),
+        Index("ix_service_client_credentials_client_status", "service_client_id", "status"),
+        Index(
+            "uq_service_client_credentials_active",
+            "service_client_id",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    service_client_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.service_clients.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    secret_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    secret_prefix: Mapped[str] = mapped_column(String(24), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    issued_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ServiceClientRequest(Base):
+    __tablename__ = "service_client_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "operation IN ('CREATE','UPDATE','ROTATE','REACTIVATE')", name="operation_allowed"
+        ),
+        CheckConstraint("status IN ('PENDING','APPROVED','REJECTED')", name="status_allowed"),
+        CheckConstraint(
+            "decided_by_user_id IS NULL OR decided_by_user_id <> requested_by_user_id",
+            name="independent_reviewer",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "ix_service_client_requests_owner_status",
+            "owner_cooperative_id",
+            "status",
+            "created_at",
+        ),
+        Index(
+            "uq_service_client_requests_pending_client",
+            "service_client_id",
+            unique=True,
+            postgresql_where=text("status = 'PENDING' AND service_client_id IS NOT NULL"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    service_client_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.service_clients.id", ondelete="RESTRICT")
+    )
+    owner_cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    operation: Mapped[str] = mapped_column(String(16), nullable=False)
+    proposed_config: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    expected_client_version: Mapped[int | None] = mapped_column(Integer)
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT"), nullable=False
+    )
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decision_reason_code: Mapped[str | None] = mapped_column(String(100))
+    issued_credential_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.service_client_credentials.id", ondelete="RESTRICT"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class ServiceClientAccessToken(Base):
+    __tablename__ = "service_client_access_tokens"
+    __table_args__ = (
+        CheckConstraint("status IN ('ACTIVE','REVOKED','EXPIRED')", name="status_allowed"),
+        Index("ix_service_client_access_tokens_client_status", "service_client_id", "status"),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    service_client_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.service_clients.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    credential_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.service_client_credentials.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    access_token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    source_ip: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ServiceClientRateBucket(Base):
+    __tablename__ = "service_client_rate_buckets"
+    __table_args__ = (
+        CheckConstraint("request_count >= 1", name="request_count_positive"),
+        {"schema": "identity"},
+    )
+
+    service_client_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.service_clients.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)

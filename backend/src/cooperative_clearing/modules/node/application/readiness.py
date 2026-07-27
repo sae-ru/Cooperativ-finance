@@ -10,7 +10,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import validate_node_signing_seed
 from cooperative_clearing.shared.infrastructure.database import Database
 
-EXPECTED_SCHEMA_REVISION = "0030_safe_member_intake"
+EXPECTED_SCHEMA_REVISION = "0031_service_client_lifecycle"
 
 
 @dataclass(frozen=True, slots=True)

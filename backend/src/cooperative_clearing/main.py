@@ -32,6 +32,9 @@ from cooperative_clearing.api.responsibility_candidates import (
 )
 from cooperative_clearing.api.rights import router as rights_router
 from cooperative_clearing.api.risk import router as risk_router
+from cooperative_clearing.api.service_clients import admin_router as service_client_admin_router
+from cooperative_clearing.api.service_clients import auth_router as service_client_auth_router
+from cooperative_clearing.api.service_clients import service_router as service_client_router
 from cooperative_clearing.api.solidarity import router as solidarity_router
 from cooperative_clearing.api.system import router as system_router
 from cooperative_clearing.api.trust import router as trust_router
@@ -76,6 +79,9 @@ def create_app(settings: Settings | None = None, *, manage_runtime: bool = True)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(service_client_admin_router)
+    app.include_router(service_client_auth_router)
+    app.include_router(service_client_router)
     app.include_router(antifraud_router)
     app.include_router(clearing_router)
     app.include_router(crisis_router)

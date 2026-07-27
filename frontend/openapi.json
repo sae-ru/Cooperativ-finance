@@ -16807,6 +16807,815 @@
         "title": "SecurityStateResponse",
         "type": "object"
       },
+      "ServiceClientChangeRequest": {
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceClientConfigRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_client_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Client Version"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/ServiceClientRequestOperation"
+          },
+          "owner_cooperative_id": {
+            "format": "uuid",
+            "title": "Owner Cooperative Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "service_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Client Id"
+          }
+        },
+        "required": [
+          "owner_cooperative_id",
+          "operation",
+          "reason_code"
+        ],
+        "title": "ServiceClientChangeRequest",
+        "type": "object"
+      },
+      "ServiceClientCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceClientResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceClientCollection",
+        "type": "object"
+      },
+      "ServiceClientCommandEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ServiceClientCommandResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceClientCommandEnvelope",
+        "type": "object"
+      },
+      "ServiceClientCommandResponse": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event_id",
+          "object_id"
+        ],
+        "title": "ServiceClientCommandResponse",
+        "type": "object"
+      },
+      "ServiceClientConfigRequest": {
+        "properties": {
+          "display_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "network_allowlist": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Network Allowlist",
+            "type": "array"
+          },
+          "rate_limit_per_minute": {
+            "maximum": 6000.0,
+            "minimum": 1.0,
+            "title": "Rate Limit Per Minute",
+            "type": "integer"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceScope"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array"
+          },
+          "technical_contact_email": {
+            "maxLength": 254,
+            "minLength": 5,
+            "title": "Technical Contact Email",
+            "type": "string"
+          },
+          "technical_contact_name": {
+            "maxLength": 200,
+            "minLength": 2,
+            "title": "Technical Contact Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name",
+          "technical_contact_name",
+          "technical_contact_email",
+          "scopes",
+          "network_allowlist",
+          "rate_limit_per_minute",
+          "expires_at"
+        ],
+        "title": "ServiceClientConfigRequest",
+        "type": "object"
+      },
+      "ServiceClientDecisionEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ServiceClientDecisionResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceClientDecisionEnvelope",
+        "type": "object"
+      },
+      "ServiceClientDecisionRequest": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve",
+          "reason_code",
+          "expected_version"
+        ],
+        "title": "ServiceClientDecisionRequest",
+        "type": "object"
+      },
+      "ServiceClientDecisionResponse": {
+        "properties": {
+          "client_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Code"
+          },
+          "credential_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Expires At"
+          },
+          "credential_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Secret"
+          },
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "service_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Client Id"
+          }
+        },
+        "required": [
+          "event_id",
+          "object_id",
+          "service_client_id",
+          "client_code",
+          "credential_secret",
+          "credential_expires_at"
+        ],
+        "title": "ServiceClientDecisionResponse",
+        "type": "object"
+      },
+      "ServiceClientProtectiveRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason_code",
+          "expected_version"
+        ],
+        "title": "ServiceClientProtectiveRequest",
+        "type": "object"
+      },
+      "ServiceClientRequestCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceClientRequestResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceClientRequestCollection",
+        "type": "object"
+      },
+      "ServiceClientRequestOperation": {
+        "enum": [
+          "CREATE",
+          "UPDATE",
+          "ROTATE",
+          "REACTIVATE"
+        ],
+        "title": "ServiceClientRequestOperation",
+        "type": "string"
+      },
+      "ServiceClientRequestResponse": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "decision_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason Code"
+          },
+          "expected_client_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Client Version"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issued_credential_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued Credential Id"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/ServiceClientRequestOperation"
+          },
+          "owner_cooperative_id": {
+            "format": "uuid",
+            "title": "Owner Cooperative Id",
+            "type": "string"
+          },
+          "proposed_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Config"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "service_client_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Client Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServiceClientRequestStatus"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "service_client_id",
+          "owner_cooperative_id",
+          "operation",
+          "proposed_config",
+          "expected_client_version",
+          "reason_code",
+          "status",
+          "requested_by_user_id",
+          "decided_by_user_id",
+          "decision_reason_code",
+          "issued_credential_id",
+          "created_at",
+          "expires_at",
+          "decided_at",
+          "version"
+        ],
+        "title": "ServiceClientRequestResponse",
+        "type": "object"
+      },
+      "ServiceClientRequestStatus": {
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "REJECTED"
+        ],
+        "title": "ServiceClientRequestStatus",
+        "type": "string"
+      },
+      "ServiceClientResponse": {
+        "properties": {
+          "approved_by_user_id": {
+            "format": "uuid",
+            "title": "Approved By User Id",
+            "type": "string"
+          },
+          "client_code": {
+            "title": "Client Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "effective_status": {
+            "enum": [
+              "ACTIVE",
+              "SUSPENDED",
+              "REVOKED",
+              "EXPIRED"
+            ],
+            "title": "Effective Status",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "network_allowlist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Network Allowlist",
+            "type": "array"
+          },
+          "owner_cooperative_id": {
+            "format": "uuid",
+            "title": "Owner Cooperative Id",
+            "type": "string"
+          },
+          "rate_limit_per_minute": {
+            "title": "Rate Limit Per Minute",
+            "type": "integer"
+          },
+          "registered_by_user_id": {
+            "format": "uuid",
+            "title": "Registered By User Id",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceScope"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ServiceClientStatus"
+          },
+          "suspended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suspended At"
+          },
+          "technical_contact_email": {
+            "title": "Technical Contact Email",
+            "type": "string"
+          },
+          "technical_contact_name": {
+            "title": "Technical Contact Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "client_code",
+          "owner_cooperative_id",
+          "display_name",
+          "technical_contact_name",
+          "technical_contact_email",
+          "scopes",
+          "network_allowlist",
+          "rate_limit_per_minute",
+          "status",
+          "effective_status",
+          "expires_at",
+          "registered_by_user_id",
+          "approved_by_user_id",
+          "created_at",
+          "updated_at",
+          "suspended_at",
+          "revoked_at",
+          "version"
+        ],
+        "title": "ServiceClientResponse",
+        "type": "object"
+      },
+      "ServiceClientStatus": {
+        "enum": [
+          "ACTIVE",
+          "SUSPENDED",
+          "REVOKED"
+        ],
+        "title": "ServiceClientStatus",
+        "type": "string"
+      },
+      "ServiceContextEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ServiceContextResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceContextEnvelope",
+        "type": "object"
+      },
+      "ServiceContextResponse": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "owner_cooperative_id": {
+            "format": "uuid",
+            "title": "Owner Cooperative Id",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceScope"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "service_client_id": {
+            "format": "uuid",
+            "title": "Service Client Id",
+            "type": "string"
+          },
+          "source_ip": {
+            "title": "Source Ip",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_client_id",
+          "client_id",
+          "owner_cooperative_id",
+          "scopes",
+          "source_ip"
+        ],
+        "title": "ServiceContextResponse",
+        "type": "object"
+      },
+      "ServiceScope": {
+        "enum": [
+          "catalog:read",
+          "clearing:accounting:read"
+        ],
+        "title": "ServiceScope",
+        "type": "string"
+      },
+      "ServiceTokenEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ServiceTokenResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "ServiceTokenEnvelope",
+        "type": "object"
+      },
+      "ServiceTokenRequest": {
+        "properties": {
+          "client_id": {
+            "maxLength": 63,
+            "minLength": 5,
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "format": "password",
+            "title": "Client Secret",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "client_id",
+          "client_secret"
+        ],
+        "title": "ServiceTokenRequest",
+        "type": "object"
+      },
+      "ServiceTokenResponse": {
+        "properties": {
+          "access_expires_at": {
+            "format": "date-time",
+            "title": "Access Expires At",
+            "type": "string"
+          },
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "owner_cooperative_id": {
+            "format": "uuid",
+            "title": "Owner Cooperative Id",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceScope"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "service_client_id": {
+            "format": "uuid",
+            "title": "Service Client Id",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "Bearer",
+            "default": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "access_expires_at",
+          "service_client_id",
+          "client_id",
+          "owner_cooperative_id",
+          "scopes"
+        ],
+        "title": "ServiceTokenResponse",
+        "type": "object"
+      },
       "SessionAdminResponse": {
         "properties": {
           "access_expires_at": {
@@ -23982,6 +24791,322 @@
         "summary": "Revoke Role",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/service-client-requests": {
+      "get": {
+        "operationId": "list_service_client_requests_api_v1_admin_service_client_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientRequestCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Service Client Requests",
+        "tags": [
+          "service-clients"
+        ]
+      },
+      "post": {
+        "operationId": "request_service_client_change_api_v1_admin_service_client_requests_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceClientChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Service Client Change",
+        "tags": [
+          "service-clients"
+        ]
+      }
+    },
+    "/api/v1/admin/service-client-requests/{change_request_id}/decision": {
+      "post": {
+        "operationId": "decide_service_client_change_api_v1_admin_service_client_requests__change_request_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Change Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceClientDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientDecisionEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Service Client Change",
+        "tags": [
+          "service-clients"
+        ]
+      }
+    },
+    "/api/v1/admin/service-clients": {
+      "get": {
+        "operationId": "list_service_clients_api_v1_admin_service_clients_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Service Clients",
+        "tags": [
+          "service-clients"
+        ]
+      }
+    },
+    "/api/v1/admin/service-clients/{service_client_id}/revoke": {
+      "post": {
+        "operationId": "revoke_service_client_api_v1_admin_service_clients__service_client_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceClientProtectiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Service Client",
+        "tags": [
+          "service-clients"
+        ]
+      }
+    },
+    "/api/v1/admin/service-clients/{service_client_id}/suspend": {
+      "post": {
+        "operationId": "suspend_service_client_api_v1_admin_service_clients__service_client_id__suspend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_client_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Service Client Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceClientProtectiveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceClientCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Suspend Service Client",
+        "tags": [
+          "service-clients"
         ]
       }
     },
@@ -37530,6 +38655,167 @@
         "summary": "Decide Related Link",
         "tags": [
           "bounded-risk"
+        ]
+      }
+    },
+    "/api/v1/service-auth/token": {
+      "post": {
+        "operationId": "issue_service_token_api_v1_service_auth_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceTokenEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Issue Service Token",
+        "tags": [
+          "service-auth"
+        ]
+      }
+    },
+    "/api/v1/service/catalog/search": {
+      "post": {
+        "operationId": "service_catalog_search_api_v1_service_catalog_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Service Catalog Search",
+        "tags": [
+          "service-integration"
+        ]
+      }
+    },
+    "/api/v1/service/clearing/cycles/{cycle_id}/accounting-export": {
+      "get": {
+        "operationId": "service_accounting_export_api_v1_service_clearing_cycles__cycle_id__accounting_export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cycle_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cycle Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectEnvelope_AccountingExportResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Service Accounting Export",
+        "tags": [
+          "service-integration"
+        ]
+      }
+    },
+    "/api/v1/service/context": {
+      "get": {
+        "operationId": "service_context_api_v1_service_context_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceContextEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Service Context",
+        "tags": [
+          "service-integration"
         ]
       }
     },
