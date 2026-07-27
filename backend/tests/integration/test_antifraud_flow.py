@@ -4,10 +4,13 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 from sqlalchemy.exc import DBAPIError
 
+from cooperative_clearing.api.dependencies import get_principal
 from cooperative_clearing.cli import initialize_node
+from cooperative_clearing.main import create_app
 from cooperative_clearing.modules.federation.application.discovery import DiscoveryService
 from cooperative_clearing.modules.federation.domain.discovery import CostStatus, SearchMode
 from cooperative_clearing.modules.federation.infrastructure.discovery_models import (
@@ -21,6 +24,11 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     Membership,
 )
 from cooperative_clearing.modules.risk.application.antifraud import AntifraudService
+from cooperative_clearing.modules.risk.domain.antifraud_catalog import (
+    ALGORITHM_VERSION,
+    CALIBRATION_DATASET_VERSION,
+    rule_manifest_hash,
+)
 from cooperative_clearing.modules.risk.domain.types import AntifraudSignalStatus
 from cooperative_clearing.modules.risk.infrastructure.models import (
     AntifraudScan,
@@ -220,10 +228,7 @@ async def test_signal_holds_automation_until_independent_evidenced_review() -> N
             quote_row = await session.get(LogisticsQuote, quote_record_id)
             intent_row = await session.get(PurchaseIntent, intent.object_id)
             assert offer_row is not None and offer_row.cooperative_id == cooperative_id
-            assert (
-                quote_row is not None
-                and quote_row.cooperative_id == carrier_cooperative_id
-            )
+            assert quote_row is not None and quote_row.cooperative_id == carrier_cooperative_id
             assert intent_row is not None and intent_row.cooperative_id == cooperative_id
 
         scan_key = str(uuid4())
@@ -252,6 +257,9 @@ async def test_signal_holds_automation_until_independent_evidenced_review() -> N
         async with database.session() as session:
             scan_row = await session.get(AntifraudScan, scan.object_id)
             assert scan_row is not None
+            assert scan_row.algorithm_version == ALGORITHM_VERSION
+            assert scan_row.rule_manifest_hash == rule_manifest_hash()
+            assert scan_row.calibration_dataset_version == CALIBRATION_DATASET_VERSION
             assert scan_row.finding_count == 1
             assert scan_row.result_summary["automatic_decisions"] == 0
             signal = (
@@ -373,5 +381,27 @@ async def test_signal_holds_automation_until_independent_evidenced_review() -> N
             price="12",
             version=2,
         )
+
+        app = create_app(settings, manage_runtime=False)
+        app.state.database = database
+
+        async def as_risk_admin() -> Principal:
+            return people["risk"]
+
+        app.dependency_overrides[get_principal] = as_risk_admin
+        with TestClient(app) as client:
+            response = client.get("/api/v1/antifraud/rules")
+        assert response.status_code == 200
+        catalog = response.json()["data"]
+        assert catalog["algorithm_version"] == ALGORITHM_VERSION
+        assert catalog["manifest_hash"] == rule_manifest_hash()
+        assert catalog["calibration_dataset_version"] == CALIBRATION_DATASET_VERSION
+        assert catalog["calibration_scope"] == "SYNTHETIC_REGRESSION"
+        assert catalog["requirement_count"] == 13
+        assert catalog["rule_count"] == 15
+        assert catalog["production_approved"] is False
+        assert len(catalog["rules"]) == 15
+        assert all(rule["engineering_case_count"] == 2 for rule in catalog["rules"])
+        assert all(rule["pilot_false_positive_rate"] is None for rule in catalog["rules"])
     finally:
         await database.dispose()

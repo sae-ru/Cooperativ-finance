@@ -10,7 +10,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import validate_node_signing_seed
 from cooperative_clearing.shared.infrastructure.database import Database
 
-EXPECTED_SCHEMA_REVISION = "0027_identity_index_alignment"
+EXPECTED_SCHEMA_REVISION = "0028_antifraud_rule_manifest"
 
 
 @dataclass(frozen=True, slots=True)

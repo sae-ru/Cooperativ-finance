@@ -94,6 +94,7 @@
 - [Реализованный Slice 18: кабинет пайщика и сквозной обмен](implemented_slice_18.md)
 - [Реализованный Slice 19: объяснимая проверка аномалий](implemented_slice_19.md)
 - [Реализованный Slice 20: локальная MFA и аварийный доступ](implemented_slice_20.md)
+- [Реализованный Slice 21: полный версионированный антифрод-контур](implemented_slice_21.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

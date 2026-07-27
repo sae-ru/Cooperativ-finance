@@ -475,6 +475,10 @@ class AntifraudScan(Base):
     __table_args__ = (
         CheckConstraint("lookback_hours BETWEEN 1 AND 2160", name="lookback_bounded"),
         CheckConstraint("finding_count >= 0", name="finding_count_nonnegative"),
+        CheckConstraint(
+            "rule_manifest_hash ~ '^sha256:[0-9a-f]{64}$'",
+            name="rule_manifest_hash_sha256",
+        ),
         Index("ix_antifraud_scans_cooperative_created", "cooperative_id", "created_at"),
         {"schema": "risk"},
     )
@@ -484,6 +488,8 @@ class AntifraudScan(Base):
         PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
     )
     algorithm_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    rule_manifest_hash: Mapped[str] = mapped_column(String(71), nullable=False)
+    calibration_dataset_version: Mapped[str] = mapped_column(String(40), nullable=False)
     lookback_hours: Mapped[int] = mapped_column(Integer, nullable=False)
     input_cutoff: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finding_count: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -517,9 +523,7 @@ class AntifraudSignal(Base):
             "'SHARE_ACCOUNT','EXPOSURE_COMMITMENT')",
             name="subject_type_allowed",
         ),
-        CheckConstraint(
-            "severity IN ('LOW','MEDIUM','HIGH','CRITICAL')", name="severity_allowed"
-        ),
+        CheckConstraint("severity IN ('LOW','MEDIUM','HIGH','CRITICAL')", name="severity_allowed"),
         CheckConstraint("automation_action IN ('WARN','HOLD')", name="action_allowed"),
         CheckConstraint(
             "status IN ('OPEN','IN_REVIEW','CLEARED','CONFIRMED')", name="status_allowed"

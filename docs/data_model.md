@@ -541,6 +541,26 @@ Partial unique index допускает только один активный �
 новой версией и подписанным событием. Runtime role не имеет DELETE, а downgrade
 непустого контура запрещён.
 
+## Расширение манифеста правил Slice 21
+
+Revision `0028_antifraud_rule_manifest` добавляет в
+`risk.antifraud_scans` обязательные поля `rule_manifest_hash` и
+`calibration_dataset_version`. SHA-256 проверяется DB CHECK. Исторические строки
+получают нулевой legacy hash и `legacy-none`; новый алгоритм `2.0.0` сохраняет
+канонический hash полного списка из 15 правил и `synthetic-v2.0.0`.
+
+Манифест находится в domain-слое и содержит код/версию правила, requirement key,
+тяжесть, действие и источники. API вычисляет 13 уникальных requirement classes и
+15 rule rows из того же payload, который хешируется перед записью scan. Поэтому
+показанный каталог и provenance запуска не расходятся без изменения hash.
+
+Новые правила используют существующие доменные факты без отдельного скрытого
+профиля риска: `RelatedPartyLink`, `RiskPolicy`, `ExposureCommitment`,
+`ReserveTarget`, `InventoryLot`, `ReputationEvent`, `Contribution`,
+`AidCampaign`, `AidAllocation`, `AllocationApproval`, `ArbitrationDecision`,
+`Sanction` и `Member`. В сигналы попадают UUID, количества, интервалы и пороги,
+но не имена, телефоны или адреса.
+
 ## Реализованная schema локальной MFA и аварийного доступа Slice 20
 
 Revision `0025_identity_step_up` расширяет `identity.auth_sessions` полями

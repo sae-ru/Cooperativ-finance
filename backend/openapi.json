@@ -15458,6 +15458,143 @@
         "title": "RoundingMode",
         "type": "string"
       },
+      "RuleCatalogEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RuleCatalogResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "RuleCatalogEnvelope",
+        "type": "object"
+      },
+      "RuleCatalogResponse": {
+        "properties": {
+          "algorithm_version": {
+            "title": "Algorithm Version",
+            "type": "string"
+          },
+          "calibration_dataset_version": {
+            "title": "Calibration Dataset Version",
+            "type": "string"
+          },
+          "calibration_scope": {
+            "const": "SYNTHETIC_REGRESSION",
+            "title": "Calibration Scope",
+            "type": "string"
+          },
+          "manifest_hash": {
+            "title": "Manifest Hash",
+            "type": "string"
+          },
+          "production_approved": {
+            "title": "Production Approved",
+            "type": "boolean"
+          },
+          "requirement_count": {
+            "title": "Requirement Count",
+            "type": "integer"
+          },
+          "rule_count": {
+            "title": "Rule Count",
+            "type": "integer"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResponse"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "algorithm_version",
+          "manifest_hash",
+          "calibration_dataset_version",
+          "calibration_scope",
+          "requirement_count",
+          "rule_count",
+          "production_approved",
+          "rules"
+        ],
+        "title": "RuleCatalogResponse",
+        "type": "object"
+      },
+      "RuleResponse": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "calibration_dataset_version": {
+            "title": "Calibration Dataset Version",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "data_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Sources",
+            "type": "array"
+          },
+          "engineering_case_count": {
+            "title": "Engineering Case Count",
+            "type": "integer"
+          },
+          "pilot_false_positive_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pilot False Positive Rate"
+          },
+          "production_approved": {
+            "title": "Production Approved",
+            "type": "boolean"
+          },
+          "requirement_key": {
+            "title": "Requirement Key",
+            "type": "string"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "integer"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "rule_version",
+          "requirement_key",
+          "severity",
+          "action",
+          "data_sources",
+          "calibration_dataset_version",
+          "engineering_case_count",
+          "pilot_false_positive_rate",
+          "production_approved"
+        ],
+        "title": "RuleResponse",
+        "type": "object"
+      },
       "SanctionProposeRequest": {
         "properties": {
           "expires_at": {
@@ -15561,6 +15698,10 @@
             "title": "Algorithm Version",
             "type": "string"
           },
+          "calibration_dataset_version": {
+            "title": "Calibration Dataset Version",
+            "type": "string"
+          },
           "completed_event_id": {
             "format": "uuid",
             "title": "Completed Event Id",
@@ -15603,12 +15744,18 @@
             "additionalProperties": true,
             "title": "Result Summary",
             "type": "object"
+          },
+          "rule_manifest_hash": {
+            "title": "Rule Manifest Hash",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "cooperative_id",
           "algorithm_version",
+          "rule_manifest_hash",
+          "calibration_dataset_version",
           "lookback_hours",
           "input_cutoff",
           "finding_count",
@@ -22830,6 +22977,32 @@
           }
         ],
         "summary": "Overview",
+        "tags": [
+          "anti-fraud"
+        ]
+      }
+    },
+    "/api/v1/antifraud/rules": {
+      "get": {
+        "operationId": "rule_catalog_api_v1_antifraud_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleCatalogEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rule Catalog",
         "tags": [
           "anti-fraud"
         ]

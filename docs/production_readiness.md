@@ -27,7 +27,8 @@
 - [x] Anti-fraud signal сохраняет объяснимые факты/пороги, не принимает автоматическое обвинение и требует независимый evidence-backed review ([evidence](implemented_slice_19.md)).
 - [x] Active anti-fraud HOLD исполняется в offer/quote/purchase/share-exposure командах и снимается только после `CLEARED` ([evidence](implemented_slice_19.md)).
 - [x] Marketplace offer/quote/purchase имеют явного cooperative owner, включая команды global node roles ([evidence](implemented_slice_19.md)).
-- [ ] Все классы злоупотреблений раздела 24.5 имеют versioned rule, dataset и проверенную частоту ложных срабатываний.
+- [x] Все классы злоупотреблений раздела 24.5 имеют versioned rule и положительный/отрицательный синтетический regression-сценарий ([evidence](implemented_slice_21.md)).
+- [ ] Для каждого антифрод-правила есть репрезентативный пилотный dataset, утверждённая частота ложных срабатываний и drift review.
 - [ ] Admin console разделяет User, Member, Membership, Organization и Node.
 - [ ] Клиринговый cycle проходит freeze/preview/dispute/finalize/reconcile.
 - [ ] Clearing proof и participant statements воспроизводимы.
@@ -179,9 +180,10 @@ manual accessibility и внешние security/legal/pilot evidence остаю�
 compatibility и живой RU/EN desktop/mobile light/dark browser smoke зелёные.
 Подробности: [implemented_slice_19.md](implemented_slice_19.md).
 
-Это закрывает только реализованные инженерные контроли. Полный набор правил
-раздела 24.5, policy calibration на реальных данных, privacy/security/legal
-review, manual accessibility matrix и пилотные решения остаются открытыми.
+Это закрывает только первый набор инженерных контролей. Полное versioned
+покрытие раздела 24.5 добавлено в Slice 21; policy calibration на реальных
+данных, privacy/security/legal review, manual accessibility matrix и пилотные
+решения остаются открытыми.
 
 ## Текущее доказательство Slice 20
 
@@ -195,3 +197,17 @@ Backend, frontend и populated migration cycle проверены; подроб�
 Это закрывает только инженерную проверку local auth/TOTP/break-glass. WebAuthn,
 production key ceremony, независимый security review, физическое учение с
 реальными сотрудниками и formal accepted risks остаются открытыми checkbox.
+## Текущее доказательство Slice 21
+
+Алгоритм `2.0.0` связывает каждый запуск с SHA-256 манифеста и версией
+`synthetic-v2.0.0`. Все 13 классов раздела 24.5 представлены 15 объяснимыми
+правилами; девять новых правил имеют положительные и отрицательные проверки.
+Каталог API и RU/EN интерфейс показывают покрытие, реакцию и явный
+`production_approved=false`. PostgreSQL integration подтверждает хранение
+манифеста, signed event, реальный `HOLD` и независимое снятие ограничения.
+Подробности: [implemented_slice_21.md](implemented_slice_21.md).
+
+Этот результат закрывает инженерное versioned покрытие, но не пилотную
+калибровку. Реальный размеченный dataset, утверждённый false-positive rate,
+monitoring drift, privacy/legal review и независимое adversarial тестирование
+остаются открытыми checkbox перед хозяйственным production.

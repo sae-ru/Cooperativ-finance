@@ -217,3 +217,21 @@ Frontend gate проверяет QR enrollment, понятные RU/EN ошиб�
 визуальная проверка раздела **Безопасность** в RU/EN на desktop и mobile.
 WebAuthn, независимый security review и физическое учение восстановления
 остаются отдельными production gates.
+## Проверки Slice 21
+
+Domain/unit gate проверяет полноту enum/манифеста, стабильность SHA-256,
+положительный и отрицательный сценарий каждого нового класса, транзитивные
+связи, временные окна, actor binding помощи и репутации, достижимый порог
+дробления лимита и пересечение подгруппы кампаний.
+
+PostgreSQL integration проверяет algorithm/manifest/dataset provenance,
+неизменяемый сигнал, реальную блокировку команды и independent evidence-backed
+release. API snapshot требует `GET /api/v1/antifraud/rules` с 13/15,
+`SYNTHETIC_REGRESSION` и `production_approved=false`. Migration gate проходит
+`0027 -> 0028 -> 0027 -> 0028`, legacy backfill и `alembic check`.
+
+Frontend gate проверяет XML parity, русские и английские названия всех
+requirement/reason/fact/threshold keys, предупреждение о незавершённой пилотной
+калибровке, generated types, component suite и production PWA build. Реальная
+precision/recall/FPR измеряется только на отдельно утверждённом пилотном наборе
+и не может быть заменена зелёными синтетическими тестами.

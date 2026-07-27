@@ -317,6 +317,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/antifraud/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rule Catalog */
+        get: operations["rule_catalog_api_v1_antifraud_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/antifraud/scans": {
         parameters: {
             query?: never;
@@ -11038,6 +11055,57 @@ export interface components {
          * @enum {string}
          */
         RoundingMode: "DOWN" | "HALF_EVEN";
+        /** RuleCatalogEnvelope */
+        RuleCatalogEnvelope: {
+            data: components["schemas"]["RuleCatalogResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** RuleCatalogResponse */
+        RuleCatalogResponse: {
+            /** Algorithm Version */
+            algorithm_version: string;
+            /** Calibration Dataset Version */
+            calibration_dataset_version: string;
+            /**
+             * Calibration Scope
+             * @constant
+             */
+            calibration_scope: "SYNTHETIC_REGRESSION";
+            /** Manifest Hash */
+            manifest_hash: string;
+            /** Production Approved */
+            production_approved: boolean;
+            /** Requirement Count */
+            requirement_count: number;
+            /** Rule Count */
+            rule_count: number;
+            /** Rules */
+            rules: components["schemas"]["RuleResponse"][];
+        };
+        /** RuleResponse */
+        RuleResponse: {
+            /** Action */
+            action: string;
+            /** Calibration Dataset Version */
+            calibration_dataset_version: string;
+            /** Code */
+            code: string;
+            /** Data Sources */
+            data_sources: string[];
+            /** Engineering Case Count */
+            engineering_case_count: number;
+            /** Pilot False Positive Rate */
+            pilot_false_positive_rate: string | null;
+            /** Production Approved */
+            production_approved: boolean;
+            /** Requirement Key */
+            requirement_key: string;
+            /** Rule Version */
+            rule_version: number;
+            /** Severity */
+            severity: string;
+        };
         /** SanctionProposeRequest */
         SanctionProposeRequest: {
             /** Expires At */
@@ -11083,6 +11151,8 @@ export interface components {
         ScanResponse: {
             /** Algorithm Version */
             algorithm_version: string;
+            /** Calibration Dataset Version */
+            calibration_dataset_version: string;
             /**
              * Completed Event Id
              * Format: uuid
@@ -11121,6 +11191,8 @@ export interface components {
             result_summary: {
                 [key: string]: unknown;
             };
+            /** Rule Manifest Hash */
+            rule_manifest_hash: string;
         };
         /** SearchCandidateView */
         SearchCandidateView: {
@@ -14414,6 +14486,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rule_catalog_api_v1_antifraud_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleCatalogEnvelope"];
                 };
             };
         };

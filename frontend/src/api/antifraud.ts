@@ -4,6 +4,8 @@ import { commandHeaders, request } from "./admin";
 export type AntifraudOverview = components["schemas"]["OverviewResponse"];
 export type AntifraudScan = components["schemas"]["ScanResponse"];
 export type AntifraudSignal = components["schemas"]["SignalResponse"];
+export type AntifraudRule = components["schemas"]["RuleResponse"];
+export type AntifraudRuleCatalog = components["schemas"]["RuleCatalogResponse"];
 
 type CommandResult = { event_id: string; object_id: string; replayed: boolean };
 
@@ -15,6 +17,9 @@ function query(values: Record<string, string | undefined>): string {
   const encoded = params.toString();
   return encoded ? `?${encoded}` : "";
 }
+
+export const getAntifraudRules = () =>
+  request<AntifraudRuleCatalog>("/api/v1/antifraud/rules");
 
 export const getAntifraudOverview = (cooperativeId?: string) =>
   request<AntifraudOverview>(

@@ -325,6 +325,7 @@ POST /api/v1/participant/addresses/{address_id}/archive
 Scoped API опубликован под `/api/v1/antifraud`:
 
 ```text
+GET  /api/v1/antifraud/rules
 GET  /api/v1/antifraud/overview
 GET  /api/v1/antifraud/scans
 GET  /api/v1/antifraud/signals
@@ -341,5 +342,12 @@ cooperative scope. Запуск требует `RISK_ADMIN`; рассмотре�
 
 Ответ не содержит обвинения или итогового social score. Он возвращает версию
 алгоритма и правила, тип и UUID объекта, тяжесть, действие, статус, число
-наблюдений, локализуемую причину, наблюдавшиеся факты и пороги. Детали и
-границы: [implemented_slice_19.md](implemented_slice_19.md).
+наблюдений, локализуемую причину, наблюдавшиеся факты и пороги.
+
+`GET /rules` публикует манифест алгоритма `2.0.0`: 13 requirement classes, 15
+rules, SHA-256, версию синтетического regression-набора, действие каждого
+правила и `production_approved=false`. Endpoint имеет ту же read-role policy,
+но не требует cooperative parameter, поскольку манифест статичен для версии
+приложения и не раскрывает хозяйственные данные. Детали и границы:
+[implemented_slice_19.md](implemented_slice_19.md) и
+[implemented_slice_21.md](implemented_slice_21.md).

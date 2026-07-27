@@ -148,7 +148,7 @@ acceptance criteria и tests. Если строка карты меняется,
 | Неизменяемость основания | revision `0023`, immutable facts/thresholds trigger, signed events | direct SQL update rejection |
 | Нет обхода через global node role | revision `0024`, обязательный cooperative owner в offer/quote/intent и fail-closed context resolution | populated migration invariants и global-role HOLD integration |
 | Операторское рабочее место | overview, filters, fact/threshold explanation, decision form | API/component/build и browser acceptance |
-| Полный перечень раздела 24.5 | шесть правил реализованы; оставшиеся классы явно учтены как gap | [границы Slice 19](implemented_slice_19.md#проверка-и-границы) |
+| Первый контур раздела 24.5 | шесть правил версии 1.0.0 и явно зафиксированный gap | [границы Slice 19](implemented_slice_19.md#проверка-и-границы) |
 ## Slice 20 trace
 
 | Требование | Реализация | Проверка |
@@ -160,3 +160,18 @@ acceptance criteria и tests. Если строка карты меняется,
 | Запрет саморасширения | permanent assignment source required for ordinary role lifecycle | break-glass delegation rejection test |
 | Проверяемая власть | linked authority assignment and signed lifecycle events | migration FK/backfill cycle and signature assertions |
 | Понятный интерфейс | Security workspace, RU/EN errors and reason labels | component, locale, typecheck, build and browser checks |
+
+## Slice 21 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Все классы раздела 24.5 | 13 requirement keys и 15 versioned rules алгоритма 2.0.0 | enum/manifest completeness unit test |
+| Связанные аккаунты | active related links, reciprocal positive events, transitive resource components | positive/negative rule tests |
+| Дробление операций | четыре малых обязательства, 80% aggregate, предупреждение вместо недостижимого over-limit состояния | threshold unit test |
+| Репутация и пожертвования | contextual burst и совпадение verifier с автором последующей оценки | temporal/actor negative tests |
+| Связанные решения и помощь | related allocation/approval/arbitration, overlapping campaigns | conflict and interval tests |
+| Обход санкции | related member создан после начала active sanction | positive/old-account tests |
+| Воспроизводимость запуска | migration 0028, algorithm, manifest SHA-256 и dataset version в scan | PostgreSQL integration и migration cycle |
+| Честный статус калибровки | synthetic scope, пустой pilot FPR, `production_approved=false` | catalog API/component test |
+| Понятный операторский экран | 13/15, локализованные риски и реакции без внутренних table codes | RU/EN locale, component, build и browser smoke |
+| Реальный пилотный FPR | не заявлен и остаётся внешним gate | unchecked production-readiness item |

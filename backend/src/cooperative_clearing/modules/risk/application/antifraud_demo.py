@@ -30,10 +30,8 @@ async def seed_demo_antifraud(session: AsyncSession, settings: Settings) -> None
         principal=principal,
         cooperative_id=cooperative_id,
         lookback_hours=168,
-        idempotency_key="demo-antifraud-scan-v3",
+        idempotency_key="demo-antifraud-scan-v4",
         request_id=None,
         rule_codes=frozenset({AntifraudRuleCode.OFFER_PRICE_OUTLIER}),
-        subject_ids=frozenset(
-            {stable_id("federated-offer", "demo-milk-price-review")}
-        ),
+        subject_ids=frozenset({stable_id("federated-offer", "demo-milk-price-review")}),
     )

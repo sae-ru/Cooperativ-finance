@@ -23,6 +23,12 @@ from cooperative_clearing.modules.identity.application.security import require_s
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.modules.risk.application.antifraud import AntifraudService
 from cooperative_clearing.modules.risk.application.common import RiskCommandResult
+from cooperative_clearing.modules.risk.domain.antifraud_catalog import (
+    ALGORITHM_VERSION,
+    CALIBRATION_DATASET_VERSION,
+    rule_manifest_hash,
+    rule_manifest_payload,
+)
 from cooperative_clearing.modules.risk.domain.types import AntifraudSignalStatus, risk_error
 from cooperative_clearing.modules.risk.infrastructure.models import (
     AntifraudScan,
@@ -58,6 +64,8 @@ class ScanResponse(BaseModel):
     id: UUID
     cooperative_id: UUID
     algorithm_version: str
+    rule_manifest_hash: str
+    calibration_dataset_version: str
     lookback_hours: int
     input_cutoff: datetime
     finding_count: int
@@ -112,6 +120,35 @@ class OverviewEnvelope(BaseModel):
     request_id: str
 
 
+class RuleResponse(BaseModel):
+    code: str
+    rule_version: int
+    requirement_key: str
+    severity: str
+    action: str
+    data_sources: list[str]
+    calibration_dataset_version: str
+    engineering_case_count: int
+    pilot_false_positive_rate: str | None
+    production_approved: bool
+
+
+class RuleCatalogResponse(BaseModel):
+    algorithm_version: str
+    manifest_hash: str
+    calibration_dataset_version: str
+    calibration_scope: Literal["SYNTHETIC_REGRESSION"]
+    requirement_count: int
+    rule_count: int
+    production_approved: bool
+    rules: list[RuleResponse]
+
+
+class RuleCatalogEnvelope(BaseModel):
+    data: RuleCatalogResponse
+    request_id: str
+
+
 class Collection[T](BaseModel):
     data: list[T]
     request_id: str
@@ -152,6 +189,25 @@ def _command(result: RiskCommandResult) -> CommandEnvelope:
             event_id=result.event_id,
             object_id=result.object_id,
             replayed=result.replayed,
+        ),
+        request_id=get_request_id(),
+    )
+
+
+@router.get("/rules", response_model=RuleCatalogEnvelope)
+async def rule_catalog(principal: PrincipalDependency) -> RuleCatalogEnvelope:
+    _scope_condition(principal, AntifraudSignal.cooperative_id)
+    manifest = rule_manifest_payload()
+    return RuleCatalogEnvelope(
+        data=RuleCatalogResponse(
+            algorithm_version=ALGORITHM_VERSION,
+            manifest_hash=rule_manifest_hash(),
+            calibration_dataset_version=CALIBRATION_DATASET_VERSION,
+            calibration_scope="SYNTHETIC_REGRESSION",
+            requirement_count=len({str(item["requirement_key"]) for item in manifest}),
+            rule_count=len(manifest),
+            production_approved=False,
+            rules=[RuleResponse.model_validate(item) for item in manifest],
         ),
         request_id=get_request_id(),
     )

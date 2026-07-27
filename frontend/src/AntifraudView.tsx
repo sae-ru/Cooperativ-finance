@@ -8,6 +8,8 @@ import {
   Play,
   RefreshCw,
   ShieldAlert,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +19,7 @@ import {
   beginAntifraudReview,
   decideAntifraudSignal,
   getAntifraudOverview,
+  getAntifraudRules,
   getAntifraudScans,
   getAntifraudSignals,
   runAntifraudScan,
@@ -78,6 +81,10 @@ export default function AntifraudView({ principal }: { principal: Principal }) {
   const cooperatives = useQuery({
     queryKey: ["cooperatives"],
     queryFn: getCooperatives,
+  });
+  const rules = useQuery({
+    queryKey: ["antifraud", "rules"],
+    queryFn: getAntifraudRules,
   });
   const scopedCooperative = principal.roles.find(
     (item) =>
@@ -154,8 +161,8 @@ export default function AntifraudView({ principal }: { principal: Principal }) {
     },
   });
 
-  const pending = [cooperatives, overview, scans, signals].some((item) => item.isPending);
-  const failed = [cooperatives, overview, scans, signals].find((item) => item.isError);
+  const pending = [cooperatives, rules, overview, scans, signals].some((item) => item.isPending);
+  const failed = [cooperatives, rules, overview, scans, signals].find((item) => item.isError);
   if (pending) {
     return (
       <div className="view-stack">
@@ -209,6 +216,60 @@ export default function AntifraudView({ principal }: { principal: Principal }) {
           <span>{t("antifraud.notice.body")}</span>
         </div>
       </section>
+
+      {rules.data ? (
+        <section className="antifraud-catalog" aria-labelledby="antifraud-catalog-title">
+          <div className="antifraud-catalog-heading">
+            <ShieldCheck size={20} />
+            <div>
+              <h2 id="antifraud-catalog-title">{t("antifraud.catalog.title")}</h2>
+              <p>
+                {t("antifraud.catalog.coverage", {
+                  requirements: rules.data.requirement_count,
+                  rules: rules.data.rule_count,
+                })}
+              </p>
+            </div>
+            <dl>
+              <div>
+                <dt>{t("antifraud.catalog.version")}</dt>
+                <dd data-i18n-ignore>{rules.data.algorithm_version}</dd>
+              </div>
+              <div>
+                <dt>{t("antifraud.catalog.manifest")}</dt>
+                <dd data-i18n-ignore>{shortId(rules.data.manifest_hash.slice(7))}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="antifraud-calibration-warning" role="status">
+            <AlertTriangle size={17} />
+            <span>{t("antifraud.catalog.pilot_pending")}</span>
+          </div>
+          <details className="antifraud-rule-list">
+            <summary>{t("antifraud.catalog.show_rules")}</summary>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("antifraud.catalog.column.risk")}</th>
+                    <th>{t("antifraud.catalog.column.effect")}</th>
+                    <th>{t("antifraud.catalog.column.tests")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rules.data.rules.map((rule) => (
+                    <tr key={rule.code}>
+                      <td>{t(rule.requirement_key)}</td>
+                      <td>{t(`antifraud.action_value.${rule.action.toLowerCase()}`)}</td>
+                      <td>{rule.engineering_case_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      ) : null}
 
       <section className="metric-grid antifraud-metrics" aria-label={t("antifraud.summary")}>
         <article className="metric">
@@ -395,7 +456,7 @@ export default function AntifraudView({ principal }: { principal: Principal }) {
               title={t("antifraud.action.close")}
               onClick={() => setSelectedId("")}
             >
-              <span aria-hidden="true">×</span>
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
           <div className="antifraud-detail-body">

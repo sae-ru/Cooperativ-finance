@@ -24,6 +24,7 @@ vi.mock("./api/antifraud", async (importOriginal) => {
   return {
     ...actual,
     getAntifraudOverview: vi.fn(),
+    getAntifraudRules: vi.fn(),
     getAntifraudScans: vi.fn(),
     getAntifraudSignals: vi.fn(),
     runAntifraudScan: vi.fn(),
@@ -110,6 +111,27 @@ describe("AntifraudView", () => {
       created_at: "2026-07-26T00:00:00Z",
       version: 1,
     }]);
+    vi.mocked(api.getAntifraudRules).mockResolvedValue({
+      algorithm_version: "2.0.0",
+      manifest_hash: `sha256:${"a".repeat(64)}`,
+      calibration_dataset_version: "synthetic-v2.0.0",
+      calibration_scope: "SYNTHETIC_REGRESSION",
+      requirement_count: 13,
+      rule_count: 15,
+      production_approved: false,
+      rules: [{
+        code: "PURCHASE_CANCELLATION_BURST",
+        rule_version: 1,
+        requirement_key: "antifraud.requirements.synthetic_demand",
+        severity: "HIGH",
+        action: "HOLD",
+        data_sources: ["federation.purchase_intents"],
+        calibration_dataset_version: "synthetic-v2.0.0",
+        engineering_case_count: 2,
+        pilot_false_positive_rate: null,
+        production_approved: false,
+      }],
+    });
     vi.mocked(api.getAntifraudOverview).mockResolvedValue({
       cooperative_count: 1,
       signal_count: 1,
@@ -121,7 +143,9 @@ describe("AntifraudView", () => {
     vi.mocked(api.getAntifraudScans).mockResolvedValue([{
       id: signal.scan_id,
       cooperative_id: cooperativeId,
-      algorithm_version: "1.0.0",
+      algorithm_version: "2.0.0",
+      rule_manifest_hash: `sha256:${"a".repeat(64)}`,
+      calibration_dataset_version: "synthetic-v2.0.0",
       lookback_hours: 168,
       input_cutoff: "2026-07-26T10:00:00Z",
       finding_count: 1,
@@ -173,5 +197,16 @@ describe("AntifraudView", () => {
         evidence_ids: ["40000000-0000-4000-8000-000000000001"],
       }),
     ));
+  });
+
+  it("shows rule coverage without claiming pilot approval", async () => {
+    await i18n.changeLanguage("en");
+    renderView();
+
+    expect(await screen.findByRole("heading", { name: "Risks checked by the system" }))
+      .toBeInTheDocument();
+    expect(screen.getByText("Risk classes covered: 13. Active rules: 15."))
+      .toBeInTheDocument();
+    expect(screen.getByText(/still requires pilot calibration/)).toBeInTheDocument();
   });
 });

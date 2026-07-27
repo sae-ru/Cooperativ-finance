@@ -22,6 +22,9 @@ from cooperative_clearing.modules.inventory.domain.types import decimal_text
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
+from cooperative_clearing.modules.risk.application.antifraud_rules_v2 import (
+    collect_extended_findings,
+)
 from cooperative_clearing.modules.risk.application.common import (
     RiskCommandResult,
     begin_risk_command,
@@ -31,6 +34,11 @@ from cooperative_clearing.modules.risk.application.common import (
 from cooperative_clearing.modules.risk.domain.antifraud import (
     decimal_median,
     outside_ratio_band,
+)
+from cooperative_clearing.modules.risk.domain.antifraud_catalog import (
+    ALGORITHM_VERSION,
+    CALIBRATION_DATASET_VERSION,
+    rule_manifest_hash,
 )
 from cooperative_clearing.modules.risk.domain.types import (
     AntifraudAction,
@@ -51,8 +59,6 @@ from cooperative_clearing.modules.risk.infrastructure.models import (
 )
 from cooperative_clearing.shared.core.config import Settings
 
-ALGORITHM_VERSION = "1.0.0"
-RULE_VERSION = 1
 SCAN_ROLES = {RoleCode.RISK_ADMIN}
 REVIEW_ROLES = {RoleCode.AUDITOR}
 ACTIVE_SIGNAL_STATUSES = {
@@ -84,10 +90,13 @@ class AntifraudService:
         actor = risk_role_actor(principal, cooperative_id, SCAN_ROLES)
         await self._eligible_member(session, cooperative_id, actor.person_id)
         cutoff = datetime.now(UTC)
+        manifest_hash = rule_manifest_hash()
         request_payload: dict[str, object] = {
             "cooperative_id": str(cooperative_id),
             "lookback_hours": lookback_hours,
             "algorithm_version": ALGORITHM_VERSION,
+            "rule_manifest_hash": manifest_hash,
+            "calibration_dataset_version": CALIBRATION_DATASET_VERSION,
         }
         if rule_codes is not None:
             request_payload["rule_codes"] = sorted(item.value for item in rule_codes)
@@ -189,7 +198,7 @@ class AntifraudService:
                     cooperative_id=cooperative_id,
                     scan_id=scan_id,
                     rule_code=finding.rule_code.value,
-                    rule_version=RULE_VERSION,
+                    rule_version=finding.rule_version,
                     subject_type=finding.subject_type.value,
                     subject_id=finding.subject_id,
                     severity=finding.severity.value,
@@ -255,6 +264,8 @@ class AntifraudService:
                 id=scan_id,
                 cooperative_id=cooperative_id,
                 algorithm_version=ALGORITHM_VERSION,
+                rule_manifest_hash=manifest_hash,
+                calibration_dataset_version=CALIBRATION_DATASET_VERSION,
                 lookback_hours=lookback_hours,
                 input_cutoff=cutoff,
                 finding_count=len(findings),
@@ -448,11 +459,17 @@ class AntifraudService:
         since = cutoff - timedelta(hours=lookback_hours)
         findings = await self._offer_findings(session, cooperative_id, since, cutoff)
         findings.extend(await self._logistics_findings(session, cooperative_id, cutoff))
-        findings.extend(
-            await self._cancellation_findings(session, cooperative_id, since, cutoff)
-        )
+        findings.extend(await self._cancellation_findings(session, cooperative_id, since, cutoff))
         findings.extend(await self._guarantee_findings(session, cooperative_id, cutoff))
         findings.extend(await self._concentration_findings(session, cooperative_id, cutoff))
+        findings.extend(
+            await collect_extended_findings(
+                session,
+                cooperative_id=cooperative_id,
+                since=since,
+                cutoff=cutoff,
+            )
+        )
         return sorted(
             findings,
             key=lambda item: (
@@ -564,8 +581,8 @@ class AntifraudService:
             current = latest.get(row.quote_id)
             if current is None or row.quote_version > current.quote_version:
                 latest[row.quote_id] = row
-        groups: dict[tuple[str, str, str, str], list[tuple[LogisticsQuote, Decimal]]] = (
-            defaultdict(list)
+        groups: dict[tuple[str, str, str, str], list[tuple[LogisticsQuote, Decimal]]] = defaultdict(
+            list
         )
         for quote in latest.values():
             if quote.status != "ACTIVE":
@@ -782,7 +799,7 @@ class AntifraudService:
         return {
             "algorithm_version": ALGORITHM_VERSION,
             "rule_code": finding.rule_code.value,
-            "rule_version": RULE_VERSION,
+            "rule_version": finding.rule_version,
             "subject_type": finding.subject_type.value,
             "subject_id": str(finding.subject_id),
             "severity": finding.severity.value,
