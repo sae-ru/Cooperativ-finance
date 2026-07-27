@@ -12,6 +12,7 @@ def test_solidarity_evidence_accepts_any_participant_assignment() -> None:
 def test_exchange_party_evidence_accepts_participant_assignment() -> None:
     assert RoleCode.EXCHANGE_PARTICIPANT in evidence_roles("FULFILLMENT_ACT")
     assert RoleCode.EXCHANGE_PARTICIPANT in evidence_roles("acceptance_act")
+    assert RoleCode.EXCHANGE_PARTICIPANT in evidence_roles("trust_case")
 
 
 def test_other_evidence_keeps_restricted_roles() -> None:

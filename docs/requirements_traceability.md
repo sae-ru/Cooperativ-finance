@@ -271,3 +271,19 @@ acceptance criteria и tests. Если строка карты меняется,
 | Не обойти update/evidence ограничения | общий resolver, запрет faultpoint/build/DATA_ONLY и dirty override в production |
 | Windows/Linux parity | PowerShell/Linux wrappers, parser checks и shared regression suite |
 | Внешнее разрешение production | намеренно не заявлено закрытым; подписанный readiness review остаётся обязательным |
+
+## Slice 30 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Жалоба не списывает паи | assessment остаётся `NOT_EXECUTED`; отдельная compensation command | integration test до финальности и signed event assertions |
+| Только финальное решение | точная liability/trust linkage; appeal должна завершиться `AFFIRMED` | original/appeal lifecycle integration test |
+| Независимая авторизация | controller исключается, если был стороной, assessor или участником любого решения по делу | original и appeal arbitrator denial tests |
+| Ограниченная личная ответственность | минимум из assessed loss, established loss, `max_loss`, commitment remainder и незащищённого остатка | service/DB boundary tests |
+| Protected shares не затрагиваются | source только `GUARANTEE`, invariant `balance - protected - held` | PostgreSQL balance assertions до/после |
+| Согласие до расчёта | authorize увеличивает только `executed_not_settled`; recipient принимает лично | participant acceptance test и browser path |
+| Атомарный settlement | source/destination/commitment/liability/transfer/event меняются одной транзакцией | exact before/after balance assertions |
+| Scoped visibility | участник видит только перенос, где он responsible/recipient; служебные роли ограничены cooperative | API и frontend tests |
+| Повторяемые демоданные | production services, стабильные ids/idempotency keys, сохранение pending/settled state | repeated seed integration test |
+| Миграционная и API совместимость | revision `0035`, fail-closed downgrade с историей, 367-operation exact OpenAPI mirror | migration cycle и compatibility report |
+| Юридическая допустимость реального взыскания | не заявлена кодом; требуется утверждённый регламент и независимая проверка | открытый production governance gate |

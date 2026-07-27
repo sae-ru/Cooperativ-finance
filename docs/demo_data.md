@@ -86,8 +86,9 @@ Seed использует production-команды выпуска, переда
 
 Seed вызывает те же production-команды, что и API. Повторный запуск сохраняет
 одну сделку, одно обязательство, один заказ доставки и прежнюю длину signed
-journal. Споры не создаются демоданными, чтобы рабочее место по умолчанию
-показывало нормальный незавершённый процесс; их lifecycle покрыт тестами.
+journal. Основной marketplace путь остаётся без автоматического спора, но
+отдельные Slice 8 и Slice 30 создают явно помеченные учебные trust cases для
+проверки арбитража, апелляции и ограниченной компенсации.
 
 ## Состав набора Slice 6
 
@@ -99,7 +100,8 @@ journal. Споры не создаются демоданными, чтобы �
 - personally accepted `DIRECT_OBLIGATION`: reserve `30`, max loss `25`,
   coverage ratio `0.833333`;
 - READY evidence предложения/утверждения policy и открытия паевого счёта;
-- отсутствие liability case и автоматического исполнения.
+- исходный bounded-risk seed не выполняет автоматического взыскания;
+  отдельный Slice 30 добавляет финальный контролируемый compensation case.
 
 Seed использует production-команды risk service. Повторный запуск сохраняет
 одну policy, один account, один commitment и прежнюю длину signed journal.
@@ -266,3 +268,20 @@ Seed добавляет участника `Svetlana Morozova` в демонст
 ## Состав набора Slice 27
 
 Seed создает отдельный аварийный склад, отключенного прежнего хранителя `Alexey Sokolov`, активное исходное назначение, одну удержанную партию и дело `INVENTORY_PENDING`. Кандидатом является действующий демонстрационный складской хранитель. Аккаунт прежнего хранителя намеренно недоступен и не является дополнительным демонстрационным логином. Повторный seed проверен дважды и не создает дубликаты.
+
+## Состав набора Slice 30
+
+- liability incident `DEMO-COMPENSATION-INCIDENT-001` и trust/appeal case
+  `DEMO-COMPENSATION-APPEAL-001`;
+- полный original + independent appeal `AFFIRMED` lifecycle и отдельный
+  compensation controller, не участвовавший ни в одном решении;
+- перенос `15 DEMO_SHARE` из `GUARANTEE` счёта Анны в `PRIMARY` счёт Ивана;
+- после чистого seed статус `PENDING_ACCEPTANCE`: source balance `100`, protected
+  `40`, held `15`, destination balance `5`;
+- после личного принятия статус `SETTLED`: source balance `85`, protected `40`,
+  held `0`, destination balance `20`, liability `CLOSED`.
+
+Повторный seed использует стабильные ids и idempotency keys, не создаёт вторых
+дел, решений, evidence, переводов или signed events. Он принимает оба
+согласованных состояния: оставляет новый перенос ожидающим и не откатывает уже
+принятый `SETTLED` перенос обратно в demo-состояние.

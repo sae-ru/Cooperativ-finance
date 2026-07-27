@@ -10,7 +10,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import validate_node_signing_seed
 from cooperative_clearing.shared.infrastructure.database import Database
 
-EXPECTED_SCHEMA_REVISION = "0034_custody_continuity"
+EXPECTED_SCHEMA_REVISION = "0035_bounded_compensation"
 
 
 @dataclass(frozen=True, slots=True)

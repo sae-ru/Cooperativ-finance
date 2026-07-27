@@ -7,6 +7,8 @@ import MemberHomeView from "./MemberHomeView";
 import i18n from "./i18n";
 import * as participant from "./api/participant";
 import type { ParticipantDashboard } from "./api/participant";
+import * as risk from "./api/risk";
+import type { CompensationTransfer } from "./api/risk";
 
 vi.mock("./api/participant", async () => {
   const actual = await vi.importActual<typeof import("./api/participant")>("./api/participant");
@@ -16,6 +18,15 @@ vi.mock("./api/participant", async () => {
       typeof value === "function" ? vi.fn() : value,
     ]),
   );
+});
+
+vi.mock("./api/risk", async () => {
+  const actual = await vi.importActual<typeof import("./api/risk")>("./api/risk");
+  return {
+    ...actual,
+    acceptCompensation: vi.fn(),
+    getCompensations: vi.fn(),
+  };
 });
 
 const dashboard: ParticipantDashboard = {
@@ -170,6 +181,7 @@ describe("MemberHomeView", () => {
     vi.clearAllMocks();
     vi.mocked(participant.getParticipantDashboard).mockResolvedValue(dashboard);
     vi.mocked(participant.getParticipantAddresses).mockResolvedValue([]);
+    vi.mocked(risk.getCompensations).mockResolvedValue([]);
   });
 
   it("explains the member's share position, obligations, cooperative, and source", async () => {
@@ -234,4 +246,35 @@ describe("MemberHomeView", () => {
     renderView();
 
     expect(await screen.findByText("Exchange value for: Computer repair")).toBeInTheDocument();
-  });});
+  });
+
+  it("lets the recipient accept a pending share compensation from the member home", async () => {
+    const user = userEvent.setup();
+    const pending = {
+      id: "compensation-1",
+      recipient_member_id: dashboard.profile.member_id,
+      responsible_member_id: "member-2",
+      amount: "15",
+      denomination: "shares",
+      status: "PENDING_ACCEPTANCE",
+      authorized_at: "2026-07-28T10:00:00Z",
+      version: 1,
+    } as CompensationTransfer;
+    vi.mocked(risk.getCompensations).mockResolvedValue([pending]);
+    vi.mocked(risk.acceptCompensation).mockResolvedValue({
+      event_id: "event-compensation",
+      object_id: pending.id,
+      replayed: false,
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderView();
+
+    expect(await screen.findByRole("heading", { name: "My compensation" })).toBeInTheDocument();
+    expect(screen.getByText("15 shares")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Accept compensation" }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("15 shares"));
+    expect(risk.acceptCompensation).toHaveBeenCalledWith(pending, expect.anything());
+  });
+});

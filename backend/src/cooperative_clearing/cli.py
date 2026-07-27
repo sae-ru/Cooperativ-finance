@@ -62,6 +62,9 @@ from cooperative_clearing.modules.responsibility.application.demo import (
 )
 from cooperative_clearing.modules.rights.application.demo import seed_demo_rights
 from cooperative_clearing.modules.risk.application.antifraud_demo import seed_demo_antifraud
+from cooperative_clearing.modules.risk.application.compensation_demo import (
+    seed_demo_compensation,
+)
 from cooperative_clearing.modules.risk.application.demo import seed_demo_risk
 from cooperative_clearing.modules.solidarity.application.demo import seed_demo_solidarity
 from cooperative_clearing.modules.trust.application.demo import seed_demo_trust
@@ -137,6 +140,7 @@ async def seed_demo(settings: Settings) -> None:
             await seed_demo_risk(session, settings)
             await seed_demo_clearing(session, settings)
             await seed_demo_trust(session, settings)
+            await seed_demo_compensation(session, settings)
             await seed_demo_solidarity(session, settings)
             await seed_demo_crisis(session, settings)
             await seed_demo_federation(session, settings)

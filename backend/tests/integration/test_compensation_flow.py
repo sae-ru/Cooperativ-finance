@@ -55,6 +55,7 @@ async def _grant_compensation_roles(
         ("owner", RoleCode.DATA_STEWARD),
         ("controller", RoleCode.DATA_STEWARD),
         ("custodian_a", RoleCode.ARBITRATOR),
+        ("custodian_a", RoleCode.RISK_ADMIN),
         ("custodian_b", RoleCode.ARBITRATOR),
     )
     for name, role in grants:
@@ -432,6 +433,34 @@ async def test_affirmed_appeal_settles_bounded_share_compensation() -> None:
                 request_id=uuid4(),
             )
             await session.commit()
+
+        async with database.session() as session:
+            source = await session.get(ShareAccount, source_result.object_id)
+            destination = await session.get(ShareAccount, destination_result.object_id)
+            commitment = await session.get(ExposureCommitment, commitment_result.object_id)
+            liability = await session.get(LiabilityCase, liability_result.object_id)
+            assert source and destination and commitment and liability
+            with pytest.raises(
+                DomainError, match="RISK_COMPENSATION_AUTHORIZER_NOT_INDEPENDENT"
+            ):
+                await compensation_service.authorize(
+                    session,
+                    principal=people["custodian_a"],
+                    liability_case_id=liability.id,
+                    trust_case_id=trust_case_result.object_id,
+                    trust_decision_id=appeal_decision.object_id,
+                    destination_account_id=destination.id,
+                    amount=Decimal("15"),
+                    rationale="The original arbitrator cannot authorize the transfer.",
+                    evidence_ids=[authorization_evidence],
+                    expected_liability_version=liability.version,
+                    expected_source_account_version=source.version,
+                    expected_destination_account_version=destination.version,
+                    expected_commitment_version=commitment.version,
+                    idempotency_key=str(uuid4()),
+                    request_id=uuid4(),
+                )
+            await session.rollback()
 
         async with database.session() as session:
             source = await session.get(ShareAccount, source_result.object_id)

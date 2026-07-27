@@ -6,6 +6,8 @@ import {
   Clock3,
   CircleArrowOutUpRight,
   ClipboardList,
+  CheckCircle2,
+  HandCoins,
   Handshake,
   History,
   Image as ImageIcon,
@@ -46,6 +48,11 @@ import {
   type ParticipantSale,
 } from "./api/participant";
 import { userErrorMessage } from "./shared/api-error";
+import {
+  acceptCompensation,
+  getCompensations,
+  type CompensationTransfer,
+} from "./api/risk";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./member.css";
 
@@ -93,6 +100,76 @@ function obligationTitle(
 
 function errorText(error: unknown): string {
   return userErrorMessage(error);
+}
+
+function MemberCompensationSection({ memberId }: { memberId: string }) {
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+  const compensations = useQuery({
+    queryKey: ["risk", "compensations"],
+    queryFn: getCompensations,
+  });
+  const accept = useMutation({
+    mutationFn: acceptCompensation,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["risk", "compensations"] }),
+        queryClient.invalidateQueries({ queryKey: ["participant-dashboard"] }),
+      ]);
+    },
+  });
+  const transfers = compensations.data ?? [];
+  if (compensations.isPending || (!compensations.isError && transfers.length === 0)) return null;
+
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  return <section className="member-section member-compensations" aria-labelledby="member-compensations-title">
+    <div className="member-section-heading">
+      <div>
+        <h2 id="member-compensations-title">{t("member.compensation.title")}</h2>
+        <p>{t("member.compensation.subtitle")}</p>
+      </div>
+      <HandCoins size={22} />
+    </div>
+    {compensations.isError ? <p className="form-error" role="alert">{errorText(compensations.error)}</p> : null}
+    <div className="member-compensation-list">
+      {transfers.map((transfer) => {
+        const isRecipient = transfer.recipient_member_id === memberId;
+        const canAccept = isRecipient && transfer.status === "PENDING_ACCEPTANCE";
+        const amount = formatAmount(String(transfer.amount), transfer.denomination);
+        const directionKey = isRecipient ? "incoming" : "outgoing";
+        return <article className={canAccept ? "requires-action" : ""} key={transfer.id}>
+          <div className="member-compensation-icon">
+            {transfer.status === "SETTLED" ? <CheckCircle2 size={23} /> : <HandCoins size={23} />}
+          </div>
+          <div className="member-compensation-main">
+            <span>{t(`member.compensation.${directionKey}`)}</span>
+            <strong>{amount}</strong>
+            <p>{t("member.compensation.explanation")}</p>
+            <small>{t("member.compensation.authorizedAt")} {formatLocalDateTime(transfer.authorized_at)}</small>
+          </div>
+          <div className="member-compensation-action">
+            <span className={`status ${transfer.status === "SETTLED" ? "good" : transfer.status === "VOIDED" ? "bad" : "warn"}`}>
+              {t(`risk.compensation.status.${transfer.status}`)}
+            </span>
+            {canAccept ? <button
+              className="member-primary-command"
+              type="button"
+              disabled={accept.isPending}
+              onClick={() => {
+                if (window.confirm(t("member.compensation.confirm", { amount }))) {
+                  accept.mutate(transfer as CompensationTransfer);
+                }
+              }}
+            >
+              <CheckCircle2 size={17} />
+              {accept.isPending ? t("member.compensation.accepting") : t("risk.compensation.accept")}
+            </button> : null}
+          </div>
+        </article>;
+      })}
+    </div>
+    {accept.isError ? <p className="form-error" role="alert">{userErrorMessage(accept.error, locale)}</p> : null}
+  </section>;
 }
 
 function OfferImage({ offer, title }: { offer: ParticipantOffer; title: string }) {
@@ -262,6 +339,8 @@ export default function MemberHomeView({ onNavigate }: { onNavigate: (view: "dis
         <div><dt><CircleArrowOutUpRight size={18} />{t("member.due")}</dt><dd><BalanceValue value={data.exchange_position.expected_outgoing} unit={sharesUnit} /></dd></div>
       </dl>
     </section>
+
+    <MemberCompensationSection memberId={data.profile.member_id} />
 
     {data.shares.account_missing ? <section className="member-notice" role="status"><CircleHelp size={23} /><div><strong>{t("member.shares.noAccount")}</strong><p>{t("member.shares.noAccountHelp")}</p></div></section> : null}
 

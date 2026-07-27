@@ -131,12 +131,19 @@ class CompensationService:
         recipient_member_id = trust_case.claimant_member_id
         if destination.member_id != recipient_member_id:
             raise risk_error("COMPENSATION_RECIPIENT_ACCOUNT_MISMATCH", 409)
+        decision_makers = set(
+            await session.scalars(
+                select(ArbitrationDecision.issued_by_member_id).where(
+                    ArbitrationDecision.case_id == trust_case.id
+                )
+            )
+        )
         independent_people = {
             liability.responsible_member_id,
             recipient_member_id,
             liability.opened_by_member_id,
             liability.assessed_by_member_id,
-            decision.issued_by_member_id,
+            *decision_makers,
         }
         if actor.person_id in independent_people:
             raise risk_error("COMPENSATION_AUTHORIZER_NOT_INDEPENDENT", 403)

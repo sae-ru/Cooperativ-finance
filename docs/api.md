@@ -438,3 +438,20 @@ Request содержит cooperative, source/survivor UUID, версии обе�
 `GET /api/v1/inventory/custody-continuity-cases` возвращает scoped дела и строки пересчета. `GET /custody-continuity-sources` показывает только подтвержденные случаи смерти или недееспособности с активным складским назначением и партиями. `GET /custody-continuity-candidates` требует постоянную административную роль и исключает уже ответственных за склад.
 
 Команды создания, пересчета, защищенного решения и личной приемки описаны в [implemented_slice_27.md](implemented_slice_27.md). Все команды версионированы и идемпотентны; решение `SECURITY_ADMIN` требует step-up. HTTP `201` означает сохраненное подписанное событие, а `BLOCKED` является успешным fail-closed результатом, а не скрытой серверной ошибкой.
+
+## Финальная ограниченная компенсация Slice 30
+
+```text
+GET  /api/v1/risk/compensations
+POST /api/v1/risk/liability-cases/{case_id}/compensations
+POST /api/v1/risk/compensations/{transfer_id}/acceptance
+POST /api/v1/risk/compensations/{transfer_id}/void
+```
+
+Список ограничен cooperative scope служебной роли либо личным участием
+ответственного/получателя. Авторизация требует final trust decision, точные
+ссылки liability/trust/account, независимого `RISK_ADMIN`, READY evidence,
+`Idempotency-Key` и expected versions. Она только резервирует bounded amount.
+Settlement выполняет только владелец целевого member account личной acceptance;
+void до acceptance требует другого независимого оператора, причины и evidence.
+Сырые machine codes переводятся интерфейсом в понятные RU/EN сообщения.

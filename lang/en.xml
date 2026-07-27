@@ -356,6 +356,14 @@
     <message key="member.shares.policy">Valuation policy</message>
     <message key="member.shares.maxExposure">Maximum exposure</message>
     <message key="member.shares.source">Basis:</message>
+    <message key="member.compensation.title">My compensation</message>
+    <message key="member.compensation.subtitle">Share transfers after a final dispute decision</message>
+    <message key="member.compensation.incoming">Awarded to you</message>
+    <message key="member.compensation.outgoing">From your security</message>
+    <message key="member.compensation.explanation">Independent responsible people verified the amount. It is not transferred until the recipient personally accepts it.</message>
+    <message key="member.compensation.authorizedAt">Authorized:</message>
+    <message key="member.compensation.confirm">Accept {{amount}}? This transfer cannot be undone through the interface after settlement.</message>
+    <message key="member.compensation.accepting">Transferring</message>
     <message key="member.contour.PRIMARY">Primary share</message>
     <message key="member.contour.GUARANTEE">Guarantee contour</message>
     <message key="member.contour.ROLE">Role bond</message>

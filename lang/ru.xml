@@ -356,6 +356,14 @@
     <message key="member.shares.policy">Политика оценки</message>
     <message key="member.shares.maxExposure">Максимальная экспозиция</message>
     <message key="member.shares.source">Основание:</message>
+    <message key="member.compensation.title">Мои компенсации</message>
+    <message key="member.compensation.subtitle">Переводы паёв после окончательного решения по спору</message>
+    <message key="member.compensation.incoming">Назначено вам</message>
+    <message key="member.compensation.outgoing">Из вашего обеспечения</message>
+    <message key="member.compensation.explanation">Сумма проверена независимыми ответственными лицами и не перечисляется без личного принятия получателем.</message>
+    <message key="member.compensation.authorizedAt">Разрешено:</message>
+    <message key="member.compensation.confirm">Принять {{amount}}? После перечисления отменить это действие через интерфейс нельзя.</message>
+    <message key="member.compensation.accepting">Перечисляем</message>
     <message key="member.contour.PRIMARY">Основной пай</message>
     <message key="member.contour.GUARANTEE">Гарантийный контур</message>
     <message key="member.contour.ROLE">Ролевое обеспечение</message>

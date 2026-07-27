@@ -21,6 +21,21 @@
 .member-notice { display: flex; align-items: start; gap: 12px; padding: 14px 16px; color: var(--amber); background: var(--amber-soft); border: 1px solid color-mix(in srgb, var(--amber) 28%, transparent); border-radius: 6px; }
 .member-notice strong { font-size: 12px; }
 .member-notice p { margin: 4px 0 0; color: var(--ink); font-size: 11px; line-height: 1.45; }
+.member-compensations { padding: 0; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.member-compensations > .member-section-heading { padding: 0 16px; background: color-mix(in srgb, var(--surface) 82%, var(--green-soft)); border-bottom: 1px solid var(--line); }
+.member-compensation-list { display: grid; }
+.member-compensation-list article { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 13px; min-width: 0; padding: 14px 16px; background: var(--surface); border-top: 1px solid var(--line); }
+.member-compensation-list article:first-child { border-top: 0; }
+.member-compensation-list article.requires-action { background: color-mix(in srgb, var(--surface) 88%, var(--green-soft)); }
+.member-compensation-icon { display: grid; width: 40px; height: 40px; place-items: center; color: var(--forest); background: var(--green-soft); border-radius: 50%; }
+.member-compensation-main { display: grid; min-width: 0; gap: 4px; }
+.member-compensation-main > span { color: var(--green); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.member-compensation-main > strong { font-size: 18px; overflow-wrap: anywhere; }
+.member-compensation-main p { margin: 0; color: var(--ink); font-size: 10px; line-height: 1.45; }
+.member-compensation-main small { color: var(--muted); font-size: 8px; }
+.member-compensation-action { display: grid; justify-items: end; gap: 9px; min-width: 170px; }
+.member-compensation-action .status { min-width: 150px; }
+.member-compensations > .form-error { margin: 12px 16px; }
 .member-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
 .member-actions button { display: grid; grid-template-columns: 24px minmax(0, 1fr) 18px; align-items: center; gap: 11px; min-height: 70px; padding: 13px 15px; color: var(--ink); text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
 .member-actions button:hover { border-color: var(--green); background: color-mix(in srgb, var(--surface) 88%, var(--green-soft)); }
@@ -97,6 +112,7 @@
 .valuation-explanation strong { display: block; margin-bottom: 4px; color: var(--ink); font-size: 11px; }
 @media (max-width: 1100px) { .member-responsibility-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .member-balance-band { grid-template-columns: 1fr; } .member-balance-band > dl { grid-template-columns: repeat(3, 1fr); } .member-balance-band > dl div { min-height: 92px; border-top: 1px solid rgba(255,255,255,.12); } .member-offer-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 760px) { .member-responsibility-list { grid-template-columns: 1fr; } .member-heading { grid-template-columns: 46px minmax(0, 1fr); } .member-heading > .status { grid-column: 2; justify-self: start; } .member-heading h1 { font-size: 22px; } .member-balance-primary { min-height: 124px; } .member-balance-band > dl { grid-template-columns: repeat(2, 1fr); } .member-balance-band > dl div { min-height: 84px; } .member-actions { grid-template-columns: 1fr; } .member-offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .member-offer-grid article > img, .member-offer-placeholder { height: 118px; } .member-two-columns { grid-template-columns: 1fr; } .valuation-explanation { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .member-compensation-list article { grid-template-columns: 40px minmax(0, 1fr); } .member-compensation-action { grid-column: 1 / -1; width: 100%; min-width: 0; justify-items: stretch; } .member-compensation-action .status { min-width: 0; } .member-compensation-action button { justify-content: center; } }
 @media (max-width: 430px) { .member-offer-grid { grid-template-columns: 1fr; } .member-account-list details > dl { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
 .member-offer-address,
 .member-history-address { display: flex; align-items: flex-start; gap: 5px; line-height: 1.4; overflow-wrap: anywhere; }

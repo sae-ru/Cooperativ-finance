@@ -104,6 +104,9 @@
 | `shares.exposure_released` | commitment, reason, evidence |
 | `liability.case_opened` | case, incident, facts, causal graph, evidence |
 | `liability.assessment_recorded` | case, fault class, loss, coverage, appeal, evidence |
+| `liability.compensation_authorized` | case, final decision, accounts, bounded amount, controller, evidence |
+| `liability.compensation_settled` | transfer, recipient acceptance, balances before/after |
+| `liability.compensation_voided` | transfer, independent operator, reason, evidence |
 | `risk.antifraud_signal_detected` | scan, rule/version, subject, severity, action, observed facts, thresholds |
 | `risk.antifraud_signal_reobserved` | signal, scan, subject, occurrence count, observed time |
 | `risk.antifraud_scan_completed` | cooperative, algorithm, cutoff/lookback, counts, automatic decisions |
@@ -113,8 +116,9 @@
 | `responsibility.custody_offered` | subject, from, to |
 | `responsibility.custody_accepted` | subject, from, to, evidence |
 
-Событие исполнения coverage намеренно отсутствует в Slice 6: assessment не
-двигает пай автоматически.
+Автоматическое исполнение coverage из Slice 6 по-прежнему отсутствует:
+assessment не двигает пай. Slice 30 разрешает только ограниченный перенос после
+финального решения, независимой авторизации и личного принятия получателем.
 
 ## Trust
 

@@ -305,3 +305,26 @@ checkbox до зелёного workflow на опубликованном commit
 Эти проверки подтверждают code-level baseline. Они не заменяют длительный
 мониторинг на целевом host, физическое испытание ИБП, ручную browser/device
 матрицу и независимую проверку диагностического пакета по privacy policy.
+
+## Проверки Slice 30
+
+Backend integration покрывает полный liability -> original decision -> appeal
+`AFFIRMED` -> independent authorization -> personal acceptance lifecycle,
+запреты всех decision makers, scoped visibility, idempotency, exact balances и
+неизменность protected amount. Отдельный repeated-seed test запускает тот же
+production demo дважды; `scripts/test-critical-quality.sh` включает и доменный
+E2E, и demo regression.
+
+Проверенный checkpoint 28 июля 2026 года: Ruff; strict mypy по `264` source
+files; `251 passed, 1 deselected`; line coverage `82.94%` при пороге `75%`;
+`67` frontend files / `189` tests; TypeScript typecheck и production PWA build.
+Migration cycle `0034 -> 0035 -> 0034 -> 0035` прошёл на пустой БД, а downgrade
+БД с compensation history ожидаемо остановился fail-closed. OpenAPI содержит
+`367` операций, совместим с baseline и byte-exact совпадает между backend и
+frontend. Signed journal verification прошла для `623` событий.
+
+Живой Docker/browser сценарий подтвердил русскую и английскую локали, desktop и
+mobile `390x844` без горизонтального overflow и личное принятие `15 DEMO_SHARE`:
+source `100 -> 85`, destination `5 -> 20`, protected amount `40 -> 40`, held
+`15 -> 0`. Эти проверки не заменяют legal/security review, restore drill и
+полевой pilot на целевом Linux host.

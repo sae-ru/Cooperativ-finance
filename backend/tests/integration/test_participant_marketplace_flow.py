@@ -515,11 +515,16 @@ async def test_local_purchase_becomes_deal_and_is_visible_to_both_participants()
             farmer_data = farmer_dashboard.json()["data"]
             assert farmer_data["profile"]["login"] == "farmer"
             assert farmer_data["memberships"][0]["member_number"] == "D-0007"
-            assert Decimal(farmer_data["shares"]["total_balance"]) == Decimal("50")
-            assert Decimal(farmer_data["shares"]["available"]) == Decimal("40")
+            assert Decimal(farmer_data["shares"]["total_balance"]) == Decimal("55")
+            assert Decimal(farmer_data["shares"]["available"]) == Decimal("45")
             assert Decimal(farmer_data["shares"]["protected"]) == Decimal("10")
+            guarantee_account = next(
+                account
+                for account in farmer_data["shares"]["accounts"]
+                if account["contour"] == "GUARANTEE"
+            )
             assert (
-                farmer_data["shares"]["accounts"][0]["sources"][0]["source_reference"]
+                guarantee_account["sources"][0]["source_reference"]
                 == "DEMO-SHARE-REGISTER-FARMER-V1"
             )
             assert any(

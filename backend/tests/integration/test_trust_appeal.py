@@ -205,7 +205,14 @@ async def test_trust_api_limits_participants_and_exposes_role_workspaces() -> No
             own_case = client.get(f"/api/v1/trust/cases/{case.id}")
             own_profile = client.get(f"/api/v1/trust/reputation/profiles/{anna_id}")
             forbidden_workspace = client.get("/api/v1/trust/workspaces/arbitrator")
-            assert cases.status_code == 200 and len(cases.json()["data"]) == 1
+            visible_case_references = {
+                item["case_reference"] for item in cases.json()["data"]
+            }
+            assert cases.status_code == 200
+            assert visible_case_references == {
+                "DEMO-TRUST-APPEAL-001",
+                "DEMO-COMPENSATION-APPEAL-001",
+            }
             assert own_case.status_code == 200
             assert own_profile.status_code == 200
             assert forbidden_workspace.status_code == 403

@@ -51,6 +51,7 @@ tests=(
   tests/integration/test_solidarity_concurrency.py
   tests/integration/test_risk_flow.py
   tests/integration/test_compensation_flow.py
+  tests/integration/test_compensation_demo.py
   tests/integration/test_signed_journal_responsibility.py::test_concurrent_commands_preserve_node_sequence
 )
 

@@ -208,7 +208,7 @@ async def test_node_initialization_and_demo_seed_are_idempotent() -> None:
     assert journal_report.checked_events > 0
     assert journal_report.last_sequence == journal_report.checked_events
     assert before == after
-    assert before[1:] == (1, 2, 1, 1, 2, 1, 2, 1)
+    assert before[1:] == (1, 3, 1, 1, 2, 1, 2, 1)
 
 
 @pytest.mark.integration

@@ -19,7 +19,7 @@
 - [ ] Нет двойного выпуска, погашения, резервирования и execution.
 - [x] Protected amount и solidarity contour недоступны взысканию.
 - [ ] Каждая critical command имеет actor/role/scope/evidence/exposure.
-- [ ] Appeal и compensation проверены end-to-end.
+- [x] Appeal и compensation проверены end-to-end ([evidence](implemented_slice_30.md)).
 - [x] Reserve status использует только physical verified evidence и bounded snapshot age ([evidence](implemented_slice_10.md)).
 - [x] Crisis mandate имеет dual control, mandatory review, expiry, maximum end и safe state ([evidence](implemented_slice_10.md)).
 - [x] Rationing сохраняет protected minimum, exact stock bound и не создаёт debt/reputation ([evidence](implemented_slice_10.md)).
@@ -333,3 +333,17 @@ Operations checkbox остаются открытыми до проверки н
 checkbox требует независимого просмотра privacy owner; организационные роли,
 runbooks на бумаге, support training, RTO/RPO и pilot evidence также не могут
 быть закрыты результатом автоматических тестов.
+
+## Текущее доказательство Slice 30
+
+На локальном полном Docker-стенде 28 июля 2026 года подтверждены миграция
+`0035`, полный compensation lifecycle, детерминированный повторный seed,
+атомарный расчёт, signed journal, RU/EN и desktop/mobile participant UI. Полный
+backend checkpoint: `251 passed, 1 deselected`, coverage `82.94%`; frontend:
+`67` файлов, `189` тестов, typecheck и production build; OpenAPI: `367`
+совместимых операций и точное зеркало.
+
+Этот checkbox закрывает code-level end-to-end, а не общую production readiness.
+Пункты legal/governance, независимый security review, проверенный restore с
+RTO/RPO, целевой Linux host и полевой pilot остаются открытыми и не могут быть
+закрыты локальным тестом разработчика.

@@ -244,9 +244,10 @@ index запрещает вторую pending/active связь той же па
 ### `risk.exposure_commitments`
 
 Ссылка на account и действовавшую policy, владелец, тип обязательства, risk id,
-стороны/role assignment, `amount_reserved`, `max_loss`, `coverage_ratio`, срок,
-условия, exclusions, canonical terms/hash, личное acceptance, release и
-version.
+стороны/role assignment, `amount_reserved`, `executed_amount`, `max_loss`,
+`coverage_ratio`, срок, условия, exclusions, canonical terms/hash, личное
+acceptance, release и version. `executed_amount` учитывает уже завершённую часть
+ограниченной ответственности отдельно от активного резерва.
 
 Активный резерв входит в доступный остаток счёта и aggregate exposure участника
 и всей связной компоненты. Один и тот же risk id нельзя активировать повторно.
@@ -258,8 +259,26 @@ affected amount, факты, causal graph, fault class, assessed loss, coverage
 summary, rationale, appeal deadline, независимые actor/event refs и version.
 
 Сумма assessed loss всех случаев одного commitment ограничена `max_loss`.
-Текущий срез хранит assessment как `NOT_EXECUTED`: автоматического движения
-пая нет.
+Assessment сам по себе хранится как `NOT_EXECUTED` и не двигает пай. Только
+отдельный финальный lifecycle Slice 30 может связать решение с ограниченным
+переносом.
+
+### `risk.compensation_transfers`
+
+Неудаляемая запись связывает точные `liability_case`, `trust_case`, финальное
+`trust_decision`, `exposure_commitment`, исходный `GUARANTEE` и целевой `PRIMARY`
+счета. Она хранит сумму и номинал, авторизовавшего оператора, принявшего
+получателя либо аннулировавшего оператора, rationale/evidence, timestamps,
+снимки балансов до и после, status и optimistic version.
+
+Partial unique index допускает не более одного активного или завершённого
+переноса на liability case. CHECK constraints запрещают неположительную сумму,
+смешение terminal-состояний и несогласованные снимки: завершённый перенос обязан
+иметь `source_before - amount = source_after` и
+`destination_before + amount = destination_after`. До личного принятия сумма
+учитывается в `executed_not_settled`; при settlement балансы обоих счетов,
+commitment, liability case и signed event меняются одной транзакцией. DELETE для
+истории компенсации отсутствует.
 
 ## Trust и солидарность
 
