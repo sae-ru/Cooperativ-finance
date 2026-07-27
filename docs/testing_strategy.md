@@ -258,3 +258,9 @@ Unit-тесты покрывают нормализацию входа и refere
 ## Проверки Slice 27
 
 Модульные тесты проверяют сроки, ссылки на основания, постоянные роли, количество и fail-closed blockers. PostgreSQL integration проходит цепочку исходное назначение -> containment -> hold -> независимый пересчет -> одобрение -> личная приемка и отдельно доказывает блокировку обычной складской команды. Frontend-тесты проверяют RU/EN, ролевые действия, обязательные акты и optimistic versions. Миграционный gate включает минимальные права runtime-роли и цикл `0033 <-> 0034`.
+
+## Проверки Slice 28
+
+Pure Python tests проверяют precedence process/`.env`, точные environment values, atomic rewrite без дублей, fresh production, запрет demo promotion, known demo credentials и hardened downgrade. Static contract tests требуют одинаковые signed-bundle/no-build guards в Windows/Linux wrappers, сохранение operational artifacts, их чтение backup/update scripts и отсутствие alias `prod`.
+
+PowerShell scripts проходят parser, Linux scripts - `sh -n`. PostgreSQL integration отдельно доказывает отказ при `demo_data_loaded`, отказ in-place hardened transition и допустимый повторный старт fresh production profile. Release bundle suite включает `runtime_environment.py` в подписанный node payload. Живой demo regression должен подтвердить `environment=dev`, `demo_data_loaded=true`, `OPERATIONAL`, `RUNNING` и отсутствие browser regressions.

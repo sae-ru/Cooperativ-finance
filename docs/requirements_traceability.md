@@ -256,3 +256,17 @@ acceptance criteria и tests. Если строка карты меняется,
 | Остановить операции на время | `continuity_hold_case_id` блокирует контроль, расхождение, передачу и погашение права |
 | Не наследовать роль и репутацию | создается новое временное назначение; исходная роль, паи и репутация не переносятся |
 | Юридическая собственность и наследники | намеренно не заявлены закрытыми; OD-019, OD-033, OD-038 |
+
+## Slice 28 trace
+
+| Требование | Реализация и доказательство |
+|---|---|
+| Один production environment contract | canonical resolver принимает только пять значений; `prod` отклоняется |
+| Не выдавать dev за production | `start.*` записывает `COOP_ENVIRONMENT=production` в `.env`; status хранит то же значение |
+| Не занести demo в production | config/known-credential preflight и PostgreSQL `demo_data_loaded` guard |
+| Только подписанный выпуск | bundle signature, expected release, independent public key и pinned policy обязательны |
+| Не собирать и не загружать иные образы | verifier сверяет content ID; Compose использует `--no-build --pull never` |
+| Не потерять recovery context после закрытия shell | абсолютные bundle/key paths и policy hash атомарно сохраняются; backup/update читают их общим helper |
+| Не обойти update/evidence ограничения | общий resolver, запрет faultpoint/build/DATA_ONLY и dirty override в production |
+| Windows/Linux parity | PowerShell/Linux wrappers, parser checks и shared regression suite |
+| Внешнее разрешение production | намеренно не заявлено закрытым; подписанный readiness review остаётся обязательным |

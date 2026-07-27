@@ -66,7 +66,7 @@ screen reader, contrast/reflow и browser/device matrix.
 - OpenAPI SHA-256;
 - `COMPLETE` и `SHA256SUMS`.
 
-В `prod` грязное Git-дерево запрещено по умолчанию. Каталог `evidence/`
+В каноническом `production` грязное Git-дерево запрещено без override (уточнено в Slice 28). Каталог `evidence/`
 игнорируется Git. Контрольный пакет `release-20260721T204307Z` успешно прошёл
 повторную проверку всех checksum; он является локальным runtime-артефактом и
 не включён в репозиторий.

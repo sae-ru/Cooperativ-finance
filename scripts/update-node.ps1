@@ -11,6 +11,21 @@ param(
 $ErrorActionPreference = "Stop"
 $utf8 = [Text.UTF8Encoding]::new($false)
 $root = Split-Path -Parent $PSScriptRoot
+function Get-RuntimeSetting([string] $Name) {
+    $output = @(& python (Join-Path $PSScriptRoot "runtime_environment.py") get --root $root --name $Name)
+    if ($LASTEXITCODE -ne 0) { throw "Runtime setting resolution failed: $Name" }
+    if ($output.Count -eq 0) { return "" }
+    return $output[-1].Trim()
+}
+$releasePublicKey = if ($env:COOP_RELEASE_PUBLIC_KEY) {
+    $env:COOP_RELEASE_PUBLIC_KEY
+} else { Get-RuntimeSetting "COOP_RELEASE_PUBLIC_KEY" }
+$policySha256 = if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
+    $env:COOP_RELEASE_LICENSE_POLICY_SHA256
+} else { Get-RuntimeSetting "COOP_RELEASE_LICENSE_POLICY_SHA256" }
+$currentVerifiedBundle = if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
+    $env:COOP_VERIFIED_RELEASE_BUNDLE
+} else { Get-RuntimeSetting "COOP_VERIFIED_RELEASE_BUNDLE" }
 $compose = @("compose", "--project-directory", $root, "-f", (Join-Path $root "compose.yaml"))
 $envFile = Join-Path $root ".env"
 $current = if ($env:COOP_RELEASE) { $env:COOP_RELEASE } else { "0.1.0-dev" }
@@ -19,32 +34,26 @@ if (Test-Path $envFile) {
     if ($stored) { $current = $stored.Substring("COOP_RELEASE=".Length) }
 }
 if ($current -eq $TargetRelease) { throw "Release $TargetRelease is already selected" }
-$environment = if ($env:COOP_ENVIRONMENT) {
-    $env:COOP_ENVIRONMENT
-} else { $null }
-if (-not $environment -and (Test-Path $envFile)) {
-    $environmentLine = Get-Content $envFile |
-        Where-Object { $_ -match "^COOP_ENVIRONMENT=" } |
-        Select-Object -Last 1
-    if ($environmentLine) {
-        $environment = $environmentLine.Substring("COOP_ENVIRONMENT=".Length)
-    }
-}
-if (-not $environment) { $environment = "dev" }
+$environmentOutput = & python (Join-Path $PSScriptRoot "runtime_environment.py") resolve --root $root
+if ($LASTEXITCODE -ne 0) { throw "Runtime environment resolution failed" }
+$environment = ($environmentOutput | Select-Object -Last 1).Trim()
 $failpoint = if ($env:COOP_UPDATE_FAILPOINT) {
     $env:COOP_UPDATE_FAILPOINT
 } else { "none" }
 if ($failpoint -notin @("none", "after-release-switch", "after-migration", "after-startup")) {
     throw "Unsupported COOP_UPDATE_FAILPOINT: $failpoint"
 }
-if ($environment -eq "prod" -and $failpoint -ne "none") {
+if ($environment -eq "production" -and $failpoint -ne "none") {
     throw "Update faultpoints are forbidden in production"
 }
-if ($environment -eq "prod" -and -not $OfflineBundle) {
+if ($environment -eq "production" -and -not $OfflineBundle) {
     throw "Production update requires a signed offline bundle"
 }
-if ($environment -eq "prod" -and $Build) {
+if ($environment -eq "production" -and $Build) {
     throw "Production update cannot build images from source"
+}
+if ($environment -eq "production" -and (-not $releasePublicKey -or -not $policySha256)) {
+    throw "Production update requires the persisted release public key and license-policy SHA-256"
 }
 $httpPort = if ($env:COOP_HTTP_PORT) { $env:COOP_HTTP_PORT } else { $null }
 if (-not $httpPort -and (Test-Path $envFile)) {
@@ -57,7 +66,7 @@ if (-not $httpPort) { $httpPort = "8080" }
 
 if ($OfflineBundle) {
     $bundle = (Resolve-Path -LiteralPath $OfflineBundle).Path
-    if (-not $env:COOP_RELEASE_PUBLIC_KEY) {
+    if (-not $releasePublicKey) {
         throw "COOP_RELEASE_PUBLIC_KEY must name the independently provisioned public key"
     }
     $verification = @(
@@ -66,15 +75,15 @@ if ($OfflineBundle) {
         "--bundle"
         $bundle
         "--public-key"
-        $env:COOP_RELEASE_PUBLIC_KEY
+        $releasePublicKey
         "--expected-release"
         $TargetRelease
         "--load-images"
     )
-    if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
+    if ($policySha256) {
         $verification += @(
             "--expected-policy-sha256",
-            $env:COOP_RELEASE_LICENSE_POLICY_SHA256
+            $policySha256
         )
     }
     & python @verification
@@ -85,14 +94,14 @@ if ($env:COOP_BACKUP_ROOT) { $backupArgs.BackupRoot = $env:COOP_BACKUP_ROOT }
 if ($env:COOP_ENCRYPTED_RECOVERY_BUNDLE) {
     $backupArgs.EncryptedRecoveryBundle = $env:COOP_ENCRYPTED_RECOVERY_BUNDLE
 }
-if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
-    $backupArgs.VerifiedReleaseBundle = $env:COOP_VERIFIED_RELEASE_BUNDLE
+if ($currentVerifiedBundle) {
+    $backupArgs.VerifiedReleaseBundle = $currentVerifiedBundle
 }
 $backup = & (Join-Path $PSScriptRoot "backup-node.ps1") @backupArgs | Select-Object -Last 1
 $kindLine = Get-Content (Join-Path $backup "manifest.env") | Where-Object { $_ -match "^backup_kind=" }
 $kind = $kindLine.Substring("backup_kind=".Length)
 if ($kind -ne "FULL") {
-    if ($environment -eq "prod" -or -not $AllowDataOnlyBackup) {
+    if ($environment -eq "production" -or -not $AllowDataOnlyBackup) {
         throw "Update refused: pre-update backup is DATA_ONLY"
     }
 }
@@ -150,6 +159,26 @@ try {
     & (Join-Path $PSScriptRoot "verify-stack.ps1") -BaseUrl "http://127.0.0.1:$httpPort"
     & docker @compose run --rm --no-deps api coopctl verify-journal
     if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
+    if ($environment -eq "production") {
+        $contextUpdate = @(
+            (Join-Path $PSScriptRoot "runtime_environment.py")
+            "configure"
+            "--root"
+            $root
+            "--mode"
+            "production"
+            "--release"
+            $TargetRelease
+            "--verified-release-bundle"
+            $bundle
+            "--release-public-key"
+            $releasePublicKey
+            "--license-policy-sha256"
+            $policySha256
+        )
+        & python @contextUpdate | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Release recovery context update failed" }
+    }
 }
 catch {
     & (Join-Path $PSScriptRoot "rollback-node.ps1") -Release $current

@@ -3,13 +3,18 @@ set -Eeuo pipefail
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 output_root="${1:-${COOP_EVIDENCE_ROOT:-$root_dir/evidence}}"
-environment="${COOP_ENVIRONMENT:-dev}"
+python_bin="${PYTHON:-python3}"
+environment="$("$python_bin" "$root_dir/scripts/runtime_environment.py" resolve --root "$root_dir")"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 destination="$output_root/release-$timestamp"
 compose=(docker compose --project-directory "$root_dir" -f "$root_dir/compose.yaml")
 git_status="$(git -C "$root_dir" status --porcelain=v1)"
 
-if [ "$environment" = "prod" ] && [ -n "$git_status" ] && [ "${COOP_ALLOW_DIRTY_EVIDENCE:-0}" != "1" ]; then
+if [ "$environment" = "production" ] && [ "${COOP_ALLOW_DIRTY_EVIDENCE:-0}" = "1" ]; then
+  echo "Production evidence cannot override the clean-worktree requirement" >&2
+  exit 1
+fi
+if [ "$environment" = "production" ] && [ -n "$git_status" ]; then
   echo "Production evidence requires a clean Git worktree" >&2
   exit 1
 fi

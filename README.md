@@ -28,7 +28,7 @@
 
 ### Запуск одной командой
 
-Нужны только Docker Desktop на Windows либо Docker Engine с Compose на Linux.
+Для деморежима нужен только Docker Desktop на Windows либо Docker Engine с Compose на Linux. Production verifier дополнительно требует Python 3.
 
 ```bat
 start.bat
@@ -40,7 +40,18 @@ sh ./start.sh
 
 Обе команды создают конфигурацию и секреты, собирают контейнеры, применяют миграции, загружают демоданные и проверяют готовность узла. После запуска откройте `http://127.0.0.1:8080`. Демо-логины и пароли приведены в [руководстве по развёртыванию](docs/deployment.md#демонстрационные-учетные-записи).
 
-Для узла без демонстрационных данных используйте `start.bat production` или `sh ./start.sh production`; в этом режиме пароли генерируются случайно.
+Production-режим не собирает локальный исходный код и не запускается поверх демоузла. Для чистого узла передайте подписанный offline bundle, независимо полученный public key, ожидаемый release и утверждённый SHA-256 license policy:
+
+```bat
+start.bat production <bundle-directory> <public-key> <release> <policy-sha256>
+```
+
+```bash
+sh ./start.sh production <bundle-directory> <public-key> <release> <policy-sha256>
+```
+
+Команда проверяет подпись и полный состав bundle, загружает образы, создаёт случайные начальные пароли и запускает Compose только с `--no-build --pull never`. Проверенные абсолютные пути bundle/public key и policy hash сохраняются для последующих backup/update.
+
 ### Простой путь покупки
 
 1. Откройте **Рынок**.
@@ -87,7 +98,7 @@ A person sees a simple marketplace: choose milk, nails, cabbage, or another prod
 
 ### One-command startup
 
-The only prerequisite is Docker Desktop on Windows or Docker Engine with Compose on Linux.
+Demo mode only requires Docker Desktop on Windows or Docker Engine with Compose on Linux. The production verifier additionally requires Python 3.
 
 ```bat
 start.bat
@@ -99,7 +110,18 @@ sh ./start.sh
 
 Both commands create configuration and secrets, build containers, apply migrations, load demo data, and verify node readiness. Then open `http://127.0.0.1:8080`. Demo credentials are listed in the [deployment guide](docs/deployment.md#demo-accounts).
 
-For a node without demo data, use `start.bat production` or `sh ./start.sh production`; this mode generates random passwords.
+Production mode neither builds local source nor starts over a demo node. On a clean node, provide the signed offline bundle, an independently obtained public key, the expected release, and the approved license-policy SHA-256:
+
+```bat
+start.bat production <bundle-directory> <public-key> <release> <policy-sha256>
+```
+
+```bash
+sh ./start.sh production <bundle-directory> <public-key> <release> <policy-sha256>
+```
+
+The command verifies the signature and complete bundle inventory, loads the images, creates random bootstrap passwords, and starts Compose only with `--no-build --pull never`. Verified absolute bundle/public-key paths and the policy hash are persisted for later backup/update operations.
+
 ### Simple buying flow
 
 1. Open **Market**.

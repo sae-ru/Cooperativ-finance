@@ -20,6 +20,28 @@ class NodeRepository:
         self.session = session
 
     async def initialize_profile(self, settings: Settings) -> UUID:
+        existing_result = await self.session.execute(
+            select(NodeProfile)
+            .where(NodeProfile.node_code == settings.node_code)
+            .with_for_update()
+        )
+        existing = existing_result.scalar_one_or_none()
+        hardened = {"staging-node", "pilot", "production"}
+        if existing is not None:
+            if existing.demo_data_loaded and settings.environment.value in hardened:
+                raise RuntimeError(
+                    "demo data is present; hardened environment startup is forbidden"
+                )
+            if (
+                existing.environment != settings.environment.value
+                and (
+                    existing.environment in hardened
+                    or settings.environment.value in hardened
+                )
+            ):
+                raise RuntimeError(
+                    "in-place transition to or from a hardened environment is forbidden"
+                )
         profile_id = uuid5(NAMESPACE_URL, f"cooperative-clearing:node:{settings.node_code}")
         statement = insert(NodeProfile).values(
             id=profile_id,

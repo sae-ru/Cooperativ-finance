@@ -8,6 +8,18 @@ param(
 $ErrorActionPreference = "Stop"
 $utf8 = New-Object Text.UTF8Encoding($false)
 $root = Split-Path -Parent $PSScriptRoot
+function Get-RuntimeSetting([string] $Name) {
+    $output = @(& python (Join-Path $PSScriptRoot "runtime_environment.py") get --root $root --name $Name)
+    if ($LASTEXITCODE -ne 0) { throw "Runtime setting resolution failed: $Name" }
+    if ($output.Count -eq 0) { return "" }
+    return $output[-1].Trim()
+}
+$releasePublicKey = if ($env:COOP_RELEASE_PUBLIC_KEY) {
+    $env:COOP_RELEASE_PUBLIC_KEY
+} else { Get-RuntimeSetting "COOP_RELEASE_PUBLIC_KEY" }
+$policySha256 = if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
+    $env:COOP_RELEASE_LICENSE_POLICY_SHA256
+} else { Get-RuntimeSetting "COOP_RELEASE_LICENSE_POLICY_SHA256" }
 if (-not $BackupRoot) { $BackupRoot = Join-Path $root "backups" }
 $BackupRoot = [IO.Path]::GetFullPath($BackupRoot)
 $project = if ($env:COMPOSE_PROJECT_NAME) { $env:COMPOSE_PROJECT_NAME } else { "cooperative-clearing" }
@@ -20,8 +32,10 @@ if (-not $release -and (Test-Path (Join-Path $root ".env"))) {
     if ($releaseLine) { $release = $releaseLine.Substring("COOP_RELEASE=".Length) }
 }
 if (-not $release) { $release = "0.1.0-dev" }
-if (-not $VerifiedReleaseBundle -and $env:COOP_VERIFIED_RELEASE_BUNDLE) {
-    $VerifiedReleaseBundle = $env:COOP_VERIFIED_RELEASE_BUNDLE
+if (-not $VerifiedReleaseBundle) {
+    $VerifiedReleaseBundle = if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
+        $env:COOP_VERIFIED_RELEASE_BUNDLE
+    } else { Get-RuntimeSetting "COOP_VERIFIED_RELEASE_BUNDLE" }
 }
 $releaseMaterial = "external-required"
 $releaseManifestHash = "none"
@@ -52,7 +66,7 @@ try {
     [IO.File]::WriteAllLines((Join-Path $work "journal-verification.json"), [string[]] $journal, $utf8)
 
     if ($VerifiedReleaseBundle) {
-        if (-not $env:COOP_RELEASE_PUBLIC_KEY) {
+        if (-not $releasePublicKey) {
             throw "COOP_RELEASE_PUBLIC_KEY is required to include a release in backup"
         }
         $bundle = (Resolve-Path -LiteralPath $VerifiedReleaseBundle).Path
@@ -62,14 +76,14 @@ try {
             "--bundle"
             $bundle
             "--public-key"
-            $env:COOP_RELEASE_PUBLIC_KEY
+            $releasePublicKey
             "--expected-release"
             $release
         )
-        if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
+        if ($policySha256) {
             $verification += @(
                 "--expected-policy-sha256",
-                $env:COOP_RELEASE_LICENSE_POLICY_SHA256
+                $policySha256
             )
         }
         & python @verification | Out-Null

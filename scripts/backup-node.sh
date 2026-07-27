@@ -5,13 +5,20 @@ root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 backup_root="${1:-${COOP_BACKUP_ROOT:-$root_dir/backups}}"
 project="${COMPOSE_PROJECT_NAME:-cooperative-clearing}"
 compose=(docker compose --project-directory "$root_dir" -f "$root_dir/compose.yaml")
+python_bin="${PYTHON:-python3}"
+runtime_setting() {
+  "$python_bin" "$root_dir/scripts/runtime_environment.py" get \
+    --root "$root_dir" --name "$1"
+}
 
 release="${COOP_RELEASE:-}"
 if [ -z "$release" ] && [ -f "$root_dir/.env" ]; then
   release="$(sed -n 's/^COOP_RELEASE=//p' "$root_dir/.env" | tail -n 1)"
 fi
 release="${release:-0.1.0-dev}"
-verified_release_bundle="${COOP_VERIFIED_RELEASE_BUNDLE:-}"
+verified_release_bundle="${COOP_VERIFIED_RELEASE_BUNDLE:-$(runtime_setting COOP_VERIFIED_RELEASE_BUNDLE)}"
+release_public_key="${COOP_RELEASE_PUBLIC_KEY:-$(runtime_setting COOP_RELEASE_PUBLIC_KEY)}"
+policy_sha256="${COOP_RELEASE_LICENSE_POLICY_SHA256:-$(runtime_setting COOP_RELEASE_LICENSE_POLICY_SHA256)}"
 release_material="external-required"
 release_manifest_sha256="none"
 
@@ -58,21 +65,21 @@ fi
 
 if [ -n "$verified_release_bundle" ]; then
   verified_release_bundle="$(realpath "$verified_release_bundle")"
-  if [ -z "${COOP_RELEASE_PUBLIC_KEY:-}" ]; then
+  if [ -z "$release_public_key" ]; then
     echo "COOP_RELEASE_PUBLIC_KEY is required to include a release in backup." >&2
     exit 1
   fi
   release_verification=(
-    python3
+    "$python_bin"
     "$root_dir/scripts/release_bundle.py"
     verify
     --bundle "$verified_release_bundle"
-    --public-key "$COOP_RELEASE_PUBLIC_KEY"
+    --public-key "$release_public_key"
     --expected-release "$release"
   )
-  if [ -n "${COOP_RELEASE_LICENSE_POLICY_SHA256:-}" ]; then
+  if [ -n "$policy_sha256" ]; then
     release_verification+=(
-      --expected-policy-sha256 "$COOP_RELEASE_LICENSE_POLICY_SHA256"
+      --expected-policy-sha256 "$policy_sha256"
     )
   fi
   "${release_verification[@]}" >/dev/null

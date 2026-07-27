@@ -55,6 +55,7 @@
 ## Resilience
 
 - [x] Узел устанавливается без Интернета и публичного registry ([evidence](implemented_slice_15.md)).
+- [x] Production startup требует signed bundle, pinned policy и `--no-build --pull never`; demo/hardened transition fail-closed ([evidence](implemented_slice_28.md)).
 - [ ] Полный restore на резервном оборудовании укладывается в RTO.
 - [ ] RPO подтверждён измерением и сверкой событий.
 - [x] FULL backup включает DB, blobs, manifest, trust data и verified release ([evidence](implemented_slice_16.md)).
@@ -295,3 +296,13 @@ errors.
 Перед реальной эксплуатацией остаются обязательными внешний legal review,
 обучение персонала и независимое учение с физическим пересчётом и подписанными
 актами.
+
+## Текущее доказательство Slice 28
+
+Аудит обнаружил несовпадение `production`/`prod`: прежний production wrapper оставлял runtime в `dev`, а update/evidence guards могли не включиться. Исправление вводит один executable environment contract, сохраняет режим в `.env`, требует signed offline bundle, independently obtained key, expected release и pinned license-policy hash, загружает только проверенные образы и запускает Compose с `--no-build --pull never`.
+
+Demo configuration, известные demo credentials и PostgreSQL marker `demo_data_loaded=true` блокируют production. Отдельный DB guard запрещает обход wrapper через ручные Compose variables. Update и evidence scripts используют тот же canonical resolver; dirty override в production запрещён. Доказательства: [implemented_slice_28.md](implemented_slice_28.md).
+
+Checkpoint: `244 passed, 1 deselected`, backend coverage `77.81%`, Ruff, strict mypy по `258` файлам, `29` script tests, shell/PowerShell syntax, `alembic check`, compatible exact-mirror OpenAPI и живой `OPERATIONAL` demo-узел после `start.bat demo`.
+
+Закрыт только code-level deployment invariant. Подписанный readiness protocol, production key ceremony, назначенные реальные custodians, независимые security/legal reviews, target-host RTO/RPO/capacity, accessibility matrix и полевой pilot остаются открытыми внешними checkbox.

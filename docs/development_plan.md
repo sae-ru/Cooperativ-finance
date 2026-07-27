@@ -428,3 +428,18 @@ Service-client lifecycle реализован в Slice 24. Управляемо�
 После подтвержденной смерти или недееспособности система удерживает партии прежнего складского назначения, требует независимый пересчет с доказательствами, отдельное TOTP-одобрение и личную приемку временным хранителем. До приемки прежний `custodian_assignment_id` не меняется. Расхождение переводит дело в `BLOCKED` без автоматического исправления количества.
 
 Доказательства и границы: [implemented_slice_27.md](implemented_slice_27.md), [ADR-0014](decisions/ADR-0014-emergency-custody-continuity.md). Имущественное наследование остается вне Slice 27.
+
+## Slice 28. Fail-closed production deployment
+
+Реализован единый канонический environment contract и защищённый путь запуска:
+
+- `production`, а не неиспользуемый alias, во всех runtime/update/evidence checks;
+- сохранение режима, release и проверенных operational artifacts в `.env`;
+- запрет in-place demo -> production и hardened -> demo;
+- независимый PostgreSQL guard по `demo_data_loaded` и environment transition;
+- обязательные signed bundle, public key, expected release и pinned license policy;
+- загрузка проверенных image IDs и только `--no-build --pull never`;
+- запрет dirty-evidence override и production faultpoints/data-only backup;
+- одинаковый контракт Windows/Linux и regression tests.
+
+Доказательства и внешние границы: [implemented_slice_28.md](implemented_slice_28.md). Этот срез устраняет ложный production mode, но не заменяет подписанный readiness review, production keys, внешний security/legal review и полевой pilot.

@@ -1,6 +1,6 @@
 # Развёртывание
 
-Статус: реализованный deployment baseline Slices 0-24; до выполнения `production_readiness.md` не является production-ready.
+Статус: реализованный deployment baseline Slices 0-28; до выполнения `production_readiness.md` не является production-ready.
 
 ## Целевая топология локального узла
 
@@ -49,17 +49,25 @@ sh ./start.sh
 
 Повторный запуск безопасен: существующие данные и изменённые пользователями пароли не перезаписываются. Адрес интерфейса по умолчанию: `http://127.0.0.1:8080`.
 
-Режим без демоданных и известных начальных паролей:
+## Чистый production-запуск
+
+Слово `production` означает запуск только из заранее собранного и подписанного offline bundle. Нужны Python 3 для независимого verifier, сам bundle, отдельно полученный public key, ожидаемый release id и утверждённый SHA-256 файла license policy.
+
+Windows:
 
 ```bat
-start.bat production
+start.bat production <bundle-directory> <public-key> <release> <policy-sha256>
 ```
+
+Linux:
 
 ```bash
-sh ./start.sh production
+sh ./start.sh production <bundle-directory> <public-key> <release> <policy-sha256>
 ```
 
-В production-режиме начальные пароли генерируются случайно и сохраняются в `secrets/bootstrap_*_password`. `seed-demo` не запускается; защищённые environments дополнительно отвергают демоданные при загрузке конфигурации.
+Команда проверяет подпись, checksum inventory, SBOM, license policy и content ID каждого образа, загружает образы и только затем запускает Compose с `--no-build --pull never`. `COOP_ENVIRONMENT=production`, release, абсолютные пути проверенного bundle/public key и утверждённый policy hash сохраняются в `.env`; начальные пароли генерируются случайно в `secrets/bootstrap_*_password`; `seed-demo` не запускается.
+
+Production запрещено включать поверх демонстрационной установки. `.env` с `COOP_DEMO_DATA_ENABLED=true`, известные demo bootstrap credentials или PostgreSQL-профиль с `demo_data_loaded=true` дают отказ. Для production создаётся чистый каталог и чистые volumes; из прежнего узла восстанавливается только отдельно проверенный production backup по recovery runbook. Нельзя менять флаг или удалять marker ради обхода отказа.
 
 ## Демонстрационные учетные записи
 
@@ -300,7 +308,7 @@ PowerShell: `./scripts/capacity-smoke.ps1`. Порог и объём задаю�
 sh ./scripts/collect-production-evidence.sh
 ```
 
-В `COOP_ENVIRONMENT=prod` коллектор отклоняет dirty worktree. Он не включает
+В `COOP_ENVIRONMENT=production` коллектор всегда отклоняет dirty worktree и не допускает override. Он не включает
 логи, raw PII или secrets, создаёт `COMPLETE` и `SHA256SUMS`; локальный каталог
 `evidence/` не публикуется в Git.
 

@@ -6,11 +6,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-$environment = if ($env:COOP_ENVIRONMENT) { $env:COOP_ENVIRONMENT } else { "dev" }
+$environmentOutput = & python (Join-Path $PSScriptRoot "runtime_environment.py") resolve --root $root
+if ($LASTEXITCODE -ne 0) { throw "Runtime environment resolution failed" }
+$environment = ($environmentOutput | Select-Object -Last 1).Trim()
 $timestamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ")
 $destination = Join-Path $root (Join-Path $OutputRoot "release-$timestamp")
 $gitStatus = (& git -C $root status --porcelain=v1) -join [Environment]::NewLine
-if ($environment -eq "prod" -and $gitStatus -and -not $AllowDirty) {
+if ($environment -eq "production" -and $AllowDirty) {
+    throw "Production evidence cannot override the clean-worktree requirement"
+}
+if ($environment -eq "production" -and $gitStatus) {
     throw "Production evidence requires a clean Git worktree"
 }
 

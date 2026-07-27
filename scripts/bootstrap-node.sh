@@ -3,6 +3,27 @@ set -eu
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 secrets_dir="$root_dir/secrets"
+mode="${1:-}"
+release="${2:-}"
+python_bin="${PYTHON:-python3}"
+
+case "$mode" in
+  "")
+    ;;
+  demo|production)
+    if [ -n "$release" ]; then
+      "$python_bin" "$root_dir/scripts/runtime_environment.py" configure \
+        --root "$root_dir" --mode "$mode" --release "$release"
+    else
+      "$python_bin" "$root_dir/scripts/runtime_environment.py" configure \
+        --root "$root_dir" --mode "$mode"
+    fi
+    ;;
+  *)
+    echo "Usage: $0 [demo|production] [release]" >&2
+    exit 2
+    ;;
+esac
 
 umask 077
 mkdir -p "$secrets_dir"
@@ -21,7 +42,7 @@ write_initial_password() {
   if [ -s "$path" ]; then
     return
   fi
-  if [ "${COOP_DEMO_CREDENTIALS:-false}" = "true" ]; then
+  if [ "${COOP_DEMO_CREDENTIALS:-false}" = "true" ] || [ "$mode" = "demo" ]; then
     printf '%s\n' "$demo_value" > "$path"
   else
     openssl rand -hex 32 > "$path"

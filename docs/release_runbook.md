@@ -69,7 +69,7 @@ policy:
 ```bash
 export COOP_RELEASE_LICENSE_POLICY_SHA256=<approved-sha256>
 sh scripts/verify-release-bundle.sh \
-  /media/release/cooperative-clearing-1.0.0 \
+  /srv/cooperative-clearing/releases/1.0.0 \
   /etc/cooperative-clearing/release-public.pem \
   1.0.0
 ```
@@ -78,7 +78,7 @@ sh scripts/verify-release-bundle.sh \
 
 ```bash
 python3 scripts/release_bundle.py verify \
-  --bundle /media/release/cooperative-clearing-1.0.0 \
+  --bundle /srv/cooperative-clearing/releases/1.0.0 \
   --public-key /etc/cooperative-clearing/release-public.pem \
   --expected-release 1.0.0 \
   --expected-policy-sha256 <approved-sha256> \
@@ -91,29 +91,34 @@ python3 scripts/release_bundle.py verify \
 
 ## Чистая установка без сети
 
-1. Выполнить независимую проверку с `--load-images`.
-2. Скопировать содержимое `node/` в постоянный каталог узла.
-3. Запустить `scripts/bootstrap-node.sh`.
-4. Установить production-параметры в `.env`, убрать demo profile.
-5. Запустить `docker compose up -d --no-build --pull never`.
-6. Выполнить `scripts/verify-stack.sh`, вход назначенными ролями и
-   `docker compose run --rm --no-deps api coopctl verify-journal`.
-7. Зафиксировать release id, fingerprint, policy hash и результаты в протоколе.
+1. На независимой машине сверить fingerprint public key и утверждённый SHA-256 license policy.
+2. Скопировать содержимое подписанного `node/` в новый постоянный каталог узла, а полный release bundle и public key разместить по стабильным абсолютным путям; не использовать каталог прежней demo-установки.
+3. Запустить единую fail-closed команду из нового каталога:
 
-Если Compose пытается выполнить pull или build, установка останавливается:
-оператор не меняет флаги ради обхода неполного bundle.
+```bash
+sh ./start.sh production \
+  /srv/cooperative-clearing/releases/1.0.0 \
+  /etc/cooperative-clearing/release-public.pem \
+  1.0.0 \
+  <approved-license-policy-sha256>
+```
+
+Windows использует `start.bat production` и те же четыре аргумента. Команда сама повторно проверяет manifest, signature, checksum inventory, SBOM, license policy и content ID, загружает образы, создаёт случайные секреты, записывает канонический `COOP_ENVIRONMENT=production` и выполняет `docker compose up -d --no-build --pull never`. Абсолютные пути bundle/public key и policy hash атомарно сохраняются в `.env` для backup/update; закрытие терминала их не теряет.
+
+4. Выполнить вход назначенными ролями и `docker compose run --rm --no-deps api coopctl verify-journal`.
+5. Зафиксировать release id, fingerprint, policy hash, image IDs и результаты в подписанном readiness-протоколе.
+
+Если Compose пытается выполнить pull/build, verifier не совпадает с bundle, каталог содержит demo configuration/credentials или PostgreSQL сообщает `demo_data_loaded`, установка останавливается. Оператор не удаляет marker и не меняет environment ради обхода: для production создаётся чистый узел.
 
 ## Обновление
 
 ```bash
-export COOP_RELEASE_PUBLIC_KEY=/etc/cooperative-clearing/release-public.pem
-export COOP_RELEASE_LICENSE_POLICY_SHA256=<approved-sha256>
-sh scripts/update-node.sh 1.0.1 /media/release/cooperative-clearing-1.0.1
+sh scripts/update-node.sh 1.0.1 /srv/cooperative-clearing/releases/1.0.1
 ```
 
-`update-node` вызывает тот же verifier, загружает только проверенные образы,
-создаёт pre-update backup, применяет upgrade migration и проверяет health и
-журнал. Ошибка до успешного gate запускает application rollback; несовместимая
+`update-node` по умолчанию читает сохранённые public key и policy hash, вызывает тот же verifier, загружает только проверенные образы,
+создаёт pre-update backup, применяет upgrade migration, проверяет health и
+журнал, затем переключает сохранённый recovery context на новый bundle. Ошибка до успешного gate запускает application rollback; несовместимая
 схема требует restore по recovery runbook.
 
 ## Приёмочные признаки
@@ -124,6 +129,7 @@ sh scripts/update-node.sh 1.0.1 /media/release/cooperative-clearing-1.0.1
 - чистый узел стартует с `--pull never --no-build`;
 - закрытый ключ отсутствует в bundle и удалён с release workstation;
 - все `review_required` лицензии имеют отдельное подписанное решение.
+
 ## FULL backup и recovery release
 
 Production update разрешён только если текущий signed release доступен через
@@ -134,6 +140,7 @@ expected version и pinned policy, затем включает bundle целик
 `FULL` не определяется одним наличием secrets: без verified release копия
 остаётся `DATA_ONLY`. Dump сохраняет точные GRANT/REVOKE runtime role; restore
 воспроизводит ACL до запуска `init-node`, API и worker.
+
 ## API compatibility
 
 До подписи release выполняется scripts/openapi_compat.py: текущий backend

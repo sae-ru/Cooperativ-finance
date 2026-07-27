@@ -323,3 +323,16 @@ allowlist соответствует реальному egress внешней п
 ## Дополнение Slice 27: аварийная физическая сохранность
 
 Угрозы: самоназначение администратора, фиктивная инвентаризация, подмена партии между пересчетом и приемкой, автоматическая корректировка недостачи, приемка чужой учетной записью и использование break-glass как постоянной роли. Контроли: разделение четырех персональных субъектов, постоянные роли, TOTP, per-lot hold, optimistic snapshots, content-addressed evidence, повторная блокировка строк перед решением, атомарная смена назначений и подписанный журнал. Остаточный юридический риск собственности и наследования не маскируется технической передачей хранения.
+
+## Дополнение Slice 28: production deployment
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| wrapper называется production, но приложение работает как dev | canonical resolver и persisted `.env`; alias отклоняется | оператор запускает контейнеры вне поставляемых scripts |
+| demo data/пароли попадают в реальную эксплуатацию | config, known credentials и DB marker блокируют promotion | прямое злонамеренное изменение БД/volumes вне модели доверия |
+| локально изменённый source собирается при установке | обязательный signed bundle и `--no-build --pull never` | verifier/public key скомпрометированы вместе |
+| подписан bundle с неутверждённой license policy | обязательный independently pinned policy SHA-256 | неверный hash утверждён организационно |
+| параметры проверенной поставки теряются после закрытия shell | bundle/key paths и policy hash сохраняются в `.env`; backup/update читают их без исполнения файла | путь bundle стал недоступен или storage повреждён |
+| production update включает faultpoint или DATA_ONLY backup | canonical production guard в обеих ОС | оператор обходит scripts и вручную меняет Compose state |
+| evidence скрывает dirty source | clean worktree обязателен, override запрещён | committed malicious change требует review/CI/signature controls |
+| режим меняют только переменной Compose | PostgreSQL profile блокирует demo marker и hardened transition | физический DB administrator может подменить state; это должно попасть в external audit |

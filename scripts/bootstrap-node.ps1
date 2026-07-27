@@ -1,12 +1,34 @@
 [CmdletBinding()]
 param(
-    [switch] $DemoCredentials
+    [ValidateSet("demo", "production")]
+    [string] $Mode,
+    [switch] $DemoCredentials,
+    [string] $Release
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $secrets = Join-Path $root "secrets"
 $utf8 = [Text.UTF8Encoding]::new($false)
+
+if ($DemoCredentials -and $Mode -and $Mode -ne "demo") {
+    throw "Demo credentials are only valid in demo mode"
+}
+if ($Mode) {
+    $configuration = @(
+        (Join-Path $PSScriptRoot "runtime_environment.py")
+        "configure"
+        "--root"
+        $root
+        "--mode"
+        $Mode
+    )
+    if ($Release) {
+        $configuration += @("--release", $Release)
+    }
+    & python @configuration
+    if ($LASTEXITCODE -ne 0) { throw "Runtime environment configuration failed" }
+}
 
 [IO.Directory]::CreateDirectory($secrets) | Out-Null
 
@@ -34,7 +56,7 @@ function New-InitialPassword([string] $Path, [string] $DemoValue) {
             return
         }
     }
-    if ($DemoCredentials) {
+    if ($DemoCredentials -or $Mode -eq "demo") {
         [IO.File]::WriteAllText($Path, $DemoValue + "`n", $utf8)
     }
     else {
