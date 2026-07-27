@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cooperative_clearing.modules.audit.infrastructure.repository import AuditRepository
@@ -18,6 +18,7 @@ from cooperative_clearing.modules.identity.domain.types import (
 from cooperative_clearing.modules.identity.infrastructure.models import (
     AuthSession,
     BreakGlassGrant,
+    Member,
     RoleAssignment,
     UserAccount,
 )
@@ -64,13 +65,18 @@ class AuthenticationService:
         user = result.scalar_one_or_none()
         now = datetime.now(UTC)
         valid = False
+        member_active = await self._member_active(session, user)
         if user is None:
             self.passwords.consume_dummy_verification(password)
-        elif user.status == "ACTIVE" and (user.locked_until is None or user.locked_until <= now):
+        elif (
+            user.status == "ACTIVE"
+            and member_active
+            and (user.locked_until is None or user.locked_until <= now)
+        ):
             valid = self.passwords.verify(user.password_hash, password)
 
         if not valid:
-            if user is not None:
+            if user is not None and user.status == "ACTIVE" and member_active:
                 user.failed_login_attempts += 1
                 if user.failed_login_attempts >= self.settings.auth_max_failed_attempts:
                     user.locked_until = now + timedelta(seconds=self.settings.auth_lock_seconds)
@@ -109,12 +115,14 @@ class AuthenticationService:
         result = await session.execute(
             select(AuthSession, UserAccount)
             .join(UserAccount, UserAccount.id == AuthSession.user_id)
+            .outerjoin(Member, Member.id == UserAccount.member_id)
             .where(
                 AuthSession.access_token_hash == token_hash(access_token),
                 AuthSession.status == "ACTIVE",
                 AuthSession.access_expires_at > now,
                 AuthSession.refresh_expires_at > now,
                 UserAccount.status == "ACTIVE",
+                or_(UserAccount.member_id.is_(None), Member.status == "ACTIVE"),
             )
         )
         row = result.one_or_none()
@@ -155,6 +163,7 @@ class AuthenticationService:
             auth_session.status != "ACTIVE"
             or auth_session.refresh_expires_at <= now
             or user.status != "ACTIVE"
+            or not await self._member_active(session, user)
             or not tokens_equal(auth_session.csrf_token_hash, token_hash(csrf_cookie))
         ):
             auth_session.status = "EXPIRED"
@@ -285,6 +294,13 @@ class AuthenticationService:
             access_expires_at=auth_session.access_expires_at,
             refresh_expires_at=auth_session.refresh_expires_at,
         )
+
+    @staticmethod
+    async def _member_active(session: AsyncSession, user: UserAccount | None) -> bool:
+        if user is None or user.member_id is None:
+            return True
+        member = await session.get(Member, user.member_id)
+        return member is not None and member.status == "ACTIVE"
 
     @staticmethod
     async def _principal(

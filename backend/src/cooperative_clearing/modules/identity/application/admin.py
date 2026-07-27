@@ -143,6 +143,7 @@ class IdentityAdminService:
             payload={"from": current.value, "to": target.value},
         )
         return self._complete(record, event_id, cooperative.id)
+
     async def create_member(
         self,
         session: AsyncSession,
@@ -288,9 +289,44 @@ class IdentityAdminService:
             )
         current = MemberStatus(member.status)
         ensure_member_transition(current, target)
+        now = datetime.now(UTC)
         member.status = target.value
-        member.updated_at = datetime.now(UTC)
+        member.updated_at = now
         member.version += 1
+        if target is MemberStatus.SUSPENDED:
+            target_user_ids = select(UserAccount.id).where(UserAccount.member_id == member.id)
+            await session.execute(
+                update(AuthSession)
+                .where(
+                    AuthSession.user_id.in_(target_user_ids),
+                    AuthSession.status == "ACTIVE",
+                )
+                .values(status="REVOKED", revoked_at=now, last_seen_at=now)
+            )
+            await session.execute(
+                update(UserAccount)
+                .where(
+                    UserAccount.member_id == member.id,
+                    UserAccount.status == UserStatus.ACTIVE.value,
+                )
+                .values(
+                    status=UserStatus.DISABLED.value,
+                    updated_at=now,
+                    version=UserAccount.version + 1,
+                )
+            )
+            await session.execute(
+                update(Membership)
+                .where(
+                    Membership.member_id == member.id,
+                    Membership.status == MembershipStatus.ACTIVE.value,
+                )
+                .values(
+                    status=MembershipStatus.SUSPENDED.value,
+                    updated_at=now,
+                    version=Membership.version + 1,
+                )
+            )
         event_id = await AuditRepository(session).record(
             action="MEMBER_STATUS_CHANGED",
             object_type="Member",
@@ -426,6 +462,7 @@ class IdentityAdminService:
             },
         )
         return self._complete(record, event_id, membership.id)
+
     async def create_user(
         self,
         session: AsyncSession,
@@ -444,8 +481,16 @@ class IdentityAdminService:
         )
         if replay is not None:
             return replay
-        if member_id is not None and await session.get(Member, member_id) is None:
-            raise self._not_found("MEMBER_NOT_FOUND")
+        if member_id is not None:
+            linked_member = await session.get(Member, member_id)
+            if linked_member is None:
+                raise self._not_found("MEMBER_NOT_FOUND")
+            if linked_member.status != MemberStatus.ACTIVE.value:
+                raise DomainError(
+                    code="MEMBER_NOT_ACTIVE",
+                    message_key="errors.identity.member_not_active",
+                    status_code=409,
+                )
         user = UserAccount(
             id=uuid4(),
             login=normalized,
@@ -506,6 +551,14 @@ class IdentityAdminService:
             )
         current = UserStatus(user.status)
         ensure_user_transition(current, target)
+        if target is UserStatus.ACTIVE and user.member_id is not None:
+            member = await session.get(Member, user.member_id)
+            if member is None or member.status != MemberStatus.ACTIVE.value:
+                raise DomainError(
+                    code="MEMBER_NOT_ACTIVE",
+                    message_key="errors.identity.member_not_active",
+                    status_code=409,
+                )
         now = datetime.now(UTC)
         user.status = target.value
         user.updated_at = now
@@ -534,6 +587,7 @@ class IdentityAdminService:
             },
         )
         return self._complete(record, event_id, user.id)
+
     async def assign_role(
         self,
         session: AsyncSession,
@@ -572,6 +626,20 @@ class IdentityAdminService:
         target_user = await session.get(UserAccount, user_id)
         if target_user is None:
             raise self._not_found("USER_NOT_FOUND")
+        if target_user.status != UserStatus.ACTIVE.value:
+            raise DomainError(
+                code="USER_NOT_ACTIVE",
+                message_key="errors.identity.user_not_active",
+                status_code=409,
+            )
+        if target_user.member_id is not None:
+            target_member = await session.get(Member, target_user.member_id)
+            if target_member is None or target_member.status != MemberStatus.ACTIVE.value:
+                raise DomainError(
+                    code="MEMBER_NOT_ACTIVE",
+                    message_key="errors.identity.member_not_active",
+                    status_code=409,
+                )
         if cooperative_id is not None and await session.get(Cooperative, cooperative_id) is None:
             raise self._not_found("COOPERATIVE_NOT_FOUND")
         if target_user.member_id is not None:
@@ -821,9 +889,7 @@ async def admin_overview(
     else:
         member_condition = false()
     scoped_member_ids = select(Member.id).where(member_condition)
-    scoped_user_ids = select(UserAccount.id).where(
-        UserAccount.member_id.in_(scoped_member_ids)
-    )
+    scoped_user_ids = select(UserAccount.id).where(UserAccount.member_id.in_(scoped_member_ids))
     active_sessions = int(
         (
             await session.execute(

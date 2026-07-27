@@ -259,3 +259,11 @@ rotation drill, target-host capacity, обучение владельцев и �
 Checkpoint Slice 25 подтверждён `215` backend-тестами, `173` frontend-тестами, production PWA build, Ruff, strict mypy по `208` source files, симметрией `846` RU/EN message keys и `396` system values, циклом миграции `0031 -> 0032 -> 0031 -> 0032`, `alembic check` и живым `OPERATIONAL` Docker-узлом на revision `0032_member_duplicate_merge`. В браузере проверены demo-case, RU/EN, light/dark и отсутствие console errors.
 
 Code-level gate duplicate merge закрывается только для одной организации и карточки без хозяйственной истории. Реальные процедуры переноса паёв, долгов, поручительств, сделок, санкций, репутации, межкооперативной identity и наследования остаются внешними production gates. Перед production требуется независимый review миграции/pg_catalog scan, обучение операторов на blocked cases и подписанный регламент ошибочного объединения и восстановления.
+
+## Текущее доказательство Slice 26
+
+Процедура выхода и преемственности реализована как fail-closed containment: немедленное отключение доступов, versioned snapshot, независимое персональное решение постоянного `SECURITY_ADMIN` с TOTP, подписанные события и отсутствие универсального переноса экономических связей. Revision `0033`, OpenAPI, demo и RU/EN GUI описаны в [implemented_slice_26.md](implemented_slice_26.md).
+
+Checkpoint подтверждён `235` backend-тестами (`1 deselected`), backend coverage `78.02%`, `176` frontend-тестами, production PWA build, Ruff, strict mypy по `253` source files, симметрией `923` RU/EN message keys и `401` system values, циклом миграции `0032 -> 0033 -> 0032 -> 0033`, `alembic check` и живым `OPERATIONAL` Docker-узлом на revision `0033_member_continuity`. В браузере проверены демодело, RU/EN, light/dark и отсутствие console errors.
+
+Это доказательство не закрывает внешний legal gate: правила наследования паёв, долгов, поручительств, активных сделок и межузловых обязательств остаются обязательным условием реальной эксплуатации.

@@ -57,6 +57,7 @@ markers = [
 
 [tool.coverage.run]
 branch = true
+concurrency = ["greenlet", "thread"]
 source = ["cooperative_clearing"]
 
 [tool.coverage.report]

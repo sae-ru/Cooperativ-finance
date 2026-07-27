@@ -248,3 +248,9 @@ Frontend component tests проверяют пять раздельных вкл
 переход membership, отключение учётной записи и доступ к node management.
 Migration gate выполняет `0028 -> 0029 -> 0028 -> 0029`; OpenAPI gate требует
 exact frontend mirror и отсутствие несовместимостей с baseline.
+
+## Проверки Slice 26
+
+Unit-тесты покрывают нормализацию входа и reference groups, fail-closed разбор снимка, blockers по отсутствию, версии и статусу Member/User/Membership, постоянство персональных ролей, cooperative scope, idempotent replay и формирование case view. PostgreSQL integration проходит полный lifecycle создания, немедленного отзыва сеансов, независимого решения, событий, аудита и повторного idempotency response.
+
+Обязательный gate включает migration cycle `0032 -> 0033 -> 0032 -> 0033`, `alembic check`, равенство backend/frontend OpenAPI, RU/EN XML symmetry, component tests административного экрана, production PWA build и браузерную проверку обоих языков и темы. Для корректной трассировки async SQLAlchemy через greenlet coverage запускается с `concurrency = ["greenlet", "thread"]`.

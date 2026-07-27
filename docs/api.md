@@ -422,3 +422,13 @@ POST /api/v1/admin/member-merge-cases/{case_id}/decision
 Request содержит cooperative, source/survivor UUID, версии обеих карточек, 1-10 safe evidence refs и reason. Создание требует permanent `MEMBER_REGISTRAR` или `DATA_STEWARD`. Decision требует другого permanent `SECURITY_ADMIN`, персональный member и TOTP step-up. Все команды идемпотентны.
 
 `BLOCKED` является нормальным terminal result, а не частичным сбоем: blocker summary возвращает category codes и counts ссылок без PII. `APPROVED` означает перенос только identity records и сохранение source как `MERGED`. Cross-cooperative и economic-reference cases возвращают безопасную остановку.
+
+## Выход и преемственность Slice 26
+
+| Method | Path | Назначение |
+|---|---|---|
+| `GET` | `/api/v1/admin/member-continuity-cases` | scoped список дел и сгруппированных ссылок |
+| `POST` | `/api/v1/admin/member-continuity-cases` | создать дело и атомарно остановить доступ |
+| `POST` | `/api/v1/admin/member-continuity-cases/{continuity_case_id}/decision` | независимое TOTP-защищённое решение |
+
+Создание разрешено только постоянной персональной роли `MEMBER_REGISTRAR`, `COOPERATIVE_ADMIN` или `SECURITY_ADMIN`. Решение принимает другой постоянный персональный `SECURITY_ADMIN`; временное полномочие и собственное дело отклоняются. Mutating requests используют `Idempotency-Key`, expected version и request id. `409` означает self-review, stale state либо fail-closed блокировку; машинный код преобразуется GUI в понятное RU/EN сообщение.

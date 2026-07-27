@@ -14,6 +14,7 @@ from cooperative_clearing.modules.audit.infrastructure.repository import (
 from cooperative_clearing.modules.identity.infrastructure.models import (
     Cooperative,
     Member,
+    MemberContinuityCase,
     MemberImportBatch,
     MemberImportRow,
     MemberMergeCase,
@@ -237,6 +238,59 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
     )
     await session.execute(
         demo_merge_case.on_conflict_do_nothing(index_elements=[MemberMergeCase.id])
+    )
+
+    continuity_member_id = stable_id("member", "demo-member-exit-review")
+    continuity_membership_id = stable_id("membership", "demo-member-exit-review")
+    demo_continuity_member = insert(Member).values(
+        id=continuity_member_id,
+        display_name="Svetlana Morozova",
+        registered_by_cooperative_id=cooperative_id,
+        status="EXIT_PENDING",
+        version=2,
+    )
+    await session.execute(demo_continuity_member.on_conflict_do_nothing(index_elements=[Member.id]))
+    demo_continuity_membership = insert(Membership).values(
+        id=continuity_membership_id,
+        cooperative_id=cooperative_id,
+        member_id=continuity_member_id,
+        member_number="D-EXIT-01",
+        status="SUSPENDED",
+        joined_at=datetime.now(UTC) - timedelta(days=365),
+        version=2,
+    )
+    await session.execute(
+        demo_continuity_membership.on_conflict_do_nothing(index_elements=[Membership.id])
+    )
+    demo_continuity_case = insert(MemberContinuityCase).values(
+        id=stable_id("member-continuity-case", "demo-voluntary-exit"),
+        cooperative_id=cooperative_id,
+        member_id=continuity_member_id,
+        case_type="VOLUNTARY_EXIT",
+        previous_member_status="ACTIVE",
+        contained_member_version=2,
+        access_snapshot={
+            "users": [],
+            "memberships": [
+                {
+                    "id": str(continuity_membership_id),
+                    "previous_status": "ACTIVE",
+                    "contained_version": 2,
+                }
+            ],
+        },
+        reference_summary={
+            "groups": {"identity_registry": 1},
+            "total_references": 1,
+        },
+        review_blockers=[],
+        evidence_refs=["case:demo-voluntary-exit"],
+        reason_code="DEMO_MEMBER_REQUEST_RECEIVED",
+        status="PENDING_REVIEW",
+        requested_by_user_id=stable_id("bootstrap-user", "registrar"),
+    )
+    await session.execute(
+        demo_continuity_case.on_conflict_do_nothing(index_elements=[MemberContinuityCase.id])
     )
 
     demo_member_user_id = stable_id("demo-user", DEMO_MEMBER_LOGIN)

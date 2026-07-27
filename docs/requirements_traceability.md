@@ -228,3 +228,18 @@ acceptance criteria и tests. Если строка карты меняется,
 | Воспроизводимый demo | clean duplicate and pending independent case | repeat seed integration test |
 | Миграция и контракт | revision `0032`, OpenAPI and typed frontend schema | upgrade/downgrade/check and snapshot gates |
 | Юридические transfer/succession rules | не заявлены как закрытые | OD-038 и production-readiness external gate |
+
+## Slice 26 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Немедленно остановить действия | User `DISABLED`, session revoke, Membership `SUSPENDED` в одной транзакции | PostgreSQL lifecycle integration |
+| Сквозная персональная ответственность | permanent requester, другой permanent personal `SECURITY_ADMIN`, TOTP | self-review/temporary-role denial и successful decision |
+| Не потерять хозяйственные связи | grouped FK summary без UPDATE/DELETE экономических записей | reference-map unit и database assertions |
+| Fail-closed восстановление | versioned snapshot и повторная блокировка Member/User/Membership | missing/version/status blocker tests |
+| Безопасное отклонение | точное восстановление snapshot, старые sessions не возвращаются | reject integration assertions |
+| Optimistic/idempotent lifecycle | case/row versions и сохранённый response по `Idempotency-Key` | stale и replay tests |
+| Понятный RU/EN интерфейс | хозяйственные группы, последствия, blockers и TOTP dialog | locale symmetry, component и browser checks |
+| Воспроизводимый demo | `Svetlana Morozova`, suspended membership, pending exit case | repeated seed и live Docker inspection |
+| Миграция и контракт | revision `0033`, OpenAPI и typed frontend schema | downgrade/upgrade/check и snapshot gates |
+| Юридическое наследование/расчёты | намеренно не заявлены как закрытые | ADR-0013, OD-038 и external legal gate |

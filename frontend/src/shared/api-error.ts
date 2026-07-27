@@ -49,6 +49,27 @@ export function userErrorMessage(error: unknown, language?: string): string {
   ) {
     return translate("errors.memberImportInvalid");
   }
+  if (code === "MEMBER_CONTINUITY_INDEPENDENT_REVIEW_REQUIRED") {
+    return translate("errors.memberContinuityIndependentReview");
+  }
+  if (code === "MEMBER_CONTINUITY_CROSS_COOPERATIVE_UNSUPPORTED") {
+    return translate("errors.memberContinuityCrossCooperative");
+  }
+  if (code === "MEMBER_CONTINUITY_EVIDENCE_INVALID") {
+    return translate("errors.memberContinuityEvidence");
+  }
+  if (code === "PERMANENT_MEMBER_CONTINUITY_ROLE_REQUIRED") {
+    return translate("errors.memberContinuityPermanentRole");
+  }
+  if (
+    code === "MEMBER_CONTINUITY_CASE_NOT_PENDING" ||
+    code === "MEMBER_CONTINUITY_CASE_ALREADY_PENDING" ||
+    code === "MEMBER_CONTINUITY_CONFLICT" ||
+    code === "MEMBER_CONTINUITY_SNAPSHOT_INVALID" ||
+    code === "MEMBER_CONTINUITY_MEMBER_INELIGIBLE"
+  ) {
+    return translate("errors.memberContinuityBlocked");
+  }
   if (code === "MEMBER_MERGE_INDEPENDENT_REVIEW_REQUIRED") {
     return translate("errors.memberMergeIndependentReview");
   }

@@ -622,3 +622,9 @@ timestamps. Завершение membership сохраняет `ended_at`; от�
 `identity.member_import_batches` хранит cooperative scope, имя и SHA-256 источника, lifecycle `STAGED|PREVIEWED|APPROVED|REJECTED|APPLIED`, счётчики, автора, независимого проверяющего, причину решения, timestamps и optimistic version.
 
 `identity.member_import_rows` хранит номер строки, display name, тип и хеш identifier, хеш безопасного представления исходной строки, результат `STAGED|READY|INVALID|DUPLICATE|APPLIED`, код ошибки, основание совпадения, candidate member и created member. Открытое значение identifier и исходный CSV не сохраняются. Revision: `0030_safe_member_intake`.
+
+## Модель выхода и преемственности Slice 26
+
+Revision `0033_member_continuity` создаёт `identity.member_continuity_cases`. Запись хранит cooperative/member scope, тип `VOLUNTARY_EXIT|DEATH_OR_INCAPACITY`, lifecycle `PENDING_REVIEW|CONFIRMED|REJECTED|BLOCKED`, requester/decider, evidence reference, versioned snapshot затронутых Member/User/Membership, сгруппированную сводку внешних ссылок, blockers, timestamps и optimistic version.
+
+`MemberStatus` расширен значениями `EXIT_PENDING`, `DECEASED_OR_INCAPACITATED`, `SUCCESSION_REVIEW` и `CLOSED`. Partial unique index допускает только одно незавершённое дело на участника. Экономические FK не перенаправляются: запись дела является контуром остановки и доказательства, а не универсальным succession mapping. Downgrade fail-closed запрещён при наличии continuity cases или новых статусов.

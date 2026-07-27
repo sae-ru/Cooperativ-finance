@@ -158,6 +158,39 @@ export type MemberMergeCase = {
   version: number;
 };
 
+export type MemberContinuityCaseType = "VOLUNTARY_EXIT" | "DEATH_OR_INCAPACITY";
+export type MemberContinuityCaseStatus =
+  | "PENDING_REVIEW"
+  | "CONFIRMED"
+  | "REJECTED"
+  | "BLOCKED";
+
+export type MemberContinuityCase = {
+  id: string;
+  cooperative_id: string;
+  member_id: string;
+  case_type: MemberContinuityCaseType;
+  previous_member_status: string;
+  contained_member_version: number;
+  reference_summary: {
+    groups?: Record<string, number>;
+    total_references?: number;
+  };
+  review_blockers: string[];
+  evidence_refs: string[];
+  reason_code: string;
+  status: MemberContinuityCaseStatus;
+  requested_by_user_id: string;
+  decided_by_user_id: string | null;
+  decision_reason_code: string | null;
+  disabled_user_count: number;
+  suspended_membership_count: number;
+  created_at: string;
+  decided_at: string | null;
+  updated_at: string;
+  version: number;
+};
+
 export type Membership = {
   id: string;
   cooperative_id: string;
@@ -427,6 +460,8 @@ export const getMemberImports = () =>
   request<MemberImportBatch[]>("/api/v1/admin/imports?limit=500");
 export const getMemberMergeCases = () =>
   request<MemberMergeCase[]>("/api/v1/admin/member-merge-cases");
+export const getMemberContinuityCases = () =>
+  request<MemberContinuityCase[]>("/api/v1/admin/member-continuity-cases");
 export const getMemberImportRows = (batchId: string) =>
   request<MemberImportRow[]>(`/api/v1/admin/imports/${batchId}/rows`);
 export const getUsers = () => request<UserAccount[]>("/api/v1/admin/users");
@@ -566,6 +601,45 @@ export const decideMemberMerge = (
       }),
     },
   );
+
+export const requestMemberContinuity = (payload: {
+  cooperative_id: string;
+  member_id: string;
+  case_type: MemberContinuityCaseType;
+  expected_member_version: number;
+  evidence_refs: string[];
+  reason_code: string;
+}) =>
+  request<{
+    event_id: string;
+    object_id: string;
+    status: MemberContinuityCaseStatus;
+    replayed: boolean;
+  }>("/api/v1/admin/member-continuity-cases", {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+export const decideMemberContinuity = (
+  continuityCase: MemberContinuityCase,
+  approve: boolean,
+  reasonCode: string,
+) =>
+  request<{
+    event_id: string;
+    object_id: string;
+    status: MemberContinuityCaseStatus;
+    replayed: boolean;
+  }>(`/api/v1/admin/member-continuity-cases/${continuityCase.id}/decision`, {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      approve,
+      expected_version: continuityCase.version,
+      reason_code: reasonCode,
+    }),
+  });
 
 export const transitionMember = (member: Member, targetStatus: string) =>
   request<{ event_id: string; object_id: string }>(

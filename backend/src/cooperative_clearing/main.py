@@ -21,6 +21,7 @@ from cooperative_clearing.api.inter_node_clearing import (
     router as inter_node_clearing_router,
 )
 from cooperative_clearing.api.inventory import router as inventory_router
+from cooperative_clearing.api.member_continuity import router as member_continuity_router
 from cooperative_clearing.api.member_merges import router as member_merge_router
 from cooperative_clearing.api.middleware import RequestContextMiddleware
 from cooperative_clearing.api.operations import router as operations_router
@@ -91,6 +92,7 @@ def create_app(settings: Settings | None = None, *, manage_runtime: bool = True)
     app.include_router(federation_router)
     app.include_router(inter_node_clearing_router)
     app.include_router(inventory_router)
+    app.include_router(member_continuity_router)
     app.include_router(member_merge_router)
     app.include_router(operations_router)
     app.include_router(peer_router)

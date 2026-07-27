@@ -341,3 +341,14 @@ contact PII, credential secret, token и точный открытый authentic
 не включаются в signed payload. Успешная и неуспешная machine authentication,
 token issuance и rate/network отказ дополнительно попадают в bounded audit с
 request id; эти записи не подменяют подписанное решение человека.
+
+## События выхода и преемственности Slice 26
+
+| Event type | Назначение |
+|---|---|
+| `identity.member_continuity_requested` | персональный requester, cooperative/member scope, тип, evidence и результат немедленного containment |
+| `identity.member_continuity_confirmed` | независимый decider подтвердил обстоятельство; экономические связи оставлены для отдельных процедур |
+| `identity.member_continuity_rejected` | сообщение отклонено, точный snapshot восстановлен, прежние sessions не возвращены |
+| `identity.member_continuity_blocked` | версия, состояние или состав связанных записей изменились; доступ остаётся остановлен |
+
+События подписываются node key, входят в hash-chain и outbox. Payload содержит безопасную evidence reference, идентификаторы, версии, статусы и агрегированные количества, но не тело заявления, адреса или иные персональные данные.

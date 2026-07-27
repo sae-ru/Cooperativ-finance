@@ -19,6 +19,10 @@ class MemberStatus(StrEnum):
     LIMITED = "LIMITED"
     ACTIVE = "ACTIVE"
     SUSPENDED = "SUSPENDED"
+    EXIT_PENDING = "EXIT_PENDING"
+    DECEASED_OR_INCAPACITATED = "DECEASED_OR_INCAPACITATED"
+    SUCCESSION_REVIEW = "SUCCESSION_REVIEW"
+    CLOSED = "CLOSED"
     REJECTED = "REJECTED"
     EXITED = "EXITED"
     MERGED = "MERGED"
@@ -58,6 +62,18 @@ class MemberMergeCaseStatus(StrEnum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     EXPIRED = "EXPIRED"
+
+
+class MemberContinuityCaseType(StrEnum):
+    VOLUNTARY_EXIT = "VOLUNTARY_EXIT"
+    DEATH_OR_INCAPACITY = "DEATH_OR_INCAPACITY"
+
+
+class MemberContinuityCaseStatus(StrEnum):
+    PENDING_REVIEW = "PENDING_REVIEW"
+    CONFIRMED = "CONFIRMED"
+    REJECTED = "REJECTED"
+    BLOCKED = "BLOCKED"
 
 
 class ServiceClientStatus(StrEnum):
@@ -159,11 +175,13 @@ MEMBER_TRANSITIONS: dict[MemberStatus, frozenset[MemberStatus]] = {
     MemberStatus.PENDING_VERIFICATION: frozenset(
         {MemberStatus.LIMITED, MemberStatus.ACTIVE, MemberStatus.REJECTED}
     ),
-    MemberStatus.LIMITED: frozenset(
-        {MemberStatus.ACTIVE, MemberStatus.SUSPENDED, MemberStatus.EXITED}
-    ),
-    MemberStatus.ACTIVE: frozenset({MemberStatus.SUSPENDED, MemberStatus.EXITED}),
-    MemberStatus.SUSPENDED: frozenset({MemberStatus.ACTIVE, MemberStatus.EXITED}),
+    MemberStatus.LIMITED: frozenset({MemberStatus.ACTIVE, MemberStatus.SUSPENDED}),
+    MemberStatus.ACTIVE: frozenset({MemberStatus.SUSPENDED}),
+    MemberStatus.SUSPENDED: frozenset({MemberStatus.ACTIVE}),
+    MemberStatus.EXIT_PENDING: frozenset(),
+    MemberStatus.DECEASED_OR_INCAPACITATED: frozenset(),
+    MemberStatus.SUCCESSION_REVIEW: frozenset(),
+    MemberStatus.CLOSED: frozenset(),
     MemberStatus.REJECTED: frozenset(),
     MemberStatus.EXITED: frozenset(),
     MemberStatus.MERGED: frozenset(),

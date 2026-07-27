@@ -9073,6 +9073,305 @@
         "title": "MemberCollection",
         "type": "object"
       },
+      "MemberContinuityCaseCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MemberContinuityCaseResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "MemberContinuityCaseCollection",
+        "type": "object"
+      },
+      "MemberContinuityCaseResponse": {
+        "properties": {
+          "case_type": {
+            "$ref": "#/components/schemas/MemberContinuityCaseType"
+          },
+          "contained_member_version": {
+            "title": "Contained Member Version",
+            "type": "integer"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "decision_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason Code"
+          },
+          "disabled_user_count": {
+            "default": 0,
+            "title": "Disabled User Count",
+            "type": "integer"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "member_id": {
+            "format": "uuid",
+            "title": "Member Id",
+            "type": "string"
+          },
+          "previous_member_status": {
+            "$ref": "#/components/schemas/MemberStatus"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "reference_summary": {
+            "additionalProperties": true,
+            "title": "Reference Summary",
+            "type": "object"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "review_blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Review Blockers",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberContinuityCaseStatus"
+          },
+          "suspended_membership_count": {
+            "default": 0,
+            "title": "Suspended Membership Count",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "member_id",
+          "case_type",
+          "previous_member_status",
+          "contained_member_version",
+          "reference_summary",
+          "review_blockers",
+          "evidence_refs",
+          "reason_code",
+          "status",
+          "requested_by_user_id",
+          "decided_by_user_id",
+          "decision_reason_code",
+          "created_at",
+          "decided_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "MemberContinuityCaseResponse",
+        "type": "object"
+      },
+      "MemberContinuityCaseStatus": {
+        "enum": [
+          "PENDING_REVIEW",
+          "CONFIRMED",
+          "REJECTED",
+          "BLOCKED"
+        ],
+        "title": "MemberContinuityCaseStatus",
+        "type": "string"
+      },
+      "MemberContinuityCaseType": {
+        "enum": [
+          "VOLUNTARY_EXIT",
+          "DEATH_OR_INCAPACITY"
+        ],
+        "title": "MemberContinuityCaseType",
+        "type": "string"
+      },
+      "MemberContinuityCommandEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MemberContinuityCommandResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "MemberContinuityCommandEnvelope",
+        "type": "object"
+      },
+      "MemberContinuityCommandResponse": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberContinuityCaseStatus"
+          }
+        },
+        "required": [
+          "event_id",
+          "object_id",
+          "status",
+          "replayed"
+        ],
+        "title": "MemberContinuityCommandResponse",
+        "type": "object"
+      },
+      "MemberContinuityCreateRequest": {
+        "properties": {
+          "case_type": {
+            "$ref": "#/components/schemas/MemberContinuityCaseType"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expected_member_version": {
+            "minimum": 1.0,
+            "title": "Expected Member Version",
+            "type": "integer"
+          },
+          "member_id": {
+            "format": "uuid",
+            "title": "Member Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "member_id",
+          "case_type",
+          "expected_member_version",
+          "evidence_refs",
+          "reason_code"
+        ],
+        "title": "MemberContinuityCreateRequest",
+        "type": "object"
+      },
+      "MemberContinuityDecisionRequest": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve",
+          "expected_version",
+          "reason_code"
+        ],
+        "title": "MemberContinuityDecisionRequest",
+        "type": "object"
+      },
       "MemberCreateRequest": {
         "properties": {
           "cooperative_id": {
@@ -10044,6 +10343,10 @@
           "LIMITED",
           "ACTIVE",
           "SUSPENDED",
+          "EXIT_PENDING",
+          "DECEASED_OR_INCAPACITATED",
+          "SUCCESSION_REVIEW",
+          "CLOSED",
           "REJECTED",
           "EXITED",
           "MERGED"
@@ -24471,6 +24774,158 @@
         "summary": "List Member Import Rows",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/member-continuity-cases": {
+      "get": {
+        "operationId": "list_member_continuity_cases_api_v1_admin_member_continuity_cases_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberContinuityCaseCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Member Continuity Cases",
+        "tags": [
+          "member-continuity"
+        ]
+      },
+      "post": {
+        "operationId": "request_member_continuity_api_v1_admin_member_continuity_cases_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberContinuityCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Member Continuity",
+        "tags": [
+          "member-continuity"
+        ]
+      }
+    },
+    "/api/v1/admin/member-continuity-cases/{continuity_case_id}/decision": {
+      "post": {
+        "operationId": "decide_member_continuity_api_v1_admin_member_continuity_cases__continuity_case_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "continuity_case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Continuity Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberContinuityDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberContinuityCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Member Continuity",
+        "tags": [
+          "member-continuity"
         ]
       }
     },

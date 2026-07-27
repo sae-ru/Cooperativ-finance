@@ -50,6 +50,17 @@ READ_ROLES = frozenset(
 CASE_TTL = timedelta(hours=24)
 REFERENCE_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{2,199}")
 REASON_PATTERN = re.compile(r"[A-Z0-9_.-]{2,100}")
+INELIGIBLE_MEMBER_STATUSES = frozenset(
+    {
+        MemberStatus.MERGED.value,
+        MemberStatus.REJECTED.value,
+        MemberStatus.EXITED.value,
+        MemberStatus.EXIT_PENDING.value,
+        MemberStatus.DECEASED_OR_INCAPACITATED.value,
+        MemberStatus.SUCCESSION_REVIEW.value,
+        MemberStatus.CLOSED.value,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -348,15 +359,10 @@ class MemberMergeService:
                 or survivor.registered_by_cooperative_id != merge_case.cooperative_id
             ):
                 raise _error("MEMBER_MERGE_CROSS_COOPERATIVE_UNSUPPORTED", 409)
-            status_changed = source.status in {
-                MemberStatus.MERGED.value,
-                MemberStatus.REJECTED.value,
-                MemberStatus.EXITED.value,
-            } or survivor.status in {
-                MemberStatus.MERGED.value,
-                MemberStatus.REJECTED.value,
-                MemberStatus.EXITED.value,
-            }
+            status_changed = (
+                source.status in INELIGIBLE_MEMBER_STATUSES
+                or survivor.status in INELIGIBLE_MEMBER_STATUSES
+            )
             blockers = await member_merge_blockers(
                 session,
                 source_member_id=source.id,
@@ -566,17 +572,9 @@ class MemberMergeService:
             or survivor.registered_by_cooperative_id != cooperative_id
         ):
             raise _error("MEMBER_MERGE_CROSS_COOPERATIVE_UNSUPPORTED", 409)
-        if source.status in {
-            MemberStatus.MERGED.value,
-            MemberStatus.REJECTED.value,
-            MemberStatus.EXITED.value,
-        }:
+        if source.status in INELIGIBLE_MEMBER_STATUSES:
             raise _error("MEMBER_MERGE_SOURCE_INELIGIBLE", 409)
-        if survivor.status in {
-            MemberStatus.MERGED.value,
-            MemberStatus.REJECTED.value,
-            MemberStatus.EXITED.value,
-        }:
+        if survivor.status in INELIGIBLE_MEMBER_STATUSES:
             raise _error("MEMBER_MERGE_SURVIVOR_INELIGIBLE", 409)
 
     @staticmethod

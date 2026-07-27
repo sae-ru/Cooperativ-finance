@@ -229,6 +229,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/member-continuity-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Member Continuity Cases */
+        get: operations["list_member_continuity_cases_api_v1_admin_member_continuity_cases_get"];
+        put?: never;
+        /** Request Member Continuity */
+        post: operations["request_member_continuity_api_v1_admin_member_continuity_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/member-continuity-cases/{continuity_case_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Member Continuity */
+        post: operations["decide_member_continuity_api_v1_admin_member_continuity_cases__continuity_case_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/member-merge-cases": {
         parameters: {
             query?: never;
@@ -8739,6 +8774,140 @@ export interface components {
             /** Request Id */
             request_id: string;
         };
+        /** MemberContinuityCaseCollection */
+        MemberContinuityCaseCollection: {
+            /** Data */
+            data: components["schemas"]["MemberContinuityCaseResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberContinuityCaseResponse */
+        MemberContinuityCaseResponse: {
+            case_type: components["schemas"]["MemberContinuityCaseType"];
+            /** Contained Member Version */
+            contained_member_version: number;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: string | null;
+            /** Decision Reason Code */
+            decision_reason_code: string | null;
+            /**
+             * Disabled User Count
+             * @default 0
+             */
+            disabled_user_count: number;
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Member Id
+             * Format: uuid
+             */
+            member_id: string;
+            previous_member_status: components["schemas"]["MemberStatus"];
+            /** Reason Code */
+            reason_code: string;
+            /** Reference Summary */
+            reference_summary: {
+                [key: string]: unknown;
+            };
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /** Review Blockers */
+            review_blockers: string[];
+            status: components["schemas"]["MemberContinuityCaseStatus"];
+            /**
+             * Suspended Membership Count
+             * @default 0
+             */
+            suspended_membership_count: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * MemberContinuityCaseStatus
+         * @enum {string}
+         */
+        MemberContinuityCaseStatus: "PENDING_REVIEW" | "CONFIRMED" | "REJECTED" | "BLOCKED";
+        /**
+         * MemberContinuityCaseType
+         * @enum {string}
+         */
+        MemberContinuityCaseType: "VOLUNTARY_EXIT" | "DEATH_OR_INCAPACITY";
+        /** MemberContinuityCommandEnvelope */
+        MemberContinuityCommandEnvelope: {
+            data: components["schemas"]["MemberContinuityCommandResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberContinuityCommandResponse */
+        MemberContinuityCommandResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /** Replayed */
+            replayed: boolean;
+            status: components["schemas"]["MemberContinuityCaseStatus"];
+        };
+        /** MemberContinuityCreateRequest */
+        MemberContinuityCreateRequest: {
+            case_type: components["schemas"]["MemberContinuityCaseType"];
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /** Expected Member Version */
+            expected_member_version: number;
+            /**
+             * Member Id
+             * Format: uuid
+             */
+            member_id: string;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** MemberContinuityDecisionRequest */
+        MemberContinuityDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
         /** MemberCreateRequest */
         MemberCreateRequest: {
             /** Cooperative Id */
@@ -9108,7 +9277,7 @@ export interface components {
          * MemberStatus
          * @enum {string}
          */
-        MemberStatus: "APPLICANT" | "PENDING_VERIFICATION" | "LIMITED" | "ACTIVE" | "SUSPENDED" | "REJECTED" | "EXITED" | "MERGED";
+        MemberStatus: "APPLICANT" | "PENDING_VERIFICATION" | "LIMITED" | "ACTIVE" | "SUSPENDED" | "EXIT_PENDING" | "DECEASED_OR_INCAPACITATED" | "SUCCESSION_REVIEW" | "CLOSED" | "REJECTED" | "EXITED" | "MERGED";
         /** MemberTransitionRequest */
         MemberTransitionRequest: {
             /** Expected Version */
@@ -15316,6 +15485,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberImportRowCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_member_continuity_cases_api_v1_admin_member_continuity_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberContinuityCaseCollection"];
+                };
+            };
+        };
+    };
+    request_member_continuity_api_v1_admin_member_continuity_cases_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberContinuityCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberContinuityCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_member_continuity_api_v1_admin_member_continuity_cases__continuity_case_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                continuity_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberContinuityDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberContinuityCommandEnvelope"];
                 };
             };
             /** @description Validation Error */

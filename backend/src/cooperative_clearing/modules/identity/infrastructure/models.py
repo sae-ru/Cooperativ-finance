@@ -49,7 +49,8 @@ class Member(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN ('APPLICANT','PENDING_VERIFICATION','LIMITED','ACTIVE',"
-            "'SUSPENDED','REJECTED','EXITED','MERGED')",
+            "'SUSPENDED','EXIT_PENDING','DECEASED_OR_INCAPACITATED',"
+            "'SUCCESSION_REVIEW','CLOSED','REJECTED','EXITED','MERGED')",
             name="status_allowed",
         ),
         CheckConstraint(
@@ -406,6 +407,89 @@ class MemberMergeCase(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class MemberContinuityCase(Base):
+    __tablename__ = "member_continuity_cases"
+    __table_args__ = (
+        CheckConstraint(
+            "case_type IN ('VOLUNTARY_EXIT','DEATH_OR_INCAPACITY')",
+            name="case_type_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('PENDING_REVIEW','CONFIRMED','REJECTED','BLOCKED')",
+            name="status_allowed",
+        ),
+        CheckConstraint("contained_member_version >= 2", name="member_version_valid"),
+        CheckConstraint("jsonb_typeof(access_snapshot) = 'object'", name="access_snapshot_object"),
+        CheckConstraint(
+            "jsonb_typeof(reference_summary) = 'object'", name="reference_summary_object"
+        ),
+        CheckConstraint("jsonb_typeof(review_blockers) = 'array'", name="review_blockers_array"),
+        CheckConstraint(
+            "jsonb_typeof(evidence_refs) = 'array' AND jsonb_array_length(evidence_refs) >= 1",
+            name="evidence_nonempty_array",
+        ),
+        CheckConstraint(
+            "decided_by_user_id IS NULL OR decided_by_user_id <> requested_by_user_id",
+            name="independent_reviewer",
+        ),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "ix_member_continuity_cases_cooperative_status_created",
+            "cooperative_id",
+            "status",
+            "created_at",
+        ),
+        Index("ix_member_continuity_cases_member_id", "member_id"),
+        Index(
+            "uq_member_continuity_cases_pending_member",
+            "member_id",
+            unique=True,
+            postgresql_where=text("status = 'PENDING_REVIEW'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.members.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    case_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    previous_member_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    contained_member_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    access_snapshot: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    reference_summary: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    review_blockers: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    )
+    evidence_refs: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decision_reason_code: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
