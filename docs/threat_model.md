@@ -289,3 +289,21 @@ allowlist соответствует реальному egress внешней п
 отдельном secret store; compromised-secret drill доказывает rotation/revoke и
 непрерывность human login. Эти проверки требуют независимого security review и
 не закрываются component/integration tests.
+## Дополнение Slice 25: объединение дубликатов участников
+
+| Угроза | Реализованный контроль | Остаточный риск |
+|---|---|---|
+| оператор удаляет неудобную карточку и её историю | source не удаляется, status `MERGED` требует survivor self-FK, mapping входит в signed event | ошибочно выбран правильный survivor |
+| один сотрудник объединяет себя или связанное лицо | permanent registrar/data steward request, другой permanent security reviewer, personal actor и TOTP | сговор двух сотрудников или общая TOTP-учётная запись |
+| break-glass используется для сокрытия identity | request/review принимают только `RoleGrantSource.ASSIGNMENT` | неправомерно выданная постоянная роль |
+| merge переписывает автора старого события | journal и все другие non-identity FK являются blocker; исторические refs не обновляются | юридический оператор вручную создаст компенсирующие события неверно |
+| новый модуль забыли добавить в blocker registry | PostgreSQL function динамически перечисляет фактические FK на `identity.members` | ссылка без FK или внешний blob/search index не обнаружены |
+| две учётные записи дают захват доступа | обе user links дают `IDENTITY_ACCOUNT_CONFLICT`; переносится только единственный source user при пустом survivor | администратор заранее ошибочно отключит нужный login |
+| unique collision ломает merge частично | membership/address/account conflicts проверяются до update и повторно под row locks; одна transaction | будущая identity unique constraint не добавлена в preflight, но transaction rollback сохранит данные |
+| карточка изменилась после создания дела | versions source/survivor записаны в case и повторно проверяются при решении | изменение во внешнем хранилище без version/FK |
+| старое pending дело навсегда блокирует source | expiry показывается в read model, при новой заявке старое дело закрывается signed expiration event | без новой заявки физический status остаётся pending до review/cleanup |
+| blocker summary раскрывает PII или схему БД | signed/API payload содержит только codes/counts; GUI группирует schema по предметным областям и не показывает table/column | администратор с прямым DB-доступом видит metadata |
+| cross-cooperative merge обходит юридический контур | обе карточки обязаны иметь тот же `registered_by_cooperative_id`; иначе fail-closed | ошибочная исходная cooperative attribution требует отдельной correction procedure |
+| цепочка merge скрывает происхождение | survivor со status `MERGED` запрещён; source с inbound merge self-FK обнаруживается как blocker | будущая утверждённая consolidation цепочка потребует отдельной модели aliases |
+
+Перед production независимый review должен проверить полный FK coverage, таблицы без FK, backup/restore merge history, operator selection UX и процедуру компенсации ошибочного решения. Автоматический перенос паёв, долгов, поручительств, sanctions и reputation запрещён до отдельных доменных workflows.

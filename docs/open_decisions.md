@@ -80,3 +80,7 @@
 - OD-012: Ed25519, SHA-256, Argon2id, standard AEAD;
 - OD-017: local RPO 15 min, catastrophic RPO 24 h, RTO 4 h;
 - OD-036: signed offline bundle, expand/contract migrations, tested rollback.
+
+### OD-038 update после Slice 25
+
+Внутрикооперативное объединение чистого подтверждённого дубля реализовано на code-level с immutable mapping и dual control. Решение остаётся `OPEN` для переноса экономически используемой identity, cross-cooperative merge, смерти/недееспособности, наследования и юридически утверждённой rollback/recovery процедуры.

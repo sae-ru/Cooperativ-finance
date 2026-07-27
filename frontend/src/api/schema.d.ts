@@ -229,6 +229,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/member-merge-cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Member Merge Cases */
+        get: operations["list_member_merge_cases_api_v1_admin_member_merge_cases_get"];
+        put?: never;
+        /** Request Member Merge */
+        post: operations["request_member_merge_api_v1_admin_member_merge_cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/member-merge-cases/{merge_case_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Member Merge */
+        post: operations["decide_member_merge_api_v1_admin_member_merge_cases__merge_case_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/members": {
         parameters: {
             query?: never;
@@ -8731,6 +8766,8 @@ export interface components {
              * Format: uuid
              */
             member_id: string;
+            /** Merged Into Member Id */
+            merged_into_member_id: string | null;
             /** Registered By Cooperative Id */
             registered_by_cooperative_id: string | null;
             status: components["schemas"]["MemberStatus"];
@@ -8907,6 +8944,139 @@ export interface components {
          * @enum {string}
          */
         MemberImportStatus: "STAGED" | "PREVIEWED" | "APPROVED" | "REJECTED" | "APPLIED";
+        /** MemberMergeCaseCollection */
+        MemberMergeCaseCollection: {
+            /** Data */
+            data: components["schemas"]["MemberMergeCaseResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberMergeCaseResponse */
+        MemberMergeCaseResponse: {
+            /** Blocker Summary */
+            blocker_summary: {
+                [key: string]: unknown;
+            };
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: string | null;
+            /** Decision Reason Code */
+            decision_reason_code: string | null;
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reason Code */
+            reason_code: string;
+            /**
+             * Requested By User Id
+             * Format: uuid
+             */
+            requested_by_user_id: string;
+            /** Source Expected Version */
+            source_expected_version: number;
+            /**
+             * Source Member Id
+             * Format: uuid
+             */
+            source_member_id: string;
+            status: components["schemas"]["MemberMergeCaseStatus"];
+            /** Survivor Expected Version */
+            survivor_expected_version: number;
+            /**
+             * Survivor Member Id
+             * Format: uuid
+             */
+            survivor_member_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * MemberMergeCaseStatus
+         * @enum {string}
+         */
+        MemberMergeCaseStatus: "PENDING_REVIEW" | "BLOCKED" | "APPROVED" | "REJECTED" | "EXPIRED";
+        /** MemberMergeCommandEnvelope */
+        MemberMergeCommandEnvelope: {
+            data: components["schemas"]["MemberMergeCommandResponse"];
+            /** Request Id */
+            request_id: string;
+        };
+        /** MemberMergeCommandResponse */
+        MemberMergeCommandResponse: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /** Replayed */
+            replayed: boolean;
+            status: components["schemas"]["MemberMergeCaseStatus"];
+        };
+        /** MemberMergeCreateRequest */
+        MemberMergeCreateRequest: {
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Evidence Refs */
+            evidence_refs: string[];
+            /** Reason Code */
+            reason_code: string;
+            /** Source Expected Version */
+            source_expected_version: number;
+            /**
+             * Source Member Id
+             * Format: uuid
+             */
+            source_member_id: string;
+            /** Survivor Expected Version */
+            survivor_expected_version: number;
+            /**
+             * Survivor Member Id
+             * Format: uuid
+             */
+            survivor_member_id: string;
+        };
+        /** MemberMergeDecisionRequest */
+        MemberMergeDecisionRequest: {
+            /** Approve */
+            approve: boolean;
+            /** Expected Version */
+            expected_version: number;
+            /** Reason Code */
+            reason_code: string;
+        };
         /** MemberResponse */
         MemberResponse: {
             /**
@@ -8921,6 +9091,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Merged Into Member Id */
+            merged_into_member_id: string | null;
             /** Registered By Cooperative Id */
             registered_by_cooperative_id: string | null;
             status: components["schemas"]["MemberStatus"];
@@ -8936,7 +9108,7 @@ export interface components {
          * MemberStatus
          * @enum {string}
          */
-        MemberStatus: "APPLICANT" | "PENDING_VERIFICATION" | "LIMITED" | "ACTIVE" | "SUSPENDED" | "REJECTED" | "EXITED";
+        MemberStatus: "APPLICANT" | "PENDING_VERIFICATION" | "LIMITED" | "ACTIVE" | "SUSPENDED" | "REJECTED" | "EXITED" | "MERGED";
         /** MemberTransitionRequest */
         MemberTransitionRequest: {
             /** Expected Version */
@@ -15144,6 +15316,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemberImportRowCollection"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_member_merge_cases_api_v1_admin_member_merge_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberMergeCaseCollection"];
+                };
+            };
+        };
+    };
+    request_member_merge_api_v1_admin_member_merge_cases_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberMergeCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberMergeCommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_member_merge_api_v1_admin_member_merge_cases__merge_case_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                merge_case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberMergeDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberMergeCommandEnvelope"];
                 };
             };
             /** @description Validation Error */

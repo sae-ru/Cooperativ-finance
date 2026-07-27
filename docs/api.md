@@ -410,3 +410,15 @@ self-disable отклоняется. `cooperative_id` при создании Me
 `POST /api/v1/admin/members/duplicate-check` возвращает кандидатов по точному хешу identifier и нормализованному имени в разрешённом cooperative scope. `POST /api/v1/admin/members` принимает необязательный `duplicate_resolution_code`; совпадение имени без явного решения отклоняется.
 
 Массовый workflow использует `/api/v1/admin/imports`, `/{batch_id}/rows`, `/{batch_id}/dry-run`, `/{batch_id}/decision` и `/{batch_id}/apply`. Создание, dry run и применение требуют постоянной роли `MEMBER_REGISTRAR`; решение требует постоянной роли `DATA_STEWARD` и другого пользователя. Все команды используют `Idempotency-Key` и `expected_version`. Устаревший отчёт возвращает `MEMBER_IMPORT_PREVIEW_STALE` и не создаёт ни одной строки.
+
+## Объединение дубликатов Slice 25
+
+```text
+GET  /api/v1/admin/member-merge-cases
+POST /api/v1/admin/member-merge-cases
+POST /api/v1/admin/member-merge-cases/{case_id}/decision
+```
+
+Request содержит cooperative, source/survivor UUID, версии обеих карточек, 1-10 safe evidence refs и reason. Создание требует permanent `MEMBER_REGISTRAR` или `DATA_STEWARD`. Decision требует другого permanent `SECURITY_ADMIN`, персональный member и TOTP step-up. Все команды идемпотентны.
+
+`BLOCKED` является нормальным terminal result, а не частичным сбоем: blocker summary возвращает category codes и counts ссылок без PII. `APPROVED` означает перенос только identity records и сохранение source как `MERGED`. Cross-cooperative и economic-reference cases возвращают безопасную остановку.

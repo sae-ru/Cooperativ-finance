@@ -223,7 +223,8 @@ OpenAPI и проверки описаны в [implemented_slice_22.md](implemen
 Отмечено только инженерное разделение сущностей. Массовый импорт и
 service-client lifecycle впоследствии закрыты на code-level в Slice 23 и 24.
 Юридические процедуры выхода, обучение реальных ролей, независимый security
-review и duplicate merge остаются открытыми production gates.
+review и юридически сложные transfer/succession cases остаются открытыми production gates.
+
 ## Текущее доказательство Slice 23
 
 Безопасный ввод участников реализован как проверяемый workflow: ручное создание требует явного решения при совпадении имени, а массовый CSV проходит staging, dry run, независимое утверждение и повторную проверку перед атомарным применением. Сервер проверяет cooperative scope, постоянные роли, optimistic version и idempotency; открытые identifiers и исходный CSV не сохраняются.
@@ -251,3 +252,10 @@ Checkpoint подтверждён `207` backend-тестами, `170` frontend-�
 boundary, secret storage внешней программы, фактические allowlists, incident
 rotation drill, target-host capacity, обучение владельцев и юридическое
 утверждение подключений. Эти checkbox требуют подписанных внешних evidence.
+## Текущее доказательство Slice 25
+
+Подтверждённые чистые дубликаты теперь проходят отдельный evidence case, независимое решение постоянного `SECURITY_ADMIN` с TOTP и повторную fail-closed проверку всех ссылок. Source не удаляется; `MERGED -> survivor` mapping, signed events, audit и idempotency сохраняют происхождение identity. Revision `0032`, OpenAPI, demo и RU/EN GUI описаны в [implemented_slice_25.md](implemented_slice_25.md).
+
+Checkpoint Slice 25 подтверждён `215` backend-тестами, `173` frontend-тестами, production PWA build, Ruff, strict mypy по `208` source files, симметрией `846` RU/EN message keys и `396` system values, циклом миграции `0031 -> 0032 -> 0031 -> 0032`, `alembic check` и живым `OPERATIONAL` Docker-узлом на revision `0032_member_duplicate_merge`. В браузере проверены demo-case, RU/EN, light/dark и отсутствие console errors.
+
+Code-level gate duplicate merge закрывается только для одной организации и карточки без хозяйственной истории. Реальные процедуры переноса паёв, долгов, поручительств, сделок, санкций, репутации, межкооперативной identity и наследования остаются внешними production gates. Перед production требуется независимый review миграции/pg_catalog scan, обучение операторов на blocked cases и подписанный регламент ошибочного объединения и восстановления.

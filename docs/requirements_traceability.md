@@ -214,3 +214,17 @@ acceptance criteria и tests. Если строка карты меняется,
 | Воспроизводимый demo | active catalog bridge and registrar rotation request without plaintext secret | repeated seed-demo PostgreSQL test |
 | Миграция и контракт | revision `0031`, generated backend/frontend OpenAPI and typed API client | downgrade/upgrade/check and compatibility gate |
 | Deployment trust boundary | gateway-only ingress and trusted forwarded source requirement | Compose inspection plus external security review remains open |
+## Slice 25 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Нет silent merge/delete | source status `MERGED`, self-FK survivor mapping, no DELETE | PostgreSQL integration asserts source and mapping |
+| Сквозная персональная ответственность | permanent requester, independent personal security reviewer, TOTP step-up | self-review `409` and successful second-user decision |
+| Сохранение подписанной истории | external FK scan blocks journal/domain references; events append-only | dynamic blocker function and signed event assertions |
+| Безопасный перенос identity | identifiers, membership, addresses and at most one login only | clean transfer integration flow |
+| Fail-closed для паёв и сделок | runtime pg_catalog FK discovery for current and future tables | external-reference blocker assertion |
+| Optimistic/idempotent lifecycle | both member versions, case version, expiry, idempotency records | stale/replay integration assertions |
+| Понятный RU/EN интерфейс | source/survivor wording, grouped blockers, protected decision dialog | locale symmetry and component tests |
+| Воспроизводимый demo | clean duplicate and pending independent case | repeat seed integration test |
+| Миграция и контракт | revision `0032`, OpenAPI and typed frontend schema | upgrade/downgrade/check and snapshot gates |
+| Юридические transfer/succession rules | не заявлены как закрытые | OD-038 и production-readiness external gate |

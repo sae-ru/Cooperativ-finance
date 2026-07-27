@@ -49,6 +49,25 @@ export function userErrorMessage(error: unknown, language?: string): string {
   ) {
     return translate("errors.memberImportInvalid");
   }
+  if (code === "MEMBER_MERGE_INDEPENDENT_REVIEW_REQUIRED") {
+    return translate("errors.memberMergeIndependentReview");
+  }
+  if (code === "MEMBER_MERGE_CROSS_COOPERATIVE_UNSUPPORTED") {
+    return translate("errors.memberMergeCrossCooperative");
+  }
+  if (code === "MEMBER_MERGE_EVIDENCE_INVALID") {
+    return translate("errors.memberMergeEvidence");
+  }
+  if (code === "PERMANENT_MEMBER_MERGE_ROLE_REQUIRED") {
+    return translate("errors.memberMergePermanentRole");
+  }
+  if (
+    code === "MEMBER_MERGE_CASE_NOT_PENDING"
+    || code === "MEMBER_MERGE_CONFLICT"
+    || code === "MEMBER_MERGE_VERSION_CONFLICT"
+  ) {
+    return translate("errors.memberMergeBlocked");
+  }
   if (code === "SERVICE_INDEPENDENT_REVIEW_REQUIRED") {
     return translate("errors.serviceIndependentReview");
   }

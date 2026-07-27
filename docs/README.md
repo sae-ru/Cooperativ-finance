@@ -98,6 +98,7 @@
 - [Реализованный Slice 22: раздельный административный реестр](implemented_slice_22.md)
 - [Реализованный Slice 23: безопасный ввод участников](implemented_slice_23.md)
 - [Реализованный Slice 24: жизненный цикл внешних интеграций](implemented_slice_24.md)
+- [Реализованный Slice 25: безопасное объединение дубликатов](implemented_slice_25.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

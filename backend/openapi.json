@@ -9158,6 +9158,18 @@
             "title": "Member Id",
             "type": "string"
           },
+          "merged_into_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Member Id"
+          },
           "registered_by_cooperative_id": {
             "anyOf": [
               {
@@ -9178,6 +9190,7 @@
           "member_id",
           "display_name",
           "registered_by_cooperative_id",
+          "merged_into_member_id",
           "status",
           "match_basis"
         ],
@@ -9667,6 +9680,297 @@
         "title": "MemberImportStatus",
         "type": "string"
       },
+      "MemberMergeCaseCollection": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/MemberMergeCaseResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "MemberMergeCaseCollection",
+        "type": "object"
+      },
+      "MemberMergeCaseResponse": {
+        "properties": {
+          "blocker_summary": {
+            "additionalProperties": true,
+            "title": "Blocker Summary",
+            "type": "object"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "decision_reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason Code"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "format": "uuid",
+            "title": "Requested By User Id",
+            "type": "string"
+          },
+          "source_expected_version": {
+            "title": "Source Expected Version",
+            "type": "integer"
+          },
+          "source_member_id": {
+            "format": "uuid",
+            "title": "Source Member Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberMergeCaseStatus"
+          },
+          "survivor_expected_version": {
+            "title": "Survivor Expected Version",
+            "type": "integer"
+          },
+          "survivor_member_id": {
+            "format": "uuid",
+            "title": "Survivor Member Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "source_member_id",
+          "survivor_member_id",
+          "source_expected_version",
+          "survivor_expected_version",
+          "evidence_refs",
+          "reason_code",
+          "blocker_summary",
+          "status",
+          "requested_by_user_id",
+          "decided_by_user_id",
+          "decision_reason_code",
+          "created_at",
+          "expires_at",
+          "decided_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "MemberMergeCaseResponse",
+        "type": "object"
+      },
+      "MemberMergeCaseStatus": {
+        "enum": [
+          "PENDING_REVIEW",
+          "BLOCKED",
+          "APPROVED",
+          "REJECTED",
+          "EXPIRED"
+        ],
+        "title": "MemberMergeCaseStatus",
+        "type": "string"
+      },
+      "MemberMergeCommandEnvelope": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MemberMergeCommandResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "MemberMergeCommandEnvelope",
+        "type": "object"
+      },
+      "MemberMergeCommandResponse": {
+        "properties": {
+          "event_id": {
+            "format": "uuid",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "object_id": {
+            "format": "uuid",
+            "title": "Object Id",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberMergeCaseStatus"
+          }
+        },
+        "required": [
+          "event_id",
+          "object_id",
+          "status",
+          "replayed"
+        ],
+        "title": "MemberMergeCommandResponse",
+        "type": "object"
+      },
+      "MemberMergeCreateRequest": {
+        "properties": {
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Evidence Refs",
+            "type": "array"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "source_expected_version": {
+            "minimum": 1.0,
+            "title": "Source Expected Version",
+            "type": "integer"
+          },
+          "source_member_id": {
+            "format": "uuid",
+            "title": "Source Member Id",
+            "type": "string"
+          },
+          "survivor_expected_version": {
+            "minimum": 1.0,
+            "title": "Survivor Expected Version",
+            "type": "integer"
+          },
+          "survivor_member_id": {
+            "format": "uuid",
+            "title": "Survivor Member Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cooperative_id",
+          "source_member_id",
+          "survivor_member_id",
+          "source_expected_version",
+          "survivor_expected_version",
+          "evidence_refs",
+          "reason_code"
+        ],
+        "title": "MemberMergeCreateRequest",
+        "type": "object"
+      },
+      "MemberMergeDecisionRequest": {
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason_code": {
+            "maxLength": 100,
+            "minLength": 2,
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approve",
+          "expected_version",
+          "reason_code"
+        ],
+        "title": "MemberMergeDecisionRequest",
+        "type": "object"
+      },
       "MemberResponse": {
         "properties": {
           "created_at": {
@@ -9682,6 +9986,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "merged_into_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Member Id"
           },
           "registered_by_cooperative_id": {
             "anyOf": [
@@ -9712,6 +10028,7 @@
           "id",
           "display_name",
           "registered_by_cooperative_id",
+          "merged_into_member_id",
           "status",
           "created_at",
           "updated_at",
@@ -9728,7 +10045,8 @@
           "ACTIVE",
           "SUSPENDED",
           "REJECTED",
-          "EXITED"
+          "EXITED",
+          "MERGED"
         ],
         "title": "MemberStatus",
         "type": "string"
@@ -24153,6 +24471,158 @@
         "summary": "List Member Import Rows",
         "tags": [
           "administration"
+        ]
+      }
+    },
+    "/api/v1/admin/member-merge-cases": {
+      "get": {
+        "operationId": "list_member_merge_cases_api_v1_admin_member_merge_cases_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberMergeCaseCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Member Merge Cases",
+        "tags": [
+          "member-merges"
+        ]
+      },
+      "post": {
+        "operationId": "request_member_merge_api_v1_admin_member_merge_cases_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberMergeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberMergeCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Member Merge",
+        "tags": [
+          "member-merges"
+        ]
+      }
+    },
+    "/api/v1/admin/member-merge-cases/{merge_case_id}/decision": {
+      "post": {
+        "operationId": "decide_member_merge_api_v1_admin_member_merge_cases__merge_case_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merge_case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Merge Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberMergeDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberMergeCommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decide Member Merge",
+        "tags": [
+          "member-merges"
         ]
       }
     },

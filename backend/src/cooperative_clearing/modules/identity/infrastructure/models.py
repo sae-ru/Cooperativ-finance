@@ -49,12 +49,18 @@ class Member(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN ('APPLICANT','PENDING_VERIFICATION','LIMITED','ACTIVE',"
-            "'SUSPENDED','REJECTED','EXITED')",
+            "'SUSPENDED','REJECTED','EXITED','MERGED')",
             name="status_allowed",
+        ),
+        CheckConstraint(
+            "(status = 'MERGED') = (merged_into_member_id IS NOT NULL) "
+            "AND (merged_into_member_id IS NULL OR merged_into_member_id <> id)",
+            name="merge_link_consistent",
         ),
         CheckConstraint("version >= 1", name="version_positive"),
         Index("ix_members_status_created_at", "status", "created_at"),
         Index("ix_members_registered_by_cooperative", "registered_by_cooperative_id"),
+        Index("ix_members_merged_into_member_id", "merged_into_member_id"),
         {"schema": "identity"},
     )
 
@@ -63,6 +69,10 @@ class Member(Base):
     registered_by_cooperative_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+    )
+    merged_into_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.members.id", ondelete="RESTRICT"),
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -314,6 +324,89 @@ class ParticipantAddress(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+
+class MemberMergeCase(Base):
+    __tablename__ = "member_merge_cases"
+    __table_args__ = (
+        CheckConstraint("source_member_id <> survivor_member_id", name="distinct_members"),
+        CheckConstraint(
+            "source_expected_version >= 1 AND survivor_expected_version >= 1",
+            name="member_versions_positive",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(evidence_refs) = 'array' AND jsonb_array_length(evidence_refs) >= 1",
+            name="evidence_nonempty_array",
+        ),
+        CheckConstraint("jsonb_typeof(blocker_summary) = 'object'", name="blockers_object"),
+        CheckConstraint(
+            "status IN ('PENDING_REVIEW','BLOCKED','APPROVED','REJECTED','EXPIRED')",
+            name="status_allowed",
+        ),
+        CheckConstraint(
+            "decided_by_user_id IS NULL OR decided_by_user_id <> requested_by_user_id",
+            name="independent_reviewer",
+        ),
+        CheckConstraint("expires_at > created_at", name="expiry_after_creation"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index(
+            "ix_member_merge_cases_cooperative_status_created",
+            "cooperative_id",
+            "status",
+            "created_at",
+        ),
+        Index("ix_member_merge_cases_survivor_member_id", "survivor_member_id"),
+        Index(
+            "uq_member_merge_cases_pending_source",
+            "source_member_id",
+            unique=True,
+            postgresql_where=text("status = 'PENDING_REVIEW'"),
+        ),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.cooperatives.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.members.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    survivor_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.members.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_expected_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    survivor_expected_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    evidence_refs: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    blocker_summary: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    requested_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("identity.users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    decided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    decision_reason_code: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

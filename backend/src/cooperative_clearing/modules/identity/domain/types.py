@@ -21,6 +21,7 @@ class MemberStatus(StrEnum):
     SUSPENDED = "SUSPENDED"
     REJECTED = "REJECTED"
     EXITED = "EXITED"
+    MERGED = "MERGED"
 
 
 class MembershipStatus(StrEnum):
@@ -49,6 +50,14 @@ class MemberImportRowStatus(StrEnum):
     INVALID = "INVALID"
     DUPLICATE = "DUPLICATE"
     APPLIED = "APPLIED"
+
+
+class MemberMergeCaseStatus(StrEnum):
+    PENDING_REVIEW = "PENDING_REVIEW"
+    BLOCKED = "BLOCKED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
 
 
 class ServiceClientStatus(StrEnum):
@@ -157,6 +166,7 @@ MEMBER_TRANSITIONS: dict[MemberStatus, frozenset[MemberStatus]] = {
     MemberStatus.SUSPENDED: frozenset({MemberStatus.ACTIVE, MemberStatus.EXITED}),
     MemberStatus.REJECTED: frozenset(),
     MemberStatus.EXITED: frozenset(),
+    MemberStatus.MERGED: frozenset(),
 }
 
 COOPERATIVE_TRANSITIONS: dict[CooperativeStatus, frozenset[CooperativeStatus]] = {

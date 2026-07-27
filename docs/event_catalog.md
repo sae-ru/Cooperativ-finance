@@ -23,7 +23,11 @@
 | `identity.member_verified` | member, verifier, evidence, decision |
 | `identity.member_suspended` | member, scope, reason, decision |
 | `identity.member_exit_started` | member, obligations_snapshot, decision |
-| `identity.duplicate_merge_decided` | source ids, surviving id, reviewer, mapping |
+| `identity.duplicate_merge_requested` | source, survivor, safe evidence refs, expiry |
+| `identity.duplicate_merge_blocked` | source, survivor, blocker summary, decision stage |
+| `identity.duplicate_merge_decided` | source, survivor, reviewer, immutable mapping |
+| `identity.duplicate_merge_rejected` | source, survivor, reviewer, reason |
+| `identity.duplicate_merge_expired` | source, survivor, expiry/supersession reason |
 | `identity.service_client_registered` | client, owner, scopes, expiry |
 
 ## Assets

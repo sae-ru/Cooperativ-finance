@@ -399,4 +399,18 @@ Service-client lifecycle реализован в Slice 24. Управляемо�
 - runtime tables имеют worker retention, migration `0031`, совместимый OpenAPI, backend/frontend tests, RU/EN GUI и demo rotation request.
 
 Доказательства и остаточные ограничения: [implemented_slice_24.md](implemented_slice_24.md).
-Следующий кодовый срез - управляемое объединение подтверждённых дубликатов.
+Управляемое объединение подтверждённых дубликатов реализовано в Slice 25.
+
+## Slice 25. Безопасное объединение дубликатов участников
+
+Реализован консервативный merge lifecycle:
+
+- source никогда не удаляется и после решения хранит `MERGED -> survivor` mapping;
+- registrar/data steward создаёт versioned evidence case, другой permanent security administrator решает его с TOTP step-up;
+- PostgreSQL динамически находит все внешние ссылки на source и fail-closed блокирует паи, обязательства, сделки, доставку, signed history и будущие доменные таблицы;
+- автоматически переносятся только identity identifiers, membership, participant addresses и единственный login без конфликтов;
+- blocker summary локализуется в GUI без показа SQL constants;
+- expiration, idempotency, signed events, audit, demo case, migration `0032` и backend/frontend tests входят в срез.
+
+Доказательства и границы: [implemented_slice_25.md](implemented_slice_25.md).
+Следующий production-срез должен реализовать доменные transfer/succession процедуры для экономически используемой identity; межкооперативное и наследственное правопреемство остаётся юридически открытым.

@@ -350,14 +350,16 @@ local entries/events hash. Reconciliation проверяет полный requir
 - `identity.service_client_requests`: operation, proposed policy, expected client version, requester, independent decider, expiry и issued credential ref;
 - `identity.service_client_access_tokens`: credential/client, token hash, source IP, status, expiry и last seen;
 - `identity.service_client_rate_buckets`: client/minute и request count;
-- `identity.member_merge_cases`: duplicate candidates, evidence, decision, id map;
+- `identity.member_merge_cases`: source/survivor, member versions, safe evidence refs, blockers, independent decision, expiry и id map;
 - `identity.recovery_cases`: account, approvers, reason, status, event.
 
 Для live client имя уникально внутри owner cooperative. Ровно один active
 credential допускается partial unique index, а pending request существующего
 client также может быть только один. DB CHECK запрещает совпадение requester и
 decider, пустые scopes/allowlist, невалидные статусы, отрицательные versions и
-rate вне `1..6000`. Открытый secret не является полем модели. Worker переводит
+rate вне `1..6000`. Открытый secret не является полем модели.
+`identity.members.merged_into_member_id` задан только для status `MERGED`; self-link запрещён. Merge case допускает только разные source/survivor и другого decider. Partial unique index оставляет не более одного `PENDING_REVIEW` case на source. Два активных адреса с одинаковой меткой или два адреса забора/доставки по умолчанию блокируют перенос. Функция `identity.member_merge_external_blockers(uuid)` строит blocker map по фактическим FK PostgreSQL. Переносимыми считаются только identifiers, memberships, participant addresses и user; любая другая ссылка останавливает merge.
+Worker переводит
 истёкшие tokens в `EXPIRED`, удаляет finished tokens старше 30 дней и rate
 buckets старше двух дней.
 

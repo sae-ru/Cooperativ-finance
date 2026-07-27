@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FileSearch,
   FileUp,
+  GitMerge,
   Link2,
   Network,
   Plus,
@@ -55,6 +56,7 @@ import { getFederationNodes } from "./api/federation";
 import { fetchSystemStatus } from "./api/system";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import MemberMergeSection from "./MemberMergeSection";
 import ServiceClientsSection from "./ServiceClientsSection";
 
 const memberTransitions: Record<string, string[]> = {
@@ -94,7 +96,7 @@ const environmentNames: Record<string, string> = {
   prod: "Рабочий контур",
 };
 
-type Section = "organizations" | "members" | "memberships" | "imports" | "accounts" | "integrations" | "nodes";
+type Section = "organizations" | "members" | "memberships" | "imports" | "duplicates" | "accounts" | "integrations" | "nodes";
 type RunAction = () => Promise<unknown>;
 
 function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
@@ -454,6 +456,7 @@ export default function AdminDirectoryView({
   const client = useQueryClient();
   const canReadAccounts = hasRole(principal, "SECURITY_ADMIN", "AUDITOR");
   const canReadImports = hasRole(principal, "MEMBER_REGISTRAR", "DATA_STEWARD", "AUDITOR");
+  const canReadMerges = hasRole(principal, "MEMBER_REGISTRAR", "DATA_STEWARD", "SECURITY_ADMIN", "AUDITOR");
   const canReadNodes = hasRole(principal, "SECURITY_ADMIN", "AUDITOR", "NODE_REGISTRAR", "NODE_TECHNICAL_CUSTODIAN", "NODE_SECURITY_ADMIN", "NODE_BUSINESS_OPERATOR", "NODE_AUDITOR");
   const canReadIntegrations = hasRole(principal, "COOPERATIVE_ADMIN", "SECURITY_ADMIN", "AUDITOR");
   const [section, setSection] = useState<Section>("members");
@@ -472,6 +475,7 @@ export default function AdminDirectoryView({
     ["members", "Участники", Users, true],
     ["memberships", "Членства", Link2, true],
     ["imports", t("admin.intake.tab"), FileUp, canReadImports],
+    ["duplicates", t("admin.memberMerge.tab"), GitMerge, canReadMerges],
     ["accounts", "Учетные записи", UserCog, canReadAccounts],
     ["integrations", t("admin.integrations.tab"), Cable, canReadIntegrations],
     ["nodes", "Узлы", Network, canReadNodes],
@@ -512,6 +516,7 @@ export default function AdminDirectoryView({
     {!currentLoading && !currentError && section === "members" ? <MembersSection data={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "memberships" ? <MembershipsSection data={memberships.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "imports" ? <ImportSection data={imports.data ?? []} members={members.data ?? []} cooperatives={cooperatives.data ?? []} principal={principal} busy={busy} run={run} /> : null}
+    {!currentLoading && !currentError && section === "duplicates" ? <MemberMergeSection principal={principal} cooperatives={cooperatives.data ?? []} members={members.data ?? []} /> : null}
     {!currentLoading && !currentError && section === "accounts" ? <AccountsSection data={accounts.data ?? []} members={members.data ?? []} principal={principal} busy={busy} run={run} /> : null}
     {!currentLoading && !currentError && section === "integrations" ? <ServiceClientsSection principal={principal} cooperatives={cooperatives.data ?? []} /> : null}
     {!currentLoading && !currentError && section === "nodes" ? <NodesSection localNode={system.data} externalNodes={nodes.data ?? []} onManageNodes={onManageNodes} /> : null}

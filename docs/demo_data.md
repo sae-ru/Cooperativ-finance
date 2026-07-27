@@ -251,3 +251,10 @@ Demo scan использует idempotency key `demo-antifraud-scan-v4`, алг�
 **Реестры системы -> Интеграции**, одобряет demo rotation и сохраняет выданные
 client id/secret. Повторный seed не создаёт второй client/request и не
 восстанавливает открытый secret.
+## Состав набора Slice 25
+
+- отдельная чистая карточка `Anna Petrova (duplicate record)` без login, membership и хозяйственных ссылок;
+- survivor `Anna Petrova` из существующего демонабора;
+- `PENDING_REVIEW` merge case с безопасными evidence refs, созданный `registrar`;
+- независимое решение выполняет `security` во вкладке **Дубликаты** после TOTP step-up;
+- повторный seed не создаёт второе дело и не меняет уже объединённый source обратно.

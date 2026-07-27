@@ -171,7 +171,8 @@ GET/PATCH /admin/members/{id}
 POST /admin/members/{id}/verify
 POST /admin/members/{id}/suspend
 POST /admin/members/{id}/start-exit
-POST /admin/members/{id}/merge-case
+GET/POST /api/v1/admin/member-merge-cases
+POST /api/v1/admin/member-merge-cases/{id}/decision
 GET/POST /admin/cooperatives
 POST /admin/memberships
 POST /admin/role-assignments
@@ -244,3 +245,9 @@ Registrar выбирает организацию явно. Scoped administrator
 Вкладка «Импорт» реализует полный операторский путь: шаблон CSV, выбор организации, staging, dry run, счётчики и построчный отчёт, независимое утверждение/отклонение и применение. Регистратор не может утвердить собственный пакет. Перед применением сервер повторяет проверку, а устаревший отчёт останавливает всю транзакцию.
 
 Ручная форма участника сначала показывает duplicate candidates. Точный identifier блокирует регистрацию; одинаковое нормализованное имя требует явной отметки «это другой человек». Импорт не назначает доступ, роли, членства, паи или лимиты.
+
+## Управление дубликатами Slice 25
+
+Отдельная вкладка **Дубликаты** не предлагает удалить участника. Оператор выбирает ошибочную и основную карточки, видит последствия и передаёт ссылку на дело или hash документа. Система создаёт `BLOCKED`, если обнаружены два логина, совпадающие membership/address либо любая хозяйственная или подписанная история. В UI связи сгруппированы по понятным областям, внутренние schema/table/column не показываются.
+
+Чистое дело ждёт другого постоянного `SECURITY_ADMIN`. Decision открывает TOTP dialog и повторяет все проверки под DB locks. Успешный merge переносит только identity records; source остаётся `MERGED` с mapping. Cross-cooperative и economic transfers не выполняются общей формой.

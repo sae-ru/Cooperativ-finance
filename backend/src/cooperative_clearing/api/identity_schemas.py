@@ -120,6 +120,7 @@ class MemberDuplicateCandidateResponse(BaseModel):
     member_id: UUID
     display_name: str
     registered_by_cooperative_id: UUID | None
+    merged_into_member_id: UUID | None
     status: MemberStatus
     match_basis: Literal["EXACT_IDENTIFIER", "NORMALIZED_NAME"]
 
@@ -154,9 +155,7 @@ class MemberImportCommandRequest(BaseModel):
 
 class MemberImportDecisionRequest(MemberImportCommandRequest):
     approve: bool
-    reason_code: str = Field(
-        min_length=2, max_length=100, pattern=r"^[A-Za-z0-9_.-]+$"
-    )
+    reason_code: str = Field(min_length=2, max_length=100, pattern=r"^[A-Za-z0-9_.-]+$")
 
 
 class MemberImportBatchResponse(BaseModel):
@@ -212,6 +211,7 @@ class MemberResponse(BaseModel):
     id: UUID
     display_name: str
     registered_by_cooperative_id: UUID | None
+    merged_into_member_id: UUID | None
     status: MemberStatus
     created_at: datetime
     updated_at: datetime

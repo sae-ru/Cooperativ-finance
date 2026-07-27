@@ -68,6 +68,7 @@ export type Member = {
   id: string;
   display_name: string;
   registered_by_cooperative_id: string | null;
+  merged_into_member_id?: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -78,6 +79,7 @@ export type MemberDuplicateCandidate = {
   member_id: string;
   display_name: string;
   registered_by_cooperative_id: string | null;
+  merged_into_member_id?: string | null;
   status: string;
   match_basis: "EXACT_IDENTIFIER" | "NORMALIZED_NAME";
 };
@@ -123,6 +125,37 @@ export type MemberImportRow = {
   created_member_id: string | null;
   created_at: string;
   applied_at: string | null;
+};
+
+export type MemberMergeCaseStatus =
+  | "PENDING_REVIEW"
+  | "BLOCKED"
+  | "APPROVED"
+  | "REJECTED"
+  | "EXPIRED";
+
+export type MemberMergeCase = {
+  id: string;
+  cooperative_id: string;
+  source_member_id: string;
+  survivor_member_id: string;
+  source_expected_version: number;
+  survivor_expected_version: number;
+  evidence_refs: string[];
+  reason_code: string;
+  blocker_summary: {
+    codes?: string[];
+    references?: Record<string, number>;
+  };
+  status: MemberMergeCaseStatus;
+  requested_by_user_id: string;
+  decided_by_user_id: string | null;
+  decision_reason_code: string | null;
+  created_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  updated_at: string;
+  version: number;
 };
 
 export type Membership = {
@@ -392,6 +425,8 @@ export const getMembers = () => request<Member[]>("/api/v1/admin/members?limit=5
 export const getMemberships = () => request<Membership[]>("/api/v1/admin/memberships");
 export const getMemberImports = () =>
   request<MemberImportBatch[]>("/api/v1/admin/imports?limit=500");
+export const getMemberMergeCases = () =>
+  request<MemberMergeCase[]>("/api/v1/admin/member-merge-cases");
 export const getMemberImportRows = (batchId: string) =>
   request<MemberImportRow[]>(`/api/v1/admin/imports/${batchId}/rows`);
 export const getUsers = () => request<UserAccount[]>("/api/v1/admin/users");
@@ -493,6 +528,42 @@ export const applyMemberImport = (batch: MemberImportBatch) =>
       method: "POST",
       headers: commandHeaders(),
       body: JSON.stringify({ expected_version: batch.version }),
+    },
+  );
+
+export const requestMemberMerge = (payload: {
+  cooperative_id: string;
+  source_member_id: string;
+  survivor_member_id: string;
+  source_expected_version: number;
+  survivor_expected_version: number;
+  evidence_refs: string[];
+  reason_code: string;
+}) =>
+  request<{ event_id: string; object_id: string; status: MemberMergeCaseStatus; replayed: boolean }>(
+    "/api/v1/admin/member-merge-cases",
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
+
+export const decideMemberMerge = (
+  mergeCase: MemberMergeCase,
+  approve: boolean,
+  reasonCode: string,
+) =>
+  request<{ event_id: string; object_id: string; status: MemberMergeCaseStatus; replayed: boolean }>(
+    `/api/v1/admin/member-merge-cases/${mergeCase.id}/decision`,
+    {
+      method: "POST",
+      headers: commandHeaders(),
+      body: JSON.stringify({
+        approve,
+        expected_version: mergeCase.version,
+        reason_code: reasonCode,
+      }),
     },
   );
 

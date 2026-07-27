@@ -16,6 +16,7 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     Member,
     MemberImportBatch,
     MemberImportRow,
+    MemberMergeCase,
     Membership,
     ParticipantAddress,
     RoleAssignment,
@@ -211,6 +212,32 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
             .where(UserAccount.id == stable_id("bootstrap-user", login))
             .values(member_id=stable_id("member", member_key), updated_at=datetime.now(UTC))
         )
+
+    duplicate_member_id = stable_id("member", "demo-member-anna-duplicate")
+    duplicate_member = insert(Member).values(
+        id=duplicate_member_id,
+        display_name="Anna Petrova (duplicate record)",
+        registered_by_cooperative_id=cooperative_id,
+        status="PENDING_VERIFICATION",
+    )
+    await session.execute(duplicate_member.on_conflict_do_nothing(index_elements=[Member.id]))
+    demo_merge_case = insert(MemberMergeCase).values(
+        id=stable_id("member-merge-case", "demo-anna-duplicate"),
+        cooperative_id=cooperative_id,
+        source_member_id=duplicate_member_id,
+        survivor_member_id=stable_id("member", "demo-member-anna"),
+        source_expected_version=1,
+        survivor_expected_version=1,
+        evidence_refs=["case:demo-duplicate-anna", f"sha256:{'d' * 64}"],
+        reason_code="DEMO_CONFIRMED_DUPLICATE",
+        blocker_summary={"codes": [], "references": {}},
+        status="PENDING_REVIEW",
+        requested_by_user_id=stable_id("bootstrap-user", "registrar"),
+        expires_at=datetime.now(UTC) + timedelta(days=30),
+    )
+    await session.execute(
+        demo_merge_case.on_conflict_do_nothing(index_elements=[MemberMergeCase.id])
+    )
 
     demo_member_user_id = stable_id("demo-user", DEMO_MEMBER_LOGIN)
     demo_member = insert(UserAccount).values(
