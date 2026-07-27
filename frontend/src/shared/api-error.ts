@@ -26,6 +26,38 @@ export function userErrorMessage(error: unknown, language?: string): string {
 
   const code = apiError.code.toUpperCase();
 
+  if (code === "RISK_COMPENSATION_DECISION_NOT_FINAL") {
+    return translate("errors.compensationDecisionNotFinal");
+  }
+  if (
+    code === "RISK_COMPENSATION_DECISION_SOURCE_MISMATCH"
+    || code === "RISK_COMPENSATION_DECISION_LOSS_REQUIRED"
+  ) {
+    return translate("errors.compensationDecisionMismatch");
+  }
+  if (
+    code === "RISK_COMPENSATION_AMOUNT_EXCEEDS_BOUND"
+    || code === "RISK_COMPENSATION_ACCOUNT_AVAILABLE_EXCEEDED"
+  ) {
+    return translate("errors.compensationAmountExceeded");
+  }
+  if (
+    code === "RISK_COMPENSATION_DESTINATION_NOT_PRIMARY"
+    || code === "RISK_COMPENSATION_RECIPIENT_ACCOUNT_MISMATCH"
+    || code === "RISK_COMPENSATION_DENOMINATION_MISMATCH"
+  ) {
+    return translate("errors.compensationDestinationInvalid");
+  }
+  if (
+    code === "RISK_COMPENSATION_AUTHORIZER_NOT_INDEPENDENT"
+    || code === "RISK_COMPENSATION_VOIDER_NOT_INDEPENDENT"
+  ) {
+    return translate("errors.compensationIndependentActor");
+  }
+  if (code === "RISK_COMPENSATION_RESERVATION_BROKEN") {
+    return translate("errors.compensationReservationBroken");
+  }
+
   if (code === "MEMBER_IMPORT_PREVIEW_STALE") {
     return translate("errors.memberImportPreviewStale");
   }

@@ -1289,7 +1289,15 @@ class RiskService:
     ) -> ExposurePreview:
         reserved = (
             await session.execute(
-                select(func.coalesce(func.sum(ExposureCommitment.amount_reserved), 0)).where(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            ExposureCommitment.amount_reserved
+                            - ExposureCommitment.executed_amount
+                        ),
+                        0,
+                    )
+                ).where(
                     ExposureCommitment.account_id == account.id,
                     ExposureCommitment.status == CommitmentStatus.ACTIVE.value,
                 )
@@ -1297,7 +1305,15 @@ class RiskService:
         ).scalar_one()
         direct = (
             await session.execute(
-                select(func.coalesce(func.sum(ExposureCommitment.max_loss), 0)).where(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            ExposureCommitment.max_loss
+                            - ExposureCommitment.executed_amount
+                        ),
+                        0,
+                    )
+                ).where(
                     ExposureCommitment.cooperative_id == account.cooperative_id,
                     ExposureCommitment.owner_member_id == account.member_id,
                     ExposureCommitment.status == CommitmentStatus.ACTIVE.value,
@@ -1307,7 +1323,15 @@ class RiskService:
         group = await self._related_group(session, account.cooperative_id, account.member_id)
         related = (
             await session.execute(
-                select(func.coalesce(func.sum(ExposureCommitment.max_loss), 0)).where(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            ExposureCommitment.max_loss
+                            - ExposureCommitment.executed_amount
+                        ),
+                        0,
+                    )
+                ).where(
                     ExposureCommitment.cooperative_id == account.cooperative_id,
                     ExposureCommitment.owner_member_id.in_(group),
                     ExposureCommitment.status == CommitmentStatus.ACTIVE.value,
@@ -1423,7 +1447,10 @@ class RiskService:
                 await session.execute(
                     select(
                         ShareAccount.denomination,
-                        func.sum(ExposureCommitment.max_loss),
+                        func.sum(
+                            ExposureCommitment.max_loss
+                            - ExposureCommitment.executed_amount
+                        ),
                     )
                     .join(ShareAccount, ShareAccount.id == ExposureCommitment.account_id)
                     .where(

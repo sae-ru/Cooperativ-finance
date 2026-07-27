@@ -7,6 +7,7 @@ export type ShareContribution = components["schemas"]["ContributionResponse"];
 export type RelatedLink = components["schemas"]["RelatedLinkResponse"];
 export type ExposureCommitment = components["schemas"]["CommitmentResponse"];
 export type LiabilityCase = components["schemas"]["LiabilityResponse"];
+export type CompensationTransfer = components["schemas"]["CompensationResponse"];
 export type ExposurePreview = components["schemas"]["ExposurePreviewResponse"];
 export type ShareContour = components["schemas"]["ShareContour"];
 export type CommitmentType = components["schemas"]["CommitmentType"];
@@ -24,6 +25,8 @@ export const getExposureCommitments = () =>
   request<ExposureCommitment[]>("/api/v1/risk/commitments");
 export const getLiabilityCases = () =>
   request<LiabilityCase[]>("/api/v1/risk/liability-cases");
+export const getCompensations = () =>
+  request<CompensationTransfer[]>("/api/v1/risk/compensations");
 
 export const previewExposure = (payload: {
   account_id: string;
@@ -195,3 +198,49 @@ export const assessLiabilityCase = (
     body: JSON.stringify({ ...payload, expected_version: liabilityCase.version }),
   },
 );
+
+export const authorizeCompensation = (
+  liabilityCase: LiabilityCase,
+  payload: {
+    trust_case_id: string;
+    trust_decision_id: string;
+    destination_account_id: string;
+    amount: string;
+    rationale: string;
+    evidence_ids: string[];
+    expected_source_account_version: number;
+    expected_destination_account_version: number;
+    expected_commitment_version: number;
+  },
+) => request<CommandResult>(
+  `/api/v1/risk/liability-cases/${liabilityCase.id}/compensations`,
+  {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({
+      ...payload,
+      expected_liability_version: liabilityCase.version,
+    }),
+  },
+);
+
+export const acceptCompensation = (transfer: CompensationTransfer) =>
+  request<CommandResult>(`/api/v1/risk/compensations/${transfer.id}/acceptance`, {
+    method: "POST",
+    headers: commandHeaders(),
+    body: JSON.stringify({ expected_version: transfer.version }),
+  });
+
+export const voidCompensation = (
+  transfer: CompensationTransfer,
+  reason: string,
+  evidenceIds: string[],
+) => request<CommandResult>(`/api/v1/risk/compensations/${transfer.id}/void`, {
+  method: "POST",
+  headers: commandHeaders(),
+  body: JSON.stringify({
+    reason,
+    evidence_ids: evidenceIds,
+    expected_version: transfer.version,
+  }),
+});

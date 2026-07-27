@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-previous_revision="${COOP_MIGRATION_FROM:-0033_member_continuity}"
-expected_head="${COOP_MIGRATION_HEAD:-0034_custody_continuity}"
+previous_revision="${COOP_MIGRATION_FROM:-0034_custody_continuity}"
+expected_head="${COOP_MIGRATION_HEAD:-0035_bounded_compensation}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 project="${COOP_MIGRATION_PROJECT:-coop-migration-${timestamp,,}}"
 report="${COOP_MIGRATION_REPORT:-$root_dir/evidence/migration-$timestamp.json}"
@@ -118,22 +118,25 @@ tables_after="$(psql_value "
 critical_tables="$(psql_value "
   SELECT count(*)
   FROM information_schema.tables
-  WHERE table_schema = 'federation'
-    AND table_name IN (
-      'federated_clearing_cycles',
-      'inter_node_obligations',
-      'federated_commit_certificates',
-      'federated_clearing_proofs'
-    )")"
+  WHERE table_schema = 'risk'
+    AND table_name = 'compensation_transfers'")"
+executed_amount_columns="$(psql_value "
+  SELECT count(*)
+  FROM information_schema.columns
+  WHERE table_schema = 'risk'
+    AND table_name = 'exposure_commitments'
+    AND column_name = 'executed_amount'
+    AND is_nullable = 'NO'")"
 
 if [ "$identity_before" != "$identity_after" ] ||
    [ "$profile_before" != "$profile_after" ]; then
   echo "Previous-release identity data changed during upgrade" >&2
   exit 1
 fi
-if [ "$critical_tables" != "4" ] ||
+if [ "$critical_tables" != "1" ] ||
+   [ "$executed_amount_columns" != "1" ] ||
    [ "$tables_after" -le "$tables_before" ]; then
-  echo "Head migration did not install the expected clearing schema" >&2
+  echo "Head migration did not install the expected compensation schema" >&2
   exit 1
 fi
 
@@ -190,7 +193,8 @@ cat > "$report" <<EOF
   "identity_counts": "$identity_after",
   "tables_before": $tables_before,
   "tables_after": $tables_after,
-  "critical_head_tables": $critical_tables
+  "critical_head_tables": $critical_tables,
+  "executed_amount_columns": $executed_amount_columns
 }
 EOF
 printf '%s\n' "$report"

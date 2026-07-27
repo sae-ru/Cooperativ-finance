@@ -22,6 +22,7 @@ from cooperative_clearing.api.identity_schemas import CommandEnvelope
 from cooperative_clearing.api.identity_schemas import CommandResult as ApiCommandResult
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
 from cooperative_clearing.modules.risk.application.common import RiskCommandResult
+from cooperative_clearing.modules.risk.application.compensation import CompensationService
 from cooperative_clearing.modules.risk.application.service import RiskService
 from cooperative_clearing.modules.risk.domain.types import (
     CommitmentType,
@@ -31,6 +32,7 @@ from cooperative_clearing.modules.risk.domain.types import (
     risk_error,
 )
 from cooperative_clearing.modules.risk.infrastructure.models import (
+    CompensationTransfer,
     ExposureCommitment,
     LiabilityCase,
     RelatedPartyLink,
@@ -155,6 +157,28 @@ class LiabilityAssessmentRequest(BaseModel):
     expected_version: int = Field(ge=1)
 
 
+class CompensationAuthorizeRequest(BaseModel):
+    trust_case_id: UUID
+    trust_decision_id: UUID
+    destination_account_id: UUID
+    amount: Decimal = Field(gt=0, max_digits=38, decimal_places=12)
+    rationale: str = Field(min_length=2, max_length=8000)
+    evidence_ids: list[UUID] = Field(min_length=1, max_length=20)
+    expected_liability_version: int = Field(ge=1)
+    expected_source_account_version: int = Field(ge=1)
+    expected_destination_account_version: int = Field(ge=1)
+    expected_commitment_version: int = Field(ge=1)
+
+
+class CompensationAcceptRequest(BaseModel):
+    expected_version: int = Field(ge=1)
+
+
+class CompensationVoidRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=4000)
+    evidence_ids: list[UUID] = Field(min_length=1, max_length=20)
+    expected_version: int = Field(ge=1)
+
 class PolicyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -245,6 +269,7 @@ class CommitmentResponse(BaseModel):
     role_assignment_id: UUID | None
     amount_reserved: Decimal
     max_loss: Decimal
+    executed_amount: Decimal
     coverage_ratio: Decimal
     starts_at: datetime
     expires_at: datetime
@@ -291,6 +316,40 @@ class LiabilityResponse(BaseModel):
     assessed_at: datetime | None
     version: int
 
+
+class CompensationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    cooperative_id: UUID
+    liability_case_id: UUID
+    trust_case_id: UUID
+    trust_decision_id: UUID
+    commitment_id: UUID
+    source_account_id: UUID
+    destination_account_id: UUID
+    responsible_member_id: UUID
+    recipient_member_id: UUID
+    amount: Decimal
+    denomination: str
+    rationale: str
+    status: str
+    authorized_by_member_id: UUID
+    authorized_event_id: UUID
+    accepted_by_member_id: UUID | None
+    accepted_event_id: UUID | None
+    voided_by_member_id: UUID | None
+    voided_event_id: UUID | None
+    void_reason: str | None
+    source_balance_before: Decimal | None
+    source_balance_after: Decimal | None
+    destination_balance_before: Decimal | None
+    destination_balance_after: Decimal | None
+    authorized_at: datetime
+    accepted_at: datetime | None
+    voided_at: datetime | None
+    updated_at: datetime
+    version: int
 
 class ExposurePreviewResponse(BaseModel):
     account_available_before: Decimal
@@ -418,6 +477,22 @@ def _liability_filter(principal: Principal) -> ColumnElement[bool] | None:
         conditions.append(LiabilityCase.responsible_member_id == principal.member_id)
     return or_(*conditions) if conditions else false()
 
+
+def _compensation_filter(principal: Principal) -> ColumnElement[bool] | None:
+    scopes = _admin_scopes(principal)
+    if scopes is None:
+        return None
+    conditions: list[ColumnElement[bool]] = []
+    if scopes:
+        conditions.append(CompensationTransfer.cooperative_id.in_(scopes))
+    if principal.member_id is not None:
+        conditions.extend(
+            [
+                CompensationTransfer.responsible_member_id == principal.member_id,
+                CompensationTransfer.recipient_member_id == principal.member_id,
+            ]
+        )
+    return or_(*conditions) if conditions else false()
 
 def _command(result: RiskCommandResult) -> CommandEnvelope:
     return CommandEnvelope(
@@ -559,6 +634,24 @@ async def list_liability_cases(
         items = list((await session.execute(statement.limit(500))).scalars())
     return Collection(data=items, request_id=get_request_id())
 
+
+@router.get("/compensations", response_model=Collection[CompensationResponse])
+async def list_compensations(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    status: str | None = Query(default=None, max_length=24),
+) -> Collection[CompensationResponse]:
+    condition = _compensation_filter(principal)
+    statement = select(CompensationTransfer).order_by(
+        CompensationTransfer.authorized_at.desc(), CompensationTransfer.id
+    )
+    if condition is not None:
+        statement = statement.where(condition)
+    if status is not None:
+        statement = statement.where(CompensationTransfer.status == status.upper())
+    async with database.session() as session:
+        items = list((await session.execute(statement.limit(500))).scalars())
+    return Collection(data=items, request_id=get_request_id())
 
 @router.post("/exposure-previews", response_model=ExposurePreviewEnvelope)
 async def preview_exposure(
@@ -829,6 +922,83 @@ async def assess_liability_case(
             session,
             principal=principal,
             case_id=case_id,
+            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+
+    return await _commit_command(database, action)
+
+@router.post(
+    "/liability-cases/{case_id}/compensations",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def authorize_compensation(
+    case_id: UUID,
+    payload: CompensationAuthorizeRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> CommandEnvelope:
+    async def action(session: AsyncSession) -> RiskCommandResult:
+        return await CompensationService(settings).authorize(
+            session,
+            principal=principal,
+            liability_case_id=case_id,
+            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+
+    return await _commit_command(database, action)
+
+
+@router.post(
+    "/compensations/{transfer_id}/acceptance",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def accept_compensation(
+    transfer_id: UUID,
+    payload: CompensationAcceptRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> CommandEnvelope:
+    async def action(session: AsyncSession) -> RiskCommandResult:
+        return await CompensationService(settings).accept(
+            session,
+            principal=principal,
+            transfer_id=transfer_id,
+            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+
+    return await _commit_command(database, action)
+
+
+@router.post(
+    "/compensations/{transfer_id}/void",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def void_compensation(
+    transfer_id: UUID,
+    payload: CompensationVoidRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> CommandEnvelope:
+    async def action(session: AsyncSession) -> RiskCommandResult:
+        return await CompensationService(settings).void(
+            session,
+            principal=principal,
+            transfer_id=transfer_id,
             **payload.model_dump(),
             idempotency_key=idempotency_key,
             request_id=_request_uuid(),

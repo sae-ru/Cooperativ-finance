@@ -8,6 +8,7 @@ import {
   addShareContribution,
   assessLiabilityCase,
   decideRelatedLink,
+  getCompensations,
   getExposureCommitments,
   getLiabilityCases,
   getRelatedLinks,
@@ -51,6 +52,7 @@ vi.mock("./api/risk", async (importOriginal) => {
     getRelatedLinks: vi.fn(),
     getExposureCommitments: vi.fn(),
     getLiabilityCases: vi.fn(),
+    getCompensations: vi.fn(),
     previewExposure: vi.fn(),
     proposeRiskPolicy: vi.fn(),
     approveRiskPolicy: vi.fn(),
@@ -63,6 +65,14 @@ vi.mock("./api/risk", async (importOriginal) => {
     releaseExposure: vi.fn(),
     openLiabilityCase: vi.fn(),
     assessLiabilityCase: vi.fn(),
+  };
+});
+
+vi.mock("./api/trust", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/trust")>();
+  return {
+    ...actual,
+    getTrustCases: vi.fn(),
   };
 });
 
@@ -217,6 +227,7 @@ describe("RiskView operational commands", () => {
   beforeEach(async () => {
     const admin = await import("./api/admin");
     const inventory = await import("./api/inventory");
+    const trust = await import("./api/trust");
     vi.mocked(admin.getCooperatives).mockResolvedValue([
       { id: cooperativeId, code: "DEMO", name: "Demo", status: "ACTIVE", created_at: "2026-07-20T00:00:00Z", updated_at: "2026-07-20T00:00:00Z", version: 1 },
     ]);
@@ -241,6 +252,8 @@ describe("RiskView operational commands", () => {
     vi.mocked(getExposureCommitments).mockResolvedValue([activeCommitment]);
     vi.mocked(getRelatedLinks).mockResolvedValue([]);
     vi.mocked(getLiabilityCases).mockResolvedValue([]);
+    vi.mocked(getCompensations).mockResolvedValue([]);
+    vi.mocked(trust.getTrustCases).mockResolvedValue([]);
     vi.mocked(proposeRiskPolicy).mockResolvedValue(commandResult);
     vi.mocked(openShareAccount).mockResolvedValue(commandResult);
     vi.mocked(addShareContribution).mockResolvedValue(commandResult);

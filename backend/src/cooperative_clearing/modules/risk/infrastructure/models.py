@@ -279,7 +279,8 @@ class ExposureCommitment(Base):
             name="status_allowed",
         ),
         CheckConstraint(
-            "amount_reserved > 0 AND max_loss > 0 AND max_loss <= amount_reserved",
+            "amount_reserved > 0 AND max_loss > 0 AND max_loss <= amount_reserved "
+            "AND executed_amount >= 0 AND executed_amount <= max_loss",
             name="amounts_bounded",
         ),
         CheckConstraint("coverage_ratio > 0 AND coverage_ratio <= 1", name="ratio_bounded"),
@@ -342,6 +343,9 @@ class ExposureCommitment(Base):
     )
     amount_reserved: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
     max_loss: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    executed_amount: Mapped[Decimal] = mapped_column(
+        Numeric(38, 12), nullable=False, server_default=text("0")
+    )
     coverage_ratio: Mapped[Decimal] = mapped_column(Numeric(7, 6), nullable=False)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -469,6 +473,163 @@ class LiabilityCase(Base):
     assessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
+
+class CompensationTransfer(Base):
+    __tablename__ = "compensation_transfers"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="amount_positive"),
+        CheckConstraint(
+            "status IN ('PENDING_ACCEPTANCE','SETTLED','VOIDED')",
+            name="status_allowed",
+        ),
+        CheckConstraint("source_account_id <> destination_account_id", name="accounts_distinct"),
+        CheckConstraint("responsible_member_id <> recipient_member_id", name="members_distinct"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(
+            "jsonb_typeof(authorization_evidence_refs) = 'array' "
+            "AND jsonb_array_length(authorization_evidence_refs) >= 1",
+            name="authorization_evidence_nonempty",
+        ),
+        CheckConstraint(
+            "void_evidence_refs IS NULL OR jsonb_typeof(void_evidence_refs) = 'array'",
+            name="void_evidence_array",
+        ),
+        CheckConstraint(
+            "(status = 'PENDING_ACCEPTANCE' AND accepted_event_id IS NULL "
+            "AND voided_event_id IS NULL AND accepted_by_user_id IS NULL "
+            "AND voided_by_user_id IS NULL AND source_balance_before IS NULL "
+            "AND source_balance_after IS NULL AND destination_balance_before IS NULL "
+            "AND destination_balance_after IS NULL) OR "
+            "(status = 'SETTLED' AND accepted_event_id IS NOT NULL "
+            "AND accepted_by_user_id IS NOT NULL AND accepted_by_member_id IS NOT NULL "
+            "AND accepted_role_assignment_id IS NOT NULL AND accepted_at IS NOT NULL "
+            "AND voided_event_id IS NULL AND source_balance_before IS NOT NULL "
+            "AND source_balance_after IS NOT NULL AND destination_balance_before IS NOT NULL "
+            "AND destination_balance_after IS NOT NULL) OR "
+            "(status = 'VOIDED' AND voided_event_id IS NOT NULL "
+            "AND voided_by_user_id IS NOT NULL AND voided_by_member_id IS NOT NULL "
+            "AND voided_role_assignment_id IS NOT NULL AND voided_at IS NOT NULL "
+            "AND accepted_event_id IS NULL AND source_balance_before IS NULL "
+            "AND source_balance_after IS NULL AND destination_balance_before IS NULL "
+            "AND destination_balance_after IS NULL)",
+            name="lifecycle_consistent",
+        ),
+        CheckConstraint(
+            "status <> 'SETTLED' OR "
+            "(source_balance_before - amount = source_balance_after "
+            "AND destination_balance_before + amount = destination_balance_after)",
+            name="settlement_balanced",
+        ),
+        Index("ix_compensation_transfers_cooperative_status", "cooperative_id", "status"),
+        Index("ix_compensation_transfers_recipient_status", "recipient_member_id", "status"),
+        Index(
+            "uq_compensation_transfers_active_case",
+            "liability_case_id",
+            unique=True,
+            postgresql_where=text("status IN ('PENDING_ACCEPTANCE','SETTLED')"),
+        ),
+        {"schema": "risk"},
+    )
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    liability_case_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("risk.liability_cases.id", ondelete="RESTRICT")
+    )
+    trust_case_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("trust.cases.id", ondelete="RESTRICT")
+    )
+    trust_decision_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("trust.arbitration_decisions.id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    commitment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("risk.exposure_commitments.id", ondelete="RESTRICT")
+    )
+    source_account_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("risk.share_accounts.id", ondelete="RESTRICT")
+    )
+    destination_account_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("risk.share_accounts.id", ondelete="RESTRICT")
+    )
+    responsible_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    recipient_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    denomination: Mapped[str] = mapped_column(String(32), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    authorization_evidence_refs: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False
+    )
+    authorized_by_user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    authorized_by_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    authorized_role_assignment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    authorized_event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    source_account_version_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    destination_account_version_at_authorization: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+    commitment_version_before: Mapped[int] = mapped_column(Integer, nullable=False)
+    accepted_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    accepted_by_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    accepted_role_assignment_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    accepted_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    voided_by_user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.users.id", ondelete="RESTRICT")
+    )
+    voided_by_member_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    voided_role_assignment_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
+    )
+    voided_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT"),
+        unique=True,
+    )
+    void_reason: Mapped[str | None] = mapped_column(Text)
+    void_evidence_refs: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+    source_balance_before: Mapped[Decimal | None] = mapped_column(Numeric(38, 12))
+    source_balance_after: Mapped[Decimal | None] = mapped_column(Numeric(38, 12))
+    destination_balance_before: Mapped[Decimal | None] = mapped_column(Numeric(38, 12))
+    destination_balance_after: Mapped[Decimal | None] = mapped_column(Numeric(38, 12))
+    authorized_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
 class AntifraudScan(Base):
     __tablename__ = "antifraud_scans"

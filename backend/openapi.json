@@ -2284,6 +2284,27 @@
         "title": "Collection[CommodityRightResponse]",
         "type": "object"
       },
+      "Collection_CompensationResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CompensationResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Collection[CompensationResponse]",
+        "type": "object"
+      },
       "Collection_ComplaintResponse_": {
         "properties": {
           "data": {
@@ -3678,6 +3699,11 @@
             "title": "Exclusions",
             "type": "string"
           },
+          "executed_amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Executed Amount",
+            "type": "string"
+          },
           "expires_at": {
             "format": "date-time",
             "title": "Expires At",
@@ -3814,6 +3840,7 @@
           "role_assignment_id",
           "amount_reserved",
           "max_loss",
+          "executed_amount",
           "coverage_ratio",
           "starts_at",
           "expires_at",
@@ -4010,6 +4037,394 @@
           "version"
         ],
         "title": "CommodityRightResponse",
+        "type": "object"
+      },
+      "CompensationAcceptRequest": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_version"
+        ],
+        "title": "CompensationAcceptRequest",
+        "type": "object"
+      },
+      "CompensationAuthorizeRequest": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,26}|(?=[\\d.]{1,39}0*$)\\d{0,26}\\.\\d{0,12}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "destination_account_id": {
+            "format": "uuid",
+            "title": "Destination Account Id",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_commitment_version": {
+            "minimum": 1.0,
+            "title": "Expected Commitment Version",
+            "type": "integer"
+          },
+          "expected_destination_account_version": {
+            "minimum": 1.0,
+            "title": "Expected Destination Account Version",
+            "type": "integer"
+          },
+          "expected_liability_version": {
+            "minimum": 1.0,
+            "title": "Expected Liability Version",
+            "type": "integer"
+          },
+          "expected_source_account_version": {
+            "minimum": 1.0,
+            "title": "Expected Source Account Version",
+            "type": "integer"
+          },
+          "rationale": {
+            "maxLength": 8000,
+            "minLength": 2,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "trust_case_id": {
+            "format": "uuid",
+            "title": "Trust Case Id",
+            "type": "string"
+          },
+          "trust_decision_id": {
+            "format": "uuid",
+            "title": "Trust Decision Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trust_case_id",
+          "trust_decision_id",
+          "destination_account_id",
+          "amount",
+          "rationale",
+          "evidence_ids",
+          "expected_liability_version",
+          "expected_source_account_version",
+          "expected_destination_account_version",
+          "expected_commitment_version"
+        ],
+        "title": "CompensationAuthorizeRequest",
+        "type": "object"
+      },
+      "CompensationResponse": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "accepted_by_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted By Member Id"
+          },
+          "accepted_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Event Id"
+          },
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "authorized_at": {
+            "format": "date-time",
+            "title": "Authorized At",
+            "type": "string"
+          },
+          "authorized_by_member_id": {
+            "format": "uuid",
+            "title": "Authorized By Member Id",
+            "type": "string"
+          },
+          "authorized_event_id": {
+            "format": "uuid",
+            "title": "Authorized Event Id",
+            "type": "string"
+          },
+          "commitment_id": {
+            "format": "uuid",
+            "title": "Commitment Id",
+            "type": "string"
+          },
+          "cooperative_id": {
+            "format": "uuid",
+            "title": "Cooperative Id",
+            "type": "string"
+          },
+          "denomination": {
+            "title": "Denomination",
+            "type": "string"
+          },
+          "destination_account_id": {
+            "format": "uuid",
+            "title": "Destination Account Id",
+            "type": "string"
+          },
+          "destination_balance_after": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Balance After"
+          },
+          "destination_balance_before": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Balance Before"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "liability_case_id": {
+            "format": "uuid",
+            "title": "Liability Case Id",
+            "type": "string"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "recipient_member_id": {
+            "format": "uuid",
+            "title": "Recipient Member Id",
+            "type": "string"
+          },
+          "responsible_member_id": {
+            "format": "uuid",
+            "title": "Responsible Member Id",
+            "type": "string"
+          },
+          "source_account_id": {
+            "format": "uuid",
+            "title": "Source Account Id",
+            "type": "string"
+          },
+          "source_balance_after": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Balance After"
+          },
+          "source_balance_before": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Balance Before"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trust_case_id": {
+            "format": "uuid",
+            "title": "Trust Case Id",
+            "type": "string"
+          },
+          "trust_decision_id": {
+            "format": "uuid",
+            "title": "Trust Decision Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "void_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Void Reason"
+          },
+          "voided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided At"
+          },
+          "voided_by_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By Member Id"
+          },
+          "voided_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided Event Id"
+          }
+        },
+        "required": [
+          "id",
+          "cooperative_id",
+          "liability_case_id",
+          "trust_case_id",
+          "trust_decision_id",
+          "commitment_id",
+          "source_account_id",
+          "destination_account_id",
+          "responsible_member_id",
+          "recipient_member_id",
+          "amount",
+          "denomination",
+          "rationale",
+          "status",
+          "authorized_by_member_id",
+          "authorized_event_id",
+          "accepted_by_member_id",
+          "accepted_event_id",
+          "voided_by_member_id",
+          "voided_event_id",
+          "void_reason",
+          "source_balance_before",
+          "source_balance_after",
+          "destination_balance_before",
+          "destination_balance_after",
+          "authorized_at",
+          "accepted_at",
+          "voided_at",
+          "updated_at",
+          "version"
+        ],
+        "title": "CompensationResponse",
+        "type": "object"
+      },
+      "CompensationVoidRequest": {
+        "properties": {
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 4000,
+            "minLength": 2,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "evidence_ids",
+          "expected_version"
+        ],
+        "title": "CompensationVoidRequest",
         "type": "object"
       },
       "ComplaintOpenRequest": {
@@ -40382,6 +40797,199 @@
         ]
       }
     },
+    "/api/v1/risk/compensations": {
+      "get": {
+        "operationId": "list_compensations_api_v1_risk_compensations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 24,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_CompensationResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Compensations",
+        "tags": [
+          "bounded-risk"
+        ]
+      }
+    },
+    "/api/v1/risk/compensations/{transfer_id}/acceptance": {
+      "post": {
+        "operationId": "accept_compensation_api_v1_risk_compensations__transfer_id__acceptance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompensationAcceptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Accept Compensation",
+        "tags": [
+          "bounded-risk"
+        ]
+      }
+    },
+    "/api/v1/risk/compensations/{transfer_id}/void": {
+      "post": {
+        "operationId": "void_compensation_api_v1_risk_compensations__transfer_id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transfer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transfer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompensationVoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Void Compensation",
+        "tags": [
+          "bounded-risk"
+        ]
+      }
+    },
     "/api/v1/risk/exposure-previews": {
       "post": {
         "operationId": "preview_exposure_api_v1_risk_exposure_previews_post",
@@ -40604,6 +41212,75 @@
           }
         ],
         "summary": "Assess Liability Case",
+        "tags": [
+          "bounded-risk"
+        ]
+      }
+    },
+    "/api/v1/risk/liability-cases/{case_id}/compensations": {
+      "post": {
+        "operationId": "authorize_compensation_api_v1_risk_liability_cases__case_id__compensations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompensationAuthorizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Authorize Compensation",
         "tags": [
           "bounded-risk"
         ]

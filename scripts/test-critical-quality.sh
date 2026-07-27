@@ -50,6 +50,7 @@ tests=(
   tests/integration/test_crisis_concurrency.py
   tests/integration/test_solidarity_concurrency.py
   tests/integration/test_risk_flow.py
+  tests/integration/test_compensation_flow.py
   tests/integration/test_signed_journal_responsibility.py::test_concurrent_commands_preserve_node_sequence
 )
 
@@ -67,8 +68,8 @@ cat > "$destination/manifest.json" <<EOF
   "status": "passed",
   "repeat_count": $repeats,
   "duration_seconds": $duration_seconds,
-  "previous_schema": "0033_member_continuity",
-  "current_schema": "0034_custody_continuity",
+  "previous_schema": "0034_custody_continuity",
+  "current_schema": "0035_bounded_compensation",
   "openapi_baseline": "0.1.0"
 }
 EOF

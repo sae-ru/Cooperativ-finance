@@ -4157,6 +4157,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/risk/compensations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Compensations */
+        get: operations["list_compensations_api_v1_risk_compensations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk/compensations/{transfer_id}/acceptance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Compensation */
+        post: operations["accept_compensation_api_v1_risk_compensations__transfer_id__acceptance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk/compensations/{transfer_id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Void Compensation */
+        post: operations["void_compensation_api_v1_risk_compensations__transfer_id__void_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/risk/exposure-previews": {
         parameters: {
             query?: never;
@@ -4203,6 +4254,23 @@ export interface paths {
         put?: never;
         /** Assess Liability Case */
         post: operations["assess_liability_case_api_v1_risk_liability_cases__case_id__assessment_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/risk/liability-cases/{case_id}/compensations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Authorize Compensation */
+        post: operations["authorize_compensation_api_v1_risk_liability_cases__case_id__compensations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6236,6 +6304,13 @@ export interface components {
             /** Request Id */
             request_id: string;
         };
+        /** Collection[CompensationResponse] */
+        Collection_CompensationResponse_: {
+            /** Data */
+            data: components["schemas"]["CompensationResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
         /** Collection[ComplaintResponse] */
         Collection_ComplaintResponse_: {
             /** Data */
@@ -6710,6 +6785,8 @@ export interface components {
             debtor_member_id: string | null;
             /** Exclusions */
             exclusions: string;
+            /** Executed Amount */
+            executed_amount: string;
             /**
              * Expires At
              * Format: date-time
@@ -6865,6 +6942,157 @@ export interface components {
             valid_until: string | null;
             /** Version */
             version: number;
+        };
+        /** CompensationAcceptRequest */
+        CompensationAcceptRequest: {
+            /** Expected Version */
+            expected_version: number;
+        };
+        /** CompensationAuthorizeRequest */
+        CompensationAuthorizeRequest: {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Destination Account Id
+             * Format: uuid
+             */
+            destination_account_id: string;
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Expected Commitment Version */
+            expected_commitment_version: number;
+            /** Expected Destination Account Version */
+            expected_destination_account_version: number;
+            /** Expected Liability Version */
+            expected_liability_version: number;
+            /** Expected Source Account Version */
+            expected_source_account_version: number;
+            /** Rationale */
+            rationale: string;
+            /**
+             * Trust Case Id
+             * Format: uuid
+             */
+            trust_case_id: string;
+            /**
+             * Trust Decision Id
+             * Format: uuid
+             */
+            trust_decision_id: string;
+        };
+        /** CompensationResponse */
+        CompensationResponse: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Accepted By Member Id */
+            accepted_by_member_id: string | null;
+            /** Accepted Event Id */
+            accepted_event_id: string | null;
+            /** Amount */
+            amount: string;
+            /**
+             * Authorized At
+             * Format: date-time
+             */
+            authorized_at: string;
+            /**
+             * Authorized By Member Id
+             * Format: uuid
+             */
+            authorized_by_member_id: string;
+            /**
+             * Authorized Event Id
+             * Format: uuid
+             */
+            authorized_event_id: string;
+            /**
+             * Commitment Id
+             * Format: uuid
+             */
+            commitment_id: string;
+            /**
+             * Cooperative Id
+             * Format: uuid
+             */
+            cooperative_id: string;
+            /** Denomination */
+            denomination: string;
+            /**
+             * Destination Account Id
+             * Format: uuid
+             */
+            destination_account_id: string;
+            /** Destination Balance After */
+            destination_balance_after: string | null;
+            /** Destination Balance Before */
+            destination_balance_before: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Liability Case Id
+             * Format: uuid
+             */
+            liability_case_id: string;
+            /** Rationale */
+            rationale: string;
+            /**
+             * Recipient Member Id
+             * Format: uuid
+             */
+            recipient_member_id: string;
+            /**
+             * Responsible Member Id
+             * Format: uuid
+             */
+            responsible_member_id: string;
+            /**
+             * Source Account Id
+             * Format: uuid
+             */
+            source_account_id: string;
+            /** Source Balance After */
+            source_balance_after: string | null;
+            /** Source Balance Before */
+            source_balance_before: string | null;
+            /** Status */
+            status: string;
+            /**
+             * Trust Case Id
+             * Format: uuid
+             */
+            trust_case_id: string;
+            /**
+             * Trust Decision Id
+             * Format: uuid
+             */
+            trust_decision_id: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /** Void Reason */
+            void_reason: string | null;
+            /** Voided At */
+            voided_at: string | null;
+            /** Voided By Member Id */
+            voided_by_member_id: string | null;
+            /** Voided Event Id */
+            voided_event_id: string | null;
+        };
+        /** CompensationVoidRequest */
+        CompensationVoidRequest: {
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Expected Version */
+            expected_version: number;
+            /** Reason */
+            reason: string;
         };
         /** ComplaintOpenRequest */
         ComplaintOpenRequest: {
@@ -24566,6 +24794,111 @@ export interface operations {
             };
         };
     };
+    list_compensations_api_v1_risk_compensations_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_CompensationResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_compensation_api_v1_risk_compensations__transfer_id__acceptance_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompensationAcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    void_compensation_api_v1_risk_compensations__transfer_id__void_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                transfer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompensationVoidRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     preview_exposure_api_v1_risk_exposure_previews_post: {
         parameters: {
             query?: never;
@@ -24679,6 +25012,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LiabilityAssessmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_compensation_api_v1_risk_liability_cases__case_id__compensations_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompensationAuthorizeRequest"];
             };
         };
         responses: {

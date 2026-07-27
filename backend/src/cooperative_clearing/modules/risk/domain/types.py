@@ -60,6 +60,12 @@ class LiabilityStatus(StrEnum):
     CLOSED = "CLOSED"
 
 
+class CompensationStatus(StrEnum):
+    PENDING_ACCEPTANCE = "PENDING_ACCEPTANCE"
+    SETTLED = "SETTLED"
+    VOIDED = "VOIDED"
+
+
 class FaultClass(StrEnum):
     FORCE_MAJEURE = "FORCE_MAJEURE"
     GOOD_FAITH_ERROR = "GOOD_FAITH_ERROR"

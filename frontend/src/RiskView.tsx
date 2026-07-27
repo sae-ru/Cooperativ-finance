@@ -5,6 +5,7 @@ import {
   Check,
   FileCheck2,
   GitBranch,
+  HandCoins,
   Landmark,
   Link2,
   LockKeyhole,
@@ -19,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { type FormEvent, useMemo, useState } from "react";
 
 import {
@@ -38,6 +40,7 @@ import {
   approveRiskPolicy,
   assessLiabilityCase,
   decideRelatedLink,
+  getCompensations,
   getExposureCommitments,
   getLiabilityCases,
   getRelatedLinks,
@@ -61,11 +64,20 @@ import {
   type ShareAccount,
   type ShareContour,
 } from "./api/risk";
+import CompensationPanel from "./CompensationPanel";
+import { getTrustCases } from "./api/trust";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import "./risk.css";
 
-type Section = "overview" | "policies" | "accounts" | "commitments" | "related" | "liability";
+type Section =
+  | "overview"
+  | "policies"
+  | "accounts"
+  | "commitments"
+  | "related"
+  | "liability"
+  | "compensation";
 
 const evidenceAccept = "application/pdf,image/jpeg,image/png,image/webp,text/plain";
 
@@ -158,6 +170,7 @@ function EvidenceInput({
 
 export default function RiskView({ principal }: { principal: Principal }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [section, setSection] = useState<Section>("overview");
   const policies = useQuery({ queryKey: ["risk", "policies"], queryFn: getRiskPolicies });
   const accounts = useQuery({ queryKey: ["risk", "accounts"], queryFn: getShareAccounts });
@@ -170,11 +183,26 @@ export default function RiskView({ principal }: { principal: Principal }) {
     queryKey: ["risk", "liabilities"],
     queryFn: getLiabilityCases,
   });
+  const compensations = useQuery({
+    queryKey: ["risk", "compensations"],
+    queryFn: getCompensations,
+  });
+  const trustCases = useQuery({ queryKey: ["trust", "cases"], queryFn: getTrustCases });
   const members = useQuery({ queryKey: ["inventory-members"], queryFn: getInventoryMembers });
   const cooperatives = useQuery({ queryKey: ["cooperatives"], queryFn: getCooperatives });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["risk"] });
 
-  const queries = [policies, accounts, commitments, related, liabilities, members, cooperatives];
+  const queries = [
+    policies,
+    accounts,
+    commitments,
+    related,
+    liabilities,
+    compensations,
+    trustCases,
+    members,
+    cooperatives,
+  ];
   if (queries.some((query) => query.isPending)) {
     return <div className="view-stack"><div className="state"><RefreshCw className="spin" size={24} />Загрузка риска</div></div>;
   }
@@ -188,17 +216,27 @@ export default function RiskView({ principal }: { principal: Principal }) {
   const commitmentData = commitments.data ?? [];
   const relatedData = related.data ?? [];
   const liabilityData = liabilities.data ?? [];
+  const compensationData = compensations.data ?? [];
+  const trustCaseData = trustCases.data ?? [];
   const memberData = members.data ?? [];
   const cooperativeId = cooperatives.data?.[0]?.id ?? "";
   const activeReserved = commitmentData
     .filter((item) => item.status === "ACTIVE")
-    .reduce((sum, item) => sum + Number(item.amount_reserved), 0);
+    .reduce(
+      (sum, item) => sum + Number(item.amount_reserved) - Number(item.executed_amount),
+      0,
+    );
   const availableShares = accountData.reduce(
     (sum, item) => sum + Number(item.balance) - Number(item.protected_amount)
       - Number(item.executed_not_settled)
       - commitmentData
         .filter((commitment) => commitment.account_id === item.id && commitment.status === "ACTIVE")
-        .reduce((reserved, commitment) => reserved + Number(commitment.amount_reserved), 0),
+        .reduce(
+          (reserved, commitment) => reserved
+            + Number(commitment.amount_reserved)
+            - Number(commitment.executed_amount),
+          0,
+        ),
     0,
   );
   const sections: Array<[Section, string, typeof Scale]> = [
@@ -208,6 +246,7 @@ export default function RiskView({ principal }: { principal: Principal }) {
     ["commitments", "Риски", LockKeyhole],
     ["related", "Связи", GitBranch],
     ["liability", "Ответственность", ShieldAlert],
+    ["compensation", t("risk.compensation.tab"), HandCoins],
   ];
 
   return (
@@ -239,6 +278,7 @@ export default function RiskView({ principal }: { principal: Principal }) {
         <article className="metric"><UserCheck size={19} /><span>Ожидают принятия</span><strong>{commitmentData.filter((item) => item.status === "PROPOSED").length}</strong></article>
         <article className="metric"><GitBranch size={19} /><span>Связанные лица</span><strong>{relatedData.filter((item) => item.status === "ACTIVE").length}</strong></article>
         <article className="metric"><ShieldAlert size={19} /><span>Открытые случаи</span><strong>{liabilityData.filter((item) => item.status === "OPEN").length}</strong></article>
+        <article className="metric"><HandCoins size={19} /><span>{t("risk.compensation.pendingMetric")}</span><strong>{compensationData.filter((item) => item.status === "PENDING_ACCEPTANCE").length}</strong></article>
       </section>
 
       {section === "overview" ? (
@@ -295,6 +335,18 @@ export default function RiskView({ principal }: { principal: Principal }) {
           onDone={refresh}
         />
       ) : null}
+      {section === "compensation" ? (
+        <CompensationPanel
+          principal={principal}
+          liabilities={liabilityData}
+          commitments={commitmentData}
+          accounts={accountData}
+          transfers={compensationData}
+          trustCases={trustCaseData}
+          members={memberData}
+          onDone={refresh}
+        />
+      ) : null}
     </div>
   );
 }
@@ -320,7 +372,12 @@ function OverviewPanel({
             <tbody>{accounts.map((account) => {
               const reserved = commitments
                 .filter((item) => item.account_id === account.id && item.status === "ACTIVE")
-                .reduce((sum, item) => sum + Number(item.amount_reserved), 0);
+                .reduce(
+                  (sum, item) => sum
+                    + Number(item.amount_reserved)
+                    - Number(item.executed_amount),
+                  0,
+                );
               const available = Number(account.balance) - Number(account.protected_amount)
                 - Number(account.executed_not_settled) - reserved;
               return <tr key={account.id}><td><strong>{memberName(members, account.member_id)}</strong><small>{account.denomination} · v{account.version}</small></td><td>{contourNames[account.contour] ?? account.contour}</td><td>{exact(account.balance)}</td><td>{exact(account.protected_amount)}</td><td>{exact(reserved)}</td><td><strong>{exact(available)}</strong></td><td><Status value={account.status} /></td></tr>;

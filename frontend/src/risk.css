@@ -1,5 +1,5 @@
 .risk-view { width: min(1480px, 100%); }
-.risk-metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.risk-metrics { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .risk-metrics .metric strong { min-width: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .risk-command { background: #fff; }
 .risk-form { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); align-items: end; gap: 11px; padding: 15px; }
@@ -34,9 +34,24 @@
 .exposure-preview > code { padding: 0 11px; color: var(--red); font-size: 8px; overflow-wrap: anywhere; }
 .assessment-grid { display: grid; min-width: 260px; gap: 6px; }
 .assessment-grid input, .assessment-grid select { min-height: 31px; padding: 4px 7px; font-size: 9px; }
+.compensation-stack { display: grid; gap: 14px; }
+.risk-guidance { display: flex; align-items: flex-start; gap: 11px; padding: 13px 15px; color: var(--ink); background: #edf5f0; border-left: 4px solid var(--green); }
+.risk-guidance svg { flex: 0 0 auto; margin-top: 1px; color: var(--green); }
+.risk-guidance strong { font-size: 12px; }
+.risk-guidance p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.compensation-form { grid-template-columns: repeat(3, minmax(170px, 1fr)); }
+.compensation-table { min-width: 1120px; }
+.compensation-table td:nth-child(2) { max-width: 320px; }
+.compensation-void { min-width: 250px; }
+.compact-state { min-height: 110px; }
+.form-hint.warning { display: flex; align-items: flex-start; gap: 7px; margin: 0; padding: 0 15px 14px; color: #7d4e00; font-size: 10px; }
+.form-hint.warning svg { flex: 0 0 auto; }
 
+html[data-theme="dark"] .risk-guidance { background: #17382c; border-color: #4f9a76; }
+html[data-theme="dark"] .form-hint.warning { color: #f4d87a; }
 @media (max-width: 1200px) {
   .risk-form { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+  .compensation-form { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
   .exposure-preview { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
   .exposure-preview > .status, .exposure-preview > code { margin: 10px 12px; }
 }
