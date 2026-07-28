@@ -1811,6 +1811,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exchange/fulfillments/{fulfillment_id}/provenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconcile Fulfillment Provenance */
+        post: operations["reconcile_fulfillment_provenance_api_v1_exchange_fulfillments__fulfillment_id__provenance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exchange/logistics-orders": {
         parameters: {
             query?: never;
@@ -1879,6 +1896,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exchange/obligations/{obligation_id}/eligible-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Eligible Fulfillment Sources */
+        get: operations["list_eligible_fulfillment_sources_api_v1_exchange_obligations__obligation_id__eligible_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exchange/obligations/{obligation_id}/fulfillments": {
         parameters: {
             query?: never;
@@ -1925,6 +1959,23 @@ export interface paths {
         put?: never;
         /** Mark Overdue */
         post: operations["mark_overdue_api_v1_exchange_overdue_scans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exchange/traceability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Fulfillment Traceability */
+        get: operations["list_fulfillment_traceability_api_v1_exchange_traceability_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6360,6 +6411,13 @@ export interface components {
             /** Request Id */
             request_id: string;
         };
+        /** Collection[EligibleFulfillmentSourceResponse] */
+        Collection_EligibleFulfillmentSourceResponse_: {
+            /** Data */
+            data: components["schemas"]["EligibleFulfillmentSourceResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
         /** Collection[EntryResponse] */
         Collection_EntryResponse_: {
             /** Data */
@@ -6371,6 +6429,13 @@ export interface components {
         Collection_FulfillmentResponse_: {
             /** Data */
             data: components["schemas"]["FulfillmentResponse"][];
+            /** Request Id */
+            request_id: string;
+        };
+        /** Collection[FulfillmentTraceabilityResponse] */
+        Collection_FulfillmentTraceabilityResponse_: {
+            /** Data */
+            data: components["schemas"]["FulfillmentTraceabilityResponse"][];
             /** Request Id */
             request_id: string;
         };
@@ -8141,6 +8206,50 @@ export interface components {
             /** Resolution Notes */
             resolution_notes: string;
         };
+        /** EligibleFulfillmentSourceResponse */
+        EligibleFulfillmentSourceResponse: {
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /**
+             * Completed Event Id
+             * Format: uuid
+             */
+            completed_event_id: string;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Lot Number */
+            lot_number: string;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Quantity */
+            quantity: string;
+            /**
+             * Redemption Id
+             * Format: uuid
+             */
+            redemption_id: string;
+            /**
+             * Right Id
+             * Format: uuid
+             */
+            right_id: string;
+            /**
+             * Unit Id
+             * Format: uuid
+             */
+            unit_id: string;
+        };
         /** EligibleMemberRequest */
         EligibleMemberRequest: {
             /**
@@ -8479,6 +8588,18 @@ export interface components {
             /** Quality Status */
             quality_status: string;
         };
+        /** FulfillmentProvenanceReconcileRequest */
+        FulfillmentProvenanceReconcileRequest: {
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /** Rationale */
+            rationale: string;
+            /**
+             * Source Redemption Id
+             * Format: uuid
+             */
+            source_redemption_id: string;
+        };
         /** FulfillmentResponse */
         FulfillmentResponse: {
             /** Accepted Event Id */
@@ -8552,6 +8673,129 @@ export interface components {
             quality_claim: string;
             /** Quantity */
             quantity: number | string;
+            /** Source Redemption Id */
+            source_redemption_id?: string | null;
+        };
+        /** FulfillmentTraceabilityResponse */
+        FulfillmentTraceabilityResponse: {
+            /** Acceptance Event Id */
+            acceptance_event_id: string | null;
+            /** Accepted By Member Id */
+            accepted_by_member_id: string | null;
+            /** Accepted By Name */
+            accepted_by_name: string | null;
+            /** Accepted Quantity */
+            accepted_quantity: string | null;
+            /** Carrier Member Id */
+            carrier_member_id: string | null;
+            /** Carrier Name */
+            carrier_name: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Deal Id
+             * Format: uuid
+             */
+            deal_id: string;
+            /** Deal Title */
+            deal_title: string;
+            /** Delivered Event Id */
+            delivered_event_id: string | null;
+            /** Destination Text */
+            destination_text: string | null;
+            /**
+             * Fulfillment Id
+             * Format: uuid
+             */
+            fulfillment_id: string;
+            /** Fulfillment Quantity */
+            fulfillment_quantity: string;
+            /** Fulfillment Status */
+            fulfillment_status: string;
+            /**
+             * Intended Recipient Member Id
+             * Format: uuid
+             */
+            intended_recipient_member_id: string;
+            /** Intended Recipient Name */
+            intended_recipient_name: string;
+            /**
+             * Linked Event Id
+             * Format: uuid
+             */
+            linked_event_id: string;
+            /** Logistics Order Id */
+            logistics_order_id: string | null;
+            /**
+             * Lot Id
+             * Format: uuid
+             */
+            lot_id: string;
+            /** Lot Number */
+            lot_number: string;
+            /**
+             * Obligation Id
+             * Format: uuid
+             */
+            obligation_id: string;
+            /** Origin Text */
+            origin_text: string | null;
+            /**
+             * Performed At
+             * Format: date-time
+             */
+            performed_at: string;
+            /** Pickup Event Id */
+            pickup_event_id: string | null;
+            /**
+             * Product Id
+             * Format: uuid
+             */
+            product_id: string;
+            /** Product Name */
+            product_name: string;
+            /** Proof Hash */
+            proof_hash: string;
+            /**
+             * Redemption Completed At
+             * Format: date-time
+             */
+            redemption_completed_at: string;
+            /**
+             * Redemption Event Id
+             * Format: uuid
+             */
+            redemption_event_id: string;
+            /**
+             * Redemption Id
+             * Format: uuid
+             */
+            redemption_id: string;
+            /**
+             * Right Id
+             * Format: uuid
+             */
+            right_id: string;
+            /**
+             * Source Owner Member Id
+             * Format: uuid
+             */
+            source_owner_member_id: string;
+            /** Source Owner Name */
+            source_owner_name: string;
+            /**
+             * Submitted Event Id
+             * Format: uuid
+             */
+            submitted_event_id: string;
+            /**
+             * Unit Id
+             * Format: uuid
+             */
+            unit_id: string;
         };
         /** FundProposeRequest */
         FundProposeRequest: {
@@ -19767,6 +20011,43 @@ export interface operations {
             };
         };
     };
+    reconcile_fulfillment_provenance_api_v1_exchange_fulfillments__fulfillment_id__provenance_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                fulfillment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FulfillmentProvenanceReconcileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_logistics_orders_api_v1_exchange_logistics_orders_get: {
         parameters: {
             query?: {
@@ -19891,6 +20172,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_eligible_fulfillment_sources_api_v1_exchange_obligations__obligation_id__eligible_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obligation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_EligibleFulfillmentSourceResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -20031,6 +20343,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["cooperative_clearing__api__identity_schemas__CommandEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fulfillment_traceability_api_v1_exchange_traceability_get: {
+        parameters: {
+            query?: {
+                lot_id?: string | null;
+                fulfillment_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection_FulfillmentTraceabilityResponse_"];
                 };
             };
             /** @description Validation Error */

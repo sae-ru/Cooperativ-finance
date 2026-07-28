@@ -58,6 +58,25 @@ export function userErrorMessage(error: unknown, language?: string): string {
     return translate("errors.compensationReservationBroken");
   }
 
+  if (code === "FULFILLMENT_SOURCE_REQUIRED") {
+    return translate("errors.fulfillmentSourceRequired");
+  }
+  if (code === "FULFILLMENT_SOURCE_ALREADY_USED") {
+    return translate("errors.fulfillmentSourceUsed");
+  }
+  if (code === "FULFILLMENT_SOURCE_AFTER_PERFORMANCE") {
+    return translate("errors.fulfillmentSourceTiming");
+  }
+  if (
+    code === "FULFILLMENT_SOURCE_NOT_COMPLETED"
+    || code === "FULFILLMENT_SOURCE_MISMATCH"
+    || code === "FULFILLMENT_SOURCE_BROKEN"
+    || code === "PRODUCT_SUBJECT_REQUIRED"
+    || code === "PRODUCT_NOT_AVAILABLE"
+    || code === "PRODUCT_UNIT_MISMATCH"
+  ) {
+    return translate("errors.fulfillmentSourceInvalid");
+  }
   if (code === "MEMBER_IMPORT_PREVIEW_STALE") {
     return translate("errors.memberImportPreviewStale");
   }

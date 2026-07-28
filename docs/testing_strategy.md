@@ -328,3 +328,22 @@ mobile `390x844` без горизонтального overflow и личное 
 source `100 -> 85`, destination `5 -> 20`, protected amount `40 -> 40`, held
 `15 -> 0`. Эти проверки не заменяют legal/security review, restore drill и
 полевой pilot на целевом Linux host.
+
+## Проверки Slice 31
+
+Frontend unit boundary проверяет точную арифметику десятичных строк, границу
+`Numeric(38, 12)`, большие значения вне safe integer, отрицательные величины,
+экспоненциальную запись, локали RU/EN и отклонение недопустимого ввода.
+
+Repository contract test загружает production frontend sources и запрещает
+`Number(...)`/`parseFloat(...)` для известных полей количества, паёв, цены,
+стоимости, ущерба, покрытия, резервов и остатков. Отдельный статический аудит
+backend допускает float только в техническом времени, метриках и capacity tool;
+хозяйственные модели используют `Decimal`/`Numeric`.
+
+Проверенный checkpoint 28 июля 2026 года: `69` frontend test files, `196`
+tests, TypeScript typecheck и production PWA build. OpenAPI и migration cycle не
+повторяются как изменившиеся артефакты, потому что срез не меняет wire-format или
+схему данных. Пересобранный Docker frontend и пять healthy Compose services
+прошли RU/EN desktop/mobile smoke без horizontal overflow и browser console
+errors.

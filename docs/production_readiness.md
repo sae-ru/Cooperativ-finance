@@ -14,7 +14,7 @@
 ## Domain safety
 
 - [ ] Все инварианты ТЗ покрыты DB constraints и/или transaction tests.
-- [ ] Нет float в количестве, оценке и покрытии.
+- [x] Нет float в количестве, оценке и покрытии ([evidence](implemented_slice_31.md)).
 - [ ] Партия прослеживается до права, исполнения и получателя.
 - [ ] Нет двойного выпуска, погашения, резервирования и execution.
 - [x] Protected amount и solidarity contour недоступны взысканию.

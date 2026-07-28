@@ -32,7 +32,7 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     RoleAssignment,
     UserAccount,
 )
-from cooperative_clearing.modules.inventory.infrastructure.models import UnitOfMeasure
+from cooperative_clearing.modules.inventory.infrastructure.models import Product, UnitOfMeasure
 from cooperative_clearing.modules.journal.application.service import (
     ActorClaim,
     SignedJournalService,
@@ -135,6 +135,11 @@ class FederatedPurchaseBridge:
         offer_kind = str(offer.handling_requirements.get("offer_kind", "PRODUCT")).upper()
         if offer_kind not in {"PRODUCT", "SERVICE"}:
             offer_kind = "PRODUCT"
+        product = (
+            await self._product(session, cooperative_id, offer, goods_unit, seller)
+            if offer_kind == "PRODUCT"
+            else None
+        )
         valuation_source = (
             f"{offer.price_policy_version}; signed offer {offer.payload_hash}; "
             f"purchase summary {intent.summary_hash}"
@@ -144,7 +149,7 @@ class FederatedPurchaseBridge:
                 debtor_member_id=seller.member_id,
                 creditor_member_id=buyer.member_id,
                 subject_type=offer_kind,
-                subject_id=None,
+                subject_id=product.id if product is not None else None,
                 description=offer.description,
                 quality_criteria=offer.quality_grade,
                 fulfillment_place=intent.delivery_address_text or intent.destination_region,
@@ -509,6 +514,46 @@ class FederatedPurchaseBridge:
         if unit is None:
             raise exchange_error("PURCHASE_UNIT_NOT_REGISTERED", 409)
         return unit
+
+    @staticmethod
+    async def _product(
+        session: AsyncSession,
+        cooperative_id: UUID,
+        offer: FederatedOffer,
+        unit: UnitOfMeasure,
+        seller: _Party,
+    ) -> Product:
+        sku = offer.product_code.strip().upper()
+        if not sku or len(sku) > 63:
+            raise exchange_error("PURCHASE_PRODUCT_CODE_INVALID", 409)
+        product = (
+            await session.execute(
+                select(Product).where(
+                    Product.cooperative_id == cooperative_id,
+                    Product.sku == sku,
+                )
+            )
+        ).scalar_one_or_none()
+        if product is None:
+            product = Product(
+                id=uuid4(),
+                cooperative_id=cooperative_id,
+                sku=sku,
+                name=offer.description[:200],
+                description=offer.description,
+                default_unit_id=unit.id,
+                quantity_tolerance=Decimal(0),
+                requires_evidence=True,
+                shelf_life_required=False,
+                status="ACTIVE",
+                created_by_user_id=seller.user_id,
+                created_event_id=offer.published_event_id,
+            )
+            session.add(product)
+            await session.flush()
+        elif product.status != "ACTIVE" or product.default_unit_id != unit.id:
+            raise exchange_error("PURCHASE_PRODUCT_NOT_AVAILABLE", 409)
+        return product
 
     @staticmethod
     async def _valuation_unit(

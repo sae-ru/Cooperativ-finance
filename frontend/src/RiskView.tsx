@@ -68,6 +68,7 @@ import CompensationPanel from "./CompensationPanel";
 import { getTrustCases } from "./api/trust";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalAdd, decimalSubtract, formatDecimal } from "./shared/decimal";
 import "./risk.css";
 
 type Section =
@@ -119,11 +120,8 @@ function memberName(members: InventoryMember[], id: string | null): string {
   return members.find((item) => item.member_id === id)?.display_name ?? id.slice(0, 8);
 }
 
-function exact(value: string | number): string {
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 12 }).format(parsed)
-    : String(value);
+function exact(value: string): string {
+  return formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function localDateInput(daysFromNow: number): string {
@@ -223,22 +221,32 @@ export default function RiskView({ principal }: { principal: Principal }) {
   const activeReserved = commitmentData
     .filter((item) => item.status === "ACTIVE")
     .reduce(
-      (sum, item) => sum + Number(item.amount_reserved) - Number(item.executed_amount),
-      0,
+      (sum, item) => decimalSubtract(
+        decimalAdd(sum, item.amount_reserved),
+        item.executed_amount ?? "0",
+      ),
+      "0",
     );
-  const availableShares = accountData.reduce(
-    (sum, item) => sum + Number(item.balance) - Number(item.protected_amount)
-      - Number(item.executed_not_settled)
-      - commitmentData
-        .filter((commitment) => commitment.account_id === item.id && commitment.status === "ACTIVE")
-        .reduce(
-          (reserved, commitment) => reserved
-            + Number(commitment.amount_reserved)
-            - Number(commitment.executed_amount),
-          0,
+  const availableShares = accountData.reduce((sum, item) => {
+    const reserved = commitmentData
+      .filter((commitment) => commitment.account_id === item.id && commitment.status === "ACTIVE")
+      .reduce(
+        (value, commitment) => decimalSubtract(
+          decimalAdd(value, commitment.amount_reserved),
+          commitment.executed_amount ?? "0",
         ),
-    0,
-  );
+        "0",
+      );
+    return decimalAdd(
+      sum,
+      decimalSubtract(
+        item.balance,
+        item.protected_amount,
+        item.executed_not_settled,
+        reserved,
+      ),
+    );
+  }, "0");
   const sections: Array<[Section, string, typeof Scale]> = [
     ["overview", "Сводка", Scale],
     ["policies", "Политики", FileCheck2],
@@ -373,13 +381,18 @@ function OverviewPanel({
               const reserved = commitments
                 .filter((item) => item.account_id === account.id && item.status === "ACTIVE")
                 .reduce(
-                  (sum, item) => sum
-                    + Number(item.amount_reserved)
-                    - Number(item.executed_amount),
-                  0,
+                  (sum, item) => decimalSubtract(
+                    decimalAdd(sum, item.amount_reserved),
+                    item.executed_amount ?? "0",
+                  ),
+                  "0",
                 );
-              const available = Number(account.balance) - Number(account.protected_amount)
-                - Number(account.executed_not_settled) - reserved;
+              const available = decimalSubtract(
+                account.balance,
+                account.protected_amount,
+                account.executed_not_settled,
+                reserved,
+              );
               return <tr key={account.id}><td><strong>{memberName(members, account.member_id)}</strong><small>{account.denomination} · v{account.version}</small></td><td>{contourNames[account.contour] ?? account.contour}</td><td>{exact(account.balance)}</td><td>{exact(account.protected_amount)}</td><td>{exact(reserved)}</td><td><strong>{exact(available)}</strong></td><td><Status value={account.status} /></td></tr>;
             })}</tbody>
           </table>

@@ -35,11 +35,19 @@ from cooperative_clearing.modules.exchange.infrastructure.models import (
     DealParty,
     DealTermsVersion,
     Fulfillment,
+    FulfillmentProvenance,
     LogisticsOrder,
     Obligation,
     ObligationDispute,
 )
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode, require_role
+from cooperative_clearing.modules.identity.infrastructure.models import Member
+from cooperative_clearing.modules.inventory.infrastructure.models import InventoryLot, Product
+from cooperative_clearing.modules.journal.domain.crypto import payload_hash
+from cooperative_clearing.modules.rights.infrastructure.models import (
+    CommodityRight,
+    RightRedemption,
+)
 from cooperative_clearing.shared.core.request_context import get_request_id
 from cooperative_clearing.shared.domain.errors import DomainError
 
@@ -106,8 +114,15 @@ class FulfillmentSubmitRequest(BaseModel):
     location_text: str = Field(min_length=2, max_length=500)
     performed_at: datetime
     logistics_order_id: UUID | None = None
+    source_redemption_id: UUID | None = None
     evidence_ids: list[UUID] = Field(default_factory=list, max_length=20)
     expected_version: int = Field(ge=1)
+
+
+class FulfillmentProvenanceReconcileRequest(BaseModel):
+    source_redemption_id: UUID
+    rationale: str = Field(min_length=2, max_length=2000)
+    evidence_ids: list[UUID] = Field(min_length=1, max_length=20)
 
 
 class FulfillmentAcceptRequest(BaseModel):
@@ -253,6 +268,56 @@ class FulfillmentResponse(BaseModel):
     updated_at: datetime
     version: int
 
+
+class EligibleFulfillmentSourceResponse(BaseModel):
+    redemption_id: UUID
+    right_id: UUID
+    lot_id: UUID
+    lot_number: str
+    product_id: UUID
+    product_name: str
+    quantity: Decimal
+    unit_id: UUID
+    completed_at: datetime
+    completed_event_id: UUID
+
+
+class FulfillmentTraceabilityResponse(BaseModel):
+    proof_hash: str
+    fulfillment_id: UUID
+    fulfillment_status: str
+    fulfillment_quantity: Decimal
+    performed_at: datetime
+    submitted_event_id: UUID
+    linked_event_id: UUID
+    obligation_id: UUID
+    deal_id: UUID
+    deal_title: str
+    product_id: UUID
+    product_name: str
+    unit_id: UUID
+    lot_id: UUID
+    lot_number: str
+    right_id: UUID
+    redemption_id: UUID
+    redemption_completed_at: datetime
+    redemption_event_id: UUID
+    source_owner_member_id: UUID
+    source_owner_name: str
+    intended_recipient_member_id: UUID
+    intended_recipient_name: str
+    accepted_by_member_id: UUID | None
+    accepted_by_name: str | None
+    accepted_quantity: Decimal | None
+    acceptance_event_id: UUID | None
+    logistics_order_id: UUID | None
+    carrier_member_id: UUID | None
+    carrier_name: str | None
+    origin_text: str | None
+    destination_text: str | None
+    pickup_event_id: UUID | None
+    delivered_event_id: UUID | None
+    created_at: datetime
 
 class AcceptanceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -656,6 +721,239 @@ async def list_visible_fulfillments(
     return Collection(data=items, request_id=get_request_id())
 
 
+@router.get(
+    "/obligations/{obligation_id}/eligible-sources",
+    response_model=Collection[EligibleFulfillmentSourceResponse],
+)
+async def list_eligible_fulfillment_sources(
+    obligation_id: UUID,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+) -> Collection[EligibleFulfillmentSourceResponse]:
+    condition = _private_obligation_filter(principal)
+    visible = select(Obligation).where(Obligation.id == obligation_id)
+    if condition is not None:
+        visible = visible.where(condition)
+    async with database.session() as session:
+        obligation = (await session.execute(visible)).scalar_one_or_none()
+        if obligation is None:
+            raise DomainError(
+                code="OBLIGATION_NOT_FOUND",
+                message_key="errors.exchange.obligation_not_found",
+                status_code=404,
+            )
+        source_admin = any(
+            grant.role in PRIVATE_DETAIL_ADMIN_ROLES
+            and grant.cooperative_id in {None, obligation.cooperative_id}
+            for grant in principal.roles
+        )
+        if principal.member_id != obligation.debtor_member_id and not source_admin:
+            raise DomainError(
+                code="AUTHORIZATION_DENIED",
+                message_key="errors.auth.authorization_denied",
+                status_code=403,
+            )
+        if obligation.subject_type != "PRODUCT" or obligation.subject_id is None:
+            return Collection(data=[], request_id=get_request_id())
+        remaining = (
+            obligation.quantity_total
+            - obligation.quantity_submitted
+            - obligation.quantity_fulfilled
+            - obligation.quantity_cleared
+        )
+        rows = (
+            await session.execute(
+                select(RightRedemption, CommodityRight, InventoryLot, Product)
+                .join(CommodityRight, CommodityRight.id == RightRedemption.right_id)
+                .join(InventoryLot, InventoryLot.id == RightRedemption.lot_id)
+                .join(Product, Product.id == InventoryLot.product_id)
+                .outerjoin(
+                    FulfillmentProvenance,
+                    FulfillmentProvenance.redemption_id == RightRedemption.id,
+                )
+                .where(
+                    RightRedemption.status == "COMPLETED",
+                    RightRedemption.completed_at.is_not(None),
+                    RightRedemption.completed_event_id.is_not(None),
+                    RightRedemption.owner_member_id == obligation.debtor_member_id,
+                    CommodityRight.status == "REDEEMED",
+                    CommodityRight.cooperative_id == obligation.cooperative_id,
+                    CommodityRight.unit_id == obligation.unit_id,
+                    InventoryLot.product_id == obligation.subject_id,
+                    InventoryLot.unit_id == obligation.unit_id,
+                    FulfillmentProvenance.fulfillment_id.is_(None),
+                )
+                .order_by(RightRedemption.completed_at, RightRedemption.id)
+            )
+        ).all()
+    items = [
+        EligibleFulfillmentSourceResponse(
+            redemption_id=redemption.id,
+            right_id=right.id,
+            lot_id=lot.id,
+            lot_number=lot.lot_number,
+            product_id=product.id,
+            product_name=product.name,
+            quantity=redemption.quantity,
+            unit_id=right.unit_id,
+            completed_at=redemption.completed_at,
+            completed_event_id=redemption.completed_event_id,
+        )
+        for redemption, right, lot, product in rows
+        if redemption.quantity <= remaining
+        and (obligation.partial_allowed or redemption.quantity == remaining)
+    ]
+    return Collection(data=items, request_id=get_request_id())
+
+
+@router.get(
+    "/traceability",
+    response_model=Collection[FulfillmentTraceabilityResponse],
+)
+async def list_fulfillment_traceability(
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    lot_id: UUID | None = None,
+    fulfillment_id: UUID | None = None,
+) -> Collection[FulfillmentTraceabilityResponse]:
+    condition = _private_obligation_filter(principal)
+    statement = (
+        select(
+            FulfillmentProvenance,
+            Fulfillment,
+            Obligation,
+            Deal,
+            InventoryLot,
+            Product,
+            RightRedemption,
+            AcceptanceRecord,
+            LogisticsOrder,
+        )
+        .join(Fulfillment, Fulfillment.id == FulfillmentProvenance.fulfillment_id)
+        .join(Obligation, Obligation.id == Fulfillment.obligation_id)
+        .join(Deal, Deal.id == Obligation.deal_id)
+        .join(InventoryLot, InventoryLot.id == FulfillmentProvenance.lot_id)
+        .join(Product, Product.id == FulfillmentProvenance.product_id)
+        .join(RightRedemption, RightRedemption.id == FulfillmentProvenance.redemption_id)
+        .outerjoin(AcceptanceRecord, AcceptanceRecord.fulfillment_id == Fulfillment.id)
+        .outerjoin(LogisticsOrder, LogisticsOrder.id == Fulfillment.logistics_order_id)
+        .order_by(FulfillmentProvenance.created_at.desc(), Fulfillment.id)
+    )
+    if condition is not None:
+        statement = statement.where(condition)
+    if lot_id is not None:
+        statement = statement.where(FulfillmentProvenance.lot_id == lot_id)
+    if fulfillment_id is not None:
+        statement = statement.where(FulfillmentProvenance.fulfillment_id == fulfillment_id)
+    async with database.session() as session:
+        rows = (await session.execute(statement.limit(500))).all()
+        member_ids = {
+            value
+            for (
+                provenance,
+                _fulfillment,
+                _obligation,
+                _deal,
+                _lot,
+                _product,
+                _redemption,
+                acceptance,
+                logistics,
+            ) in rows
+            for value in (
+                provenance.source_owner_member_id,
+                provenance.intended_recipient_member_id,
+                acceptance.accepted_by_member_id if acceptance else None,
+                logistics.carrier_member_id if logistics else None,
+            )
+            if value is not None
+        }
+        names = (
+            {
+                member.id: member.display_name
+                for member in (
+                    await session.execute(select(Member).where(Member.id.in_(member_ids)))
+                ).scalars()
+            }
+            if member_ids
+            else {}
+        )
+    items: list[FulfillmentTraceabilityResponse] = []
+    for (
+        provenance,
+        fulfillment,
+        obligation,
+        deal,
+        lot,
+        product,
+        redemption,
+        acceptance,
+        logistics,
+    ) in rows:
+        proof = {
+            "fulfillment_id": str(fulfillment.id),
+            "submitted_event_id": str(fulfillment.submitted_event_id),
+            "linked_event_id": str(provenance.linked_event_id),
+            "obligation_id": str(obligation.id),
+            "deal_id": str(deal.id),
+            "lot_id": str(lot.id),
+            "right_id": str(provenance.right_id),
+            "redemption_id": str(redemption.id),
+            "redemption_event_id": str(redemption.completed_event_id),
+            "source_owner_member_id": str(provenance.source_owner_member_id),
+            "intended_recipient_member_id": str(
+                provenance.intended_recipient_member_id
+            ),
+            "accepted_by_member_id": (
+                str(acceptance.accepted_by_member_id) if acceptance else None
+            ),
+            "quantity": str(provenance.quantity),
+        }
+        items.append(
+            FulfillmentTraceabilityResponse(
+                proof_hash=payload_hash(proof),
+                fulfillment_id=fulfillment.id,
+                fulfillment_status=fulfillment.status,
+                fulfillment_quantity=fulfillment.quantity,
+                performed_at=fulfillment.performed_at,
+                submitted_event_id=fulfillment.submitted_event_id,
+                linked_event_id=provenance.linked_event_id,
+                obligation_id=obligation.id,
+                deal_id=deal.id,
+                deal_title=deal.title,
+                product_id=product.id,
+                product_name=product.name,
+                unit_id=obligation.unit_id,
+                lot_id=lot.id,
+                lot_number=lot.lot_number,
+                right_id=provenance.right_id,
+                redemption_id=redemption.id,
+                redemption_completed_at=redemption.completed_at,
+                redemption_event_id=redemption.completed_event_id,
+                source_owner_member_id=provenance.source_owner_member_id,
+                source_owner_name=names[provenance.source_owner_member_id],
+                intended_recipient_member_id=provenance.intended_recipient_member_id,
+                intended_recipient_name=names[provenance.intended_recipient_member_id],
+                accepted_by_member_id=(
+                    acceptance.accepted_by_member_id if acceptance else None
+                ),
+                accepted_by_name=(
+                    names[acceptance.accepted_by_member_id] if acceptance else None
+                ),
+                accepted_quantity=acceptance.accepted_quantity if acceptance else None,
+                acceptance_event_id=acceptance.event_id if acceptance else None,
+                logistics_order_id=logistics.id if logistics else None,
+                carrier_member_id=logistics.carrier_member_id if logistics else None,
+                carrier_name=(names[logistics.carrier_member_id] if logistics else None),
+                origin_text=logistics.origin_text if logistics else None,
+                destination_text=logistics.destination_text if logistics else None,
+                pickup_event_id=logistics.pickup_event_id if logistics else None,
+                delivered_event_id=logistics.delivered_event_id if logistics else None,
+                created_at=provenance.created_at,
+            )
+        )
+    return Collection(data=items, request_id=get_request_id())
+
 @router.get("/acceptances", response_model=Collection[AcceptanceResponse])
 async def list_acceptances(
     principal: PrincipalDependency, database: DatabaseDependency
@@ -819,6 +1117,31 @@ async def submit_fulfillment(
 
     return await _commit_command(database, action)
 
+
+@router.post(
+    "/fulfillments/{fulfillment_id}/provenance",
+    response_model=CommandEnvelope,
+    status_code=201,
+)
+async def reconcile_fulfillment_provenance(
+    fulfillment_id: UUID,
+    payload: FulfillmentProvenanceReconcileRequest,
+    idempotency_key: IdempotencyKey,
+    principal: PrincipalDependency,
+    database: DatabaseDependency,
+    settings: SettingsDependency,
+) -> CommandEnvelope:
+    async def action(session: AsyncSession) -> ExchangeCommandResult:
+        return await ExchangeService(settings).reconcile_fulfillment_provenance(
+            session,
+            principal=principal,
+            fulfillment_id=fulfillment_id,
+            **payload.model_dump(),
+            idempotency_key=idempotency_key,
+            request_id=_request_uuid(),
+        )
+
+    return await _commit_command(database, action)
 
 @router.post(
     "/fulfillments/{fulfillment_id}/acceptance",

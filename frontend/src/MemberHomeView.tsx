@@ -54,14 +54,12 @@ import {
   type CompensationTransfer,
 } from "./api/risk";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalCompare, decimalSubtract, formatDecimal } from "./shared/decimal";
 import "./member.css";
 
 function formatAmount(value: string, unit?: string | null): string {
-  const number = Number(value);
   const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
-  const formatted = Number.isFinite(number)
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(number)
-    : value;
+  const formatted = formatDecimal(value, locale, { maximumFractionDigits: 4 });
   return unit ? `${formatted} ${unit}` : formatted;
 }
 function BalanceValue({ value, unit }: { value: string; unit: string }) {
@@ -69,8 +67,8 @@ function BalanceValue({ value, unit }: { value: string; unit: string }) {
 }
 
 function remainingAmount(total: string, fulfilled: string, cleared: string): string {
-  const remaining = Number(total) - Number(fulfilled) - Number(cleared);
-  return Number.isFinite(remaining) ? String(Math.max(0, remaining)) : total;
+  const remaining = decimalSubtract(total, fulfilled, cleared);
+  return decimalCompare(remaining, "0") < 0 ? "0" : remaining;
 }
 
 function localizedUnit(code: string, t: (key: string, options?: Record<string, unknown>) => string): string {

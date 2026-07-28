@@ -219,6 +219,15 @@
     <message key="participantFulfillment.receiptNotesDefault">Количество и состояние проверены при получении.</message>
     <message key="participantFulfillment.addReceiptProof">Добавить фото или акт приёмки</message>
     <message key="participantFulfillment.confirmReceipt">Подтвердить получение</message>
+    <message key="participantFulfillment.sourceLoading">Проверяем доступные складские партии...</message>
+    <message key="participantFulfillment.sourceLabel">Какую партию передаёте</message>
+    <message key="participantFulfillment.sourceOption">Партия {{lot}} · {{product}} · {{quantity}} {{unit}}</message>
+    <message key="participantFulfillment.sourceHint">Количество берётся из подписанного складского выпуска и не вводится вручную.</message>
+    <message key="participantFulfillment.sourceEmpty">Нет подготовленной партии. Попросите склад сначала оформить и погасить товарное право.</message>
+    <message key="participantFulfillment.traceTitle">Происхождение подтверждено</message>
+    <message key="participantFulfillment.traceRoute">{{product}}, партия {{lot}} → {{recipient}}</message>
+    <message key="participantFulfillment.traceProof">Контрольный код: {{hash}}</message>
+    <message key="exchangeEditor.product">Товар из каталога</message>
     <message key="market.sharesUnit">паёв</message>
     <message key="language.ru">Русский</message>
     <message key="language.en">Английский</message>
@@ -392,6 +401,10 @@
     <message key="member.valuation.sourcesText">Сейчас доступно записей-оснований: {{count}}. Оценка не является внешней валютой и не списывает основной пай автоматически.</message>
     <message key="errors.amountInvalid">Введите сумму больше нуля. Используйте только цифры и разделитель дробной части.</message>
     <message key="errors.quantityInvalid">Введите количество больше нуля.</message>
+    <message key="errors.fulfillmentSourceRequired">Выберите подготовленную складом партию товара.</message>
+    <message key="errors.fulfillmentSourceUsed">Эта складская партия уже использована в другой передаче. Выберите другую.</message>
+    <message key="errors.fulfillmentSourceTiming">Складской выпуск должен быть оформлен до фактической передачи товара.</message>
+    <message key="errors.fulfillmentSourceInvalid">Выбранная партия не соответствует товару, владельцу, единице или количеству этой передачи.</message>
     <message key="errors.permissionDenied">У вас нет права выполнять это действие. Обратитесь к администратору кооператива.</message>
     <message key="errors.authenticationFailed">Неверный логин или пароль.</message>
     <message key="errors.stepUpRequired">Перед важным действием подтвердите личность в разделе «Безопасность».</message>

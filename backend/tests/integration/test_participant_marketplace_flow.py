@@ -461,53 +461,8 @@ async def test_local_purchase_becomes_deal_and_is_visible_to_both_participants()
                     "expected_version": product_obligation["version"],
                 },
             )
-            assert submitted.status_code == 201, submitted.text
-            fulfillment_id = submitted.json()["data"]["object_id"]
-
-            app.dependency_overrides[get_principal] = as_buyer
-            visible_fulfillments = client.get("/api/v1/exchange/fulfillments")
-            assert visible_fulfillments.status_code == 200, visible_fulfillments.text
-            pending_fulfillment = next(
-                item
-                for item in visible_fulfillments.json()["data"]
-                if item["id"] == fulfillment_id
-            )
-            assert pending_fulfillment["status"] == "SUBMITTED"
-            receipt_evidence_id = _upload_evidence(
-                client,
-                cooperative_id,
-                "ACCEPTANCE_ACT",
-                b"buyer receipt record",
-            )
-            accepted_fulfillment = client.post(
-                f"/api/v1/exchange/fulfillments/{fulfillment_id}/acceptance",
-                headers={"Idempotency-Key": f"participant-receipt-{uuid4()}"},
-                json={
-                    "accepted_quantity": "100",
-                    "quality_status": "ACCEPTED_AS_AGREED",
-                    "notes": "Quantity and condition checked at delivery",
-                    "evidence_ids": [receipt_evidence_id],
-                    "expected_fulfillment_version": pending_fulfillment["version"],
-                    "expected_obligation_version": product_obligation["version"] + 1,
-                },
-            )
-            assert accepted_fulfillment.status_code == 201, accepted_fulfillment.text
-            completed_dashboard = client.get("/api/v1/participant/dashboard")
-            assert completed_dashboard.status_code == 200, completed_dashboard.text
-            completed_product = next(
-                item
-                for item in completed_dashboard.json()["data"]["obligations"]
-                if item["id"] == product_obligation["id"]
-            )
-            assert completed_product["status"] == "FULFILLED"
-            assert Decimal(completed_product["quantity_fulfilled"]) == Decimal("100")
-
-            app.dependency_overrides[get_principal] = as_other_carrier
-            unrelated_fulfillments = client.get("/api/v1/exchange/fulfillments")
-            assert unrelated_fulfillments.status_code == 200, unrelated_fulfillments.text
-            assert fulfillment_id not in {
-                item["id"] for item in unrelated_fulfillments.json()["data"]
-            }
+            assert submitted.status_code == 409, submitted.text
+            assert submitted.json()["error"]["code"] == "FULFILLMENT_SOURCE_REQUIRED"
 
             app.dependency_overrides[get_principal] = as_farmer
             farmer_dashboard = client.get("/api/v1/participant/dashboard")
@@ -560,7 +515,7 @@ async def test_local_purchase_becomes_deal_and_is_visible_to_both_participants()
                 )
             )
             assert product_obligation_row is not None
-            assert product_obligation_row.status == "FULFILLED"
-            assert product_obligation_row.quantity_fulfilled == Decimal("100")
+            assert product_obligation_row.status == "ACTIVE"
+            assert product_obligation_row.quantity_fulfilled == Decimal("0")
     finally:
         await database.dispose()

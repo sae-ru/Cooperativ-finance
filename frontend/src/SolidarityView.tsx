@@ -50,6 +50,7 @@ import {
 } from "./api/solidarity";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalAdd, formatDecimal } from "./shared/decimal";
 import "./solidarity.css";
 
 type Section =
@@ -91,10 +92,7 @@ const formNames: Record<string, string> = {
 };
 
 function formatQuantity(value: string): string {
-  const quantity = Number(value);
-  return Number.isFinite(quantity)
-    ? quantity.toLocaleString("ru-RU", { maximumFractionDigits: 12 })
-    : value;
+  return formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function hasRole(principal: Principal, ...roles: RoleCode[]): boolean {
@@ -444,7 +442,7 @@ export default function SolidarityView({ principal }: { principal: Principal }) 
       <section className="solidarity-scope-strip">
         <label>Кампания<select value={campaignId} onChange={(event) => setCampaignId(event.target.value)}><option value="">Все кампании</option>{campaigns.data?.map((item) => <option value={item.id} key={item.id}>{item.campaign_code} · {item.title}</option>)}</select></label>
         <div><span>Статус</span>{selectedCampaign ? <Status value={selectedCampaign.status} /> : <strong>Все</strong>}</div>
-        <div><span>Доступно</span><strong>{balances.data?.reduce((sum, item) => sum + Number(item.available), 0).toLocaleString("ru-RU") ?? "—"}</strong></div>
+        <div><span>Доступно</span><strong>{balances.data ? formatQuantity(decimalAdd(...balances.data.map((item) => item.available))) : "—"}</strong></div>
       </section>
       <section className="metric-grid solidarity-metrics" aria-label="Сводка">
         <article className="metric"><HandHeart size={18} /><span>Кампании</span><strong>{campaigns.data?.length ?? 0}</strong></article>

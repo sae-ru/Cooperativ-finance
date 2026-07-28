@@ -89,6 +89,56 @@ export type Fulfillment = {
   version: number;
 };
 
+export type EligibleFulfillmentSource = {
+  redemption_id: string;
+  right_id: string;
+  lot_id: string;
+  lot_number: string;
+  product_id: string;
+  product_name: string;
+  quantity: string;
+  unit_id: string;
+  completed_at: string;
+  completed_event_id: string;
+};
+
+export type FulfillmentTraceability = {
+  proof_hash: string;
+  fulfillment_id: string;
+  fulfillment_status: string;
+  fulfillment_quantity: string;
+  performed_at: string;
+  submitted_event_id: string;
+  linked_event_id: string;
+  obligation_id: string;
+  deal_id: string;
+  deal_title: string;
+  product_id: string;
+  product_name: string;
+  unit_id: string;
+  lot_id: string;
+  lot_number: string;
+  right_id: string;
+  redemption_id: string;
+  redemption_completed_at: string;
+  redemption_event_id: string;
+  source_owner_member_id: string;
+  source_owner_name: string;
+  intended_recipient_member_id: string;
+  intended_recipient_name: string;
+  accepted_by_member_id: string | null;
+  accepted_by_name: string | null;
+  accepted_quantity: string | null;
+  acceptance_event_id: string | null;
+  logistics_order_id: string | null;
+  carrier_member_id: string | null;
+  carrier_name: string | null;
+  origin_text: string | null;
+  destination_text: string | null;
+  pickup_event_id: string | null;
+  delivered_event_id: string | null;
+  created_at: string;
+};
 export type Acceptance = {
   id: string;
   fulfillment_id: string;
@@ -191,6 +241,12 @@ export const getFulfillments = (obligationId: string) =>
   request<Fulfillment[]>(`/api/v1/exchange/obligations/${obligationId}/fulfillments`);
 export const getVisibleFulfillments = () =>
   request<Fulfillment[]>("/api/v1/exchange/fulfillments");
+export const getEligibleFulfillmentSources = (obligationId: string) =>
+  request<EligibleFulfillmentSource[]>(
+    `/api/v1/exchange/obligations/${obligationId}/eligible-sources`,
+  );
+export const getFulfillmentTraceability = () =>
+  request<FulfillmentTraceability[]>("/api/v1/exchange/traceability");
 export const getAcceptances = () =>
   request<Acceptance[]>("/api/v1/exchange/acceptances");
 export const getLogisticsOrders = () =>
@@ -235,6 +291,7 @@ export const submitFulfillment = (
     location_text: string;
     performed_at: string;
     logistics_order_id: string | null;
+    source_redemption_id: string | null;
     evidence_ids: string[];
   },
 ) => request<CommandResult>(`/api/v1/exchange/obligations/${obligation.id}/fulfillments`, {

@@ -35,6 +35,7 @@ import {
 } from "./api/responsibility";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalAdd, formatDecimal } from "./shared/decimal";
 
 type Section = "assignments" | "journal";
 
@@ -289,7 +290,7 @@ export default function ResponsibilityView({ principal }: { principal: Principal
       active: values.filter((item) => item.status === "ACTIVE").length,
       exposure: values
         .filter((item) => item.status === "ACTIVE")
-        .reduce((sum, item) => sum + Number(item.max_exposure), 0),
+        .reduce((sum, item) => decimalAdd(sum, item.max_exposure), "0"),
     };
   }, [assignments.data]);
 
@@ -316,7 +317,7 @@ export default function ResponsibilityView({ principal }: { principal: Principal
             <article className="metric"><ClipboardCheck size={18} /><span>Всего</span><strong>{totals.total}</strong></article>
             <article className="metric"><ShieldCheck size={18} /><span>Действуют</span><strong>{totals.active}</strong></article>
             <article className="metric"><ShieldAlert size={18} /><span>Ожидают</span><strong>{totals.pending}</strong></article>
-            <article className="metric"><FileKey size={18} /><span>Активный лимит</span><strong>{totals.exposure.toLocaleString("ru-RU")}</strong></article>
+            <article className="metric"><FileKey size={18} /><span>Активный лимит</span><strong>{formatDecimal(totals.exposure, "ru-RU", { maximumFractionDigits: 12 })}</strong></article>
           </section>
 
           {canPropose ? (

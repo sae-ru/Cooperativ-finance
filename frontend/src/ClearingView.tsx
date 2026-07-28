@@ -51,6 +51,7 @@ import {
 import { getInventoryMembers, getUnits, uploadEvidence } from "./api/inventory";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalAdd, formatDecimal } from "./shared/decimal";
 import "./clearing.css";
 
 type Section = "cycles" | "entries" | "positions" | "control" | "proof" | "statements";
@@ -94,11 +95,8 @@ function errorText(error: unknown): string {
   return userErrorMessage(error);
 }
 
-function exact(value: string | number): string {
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 12 }).format(parsed)
-    : String(value);
+function exact(value: string): string {
+  return formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function localDate(value: Date): string {
@@ -219,7 +217,7 @@ export default function ClearingView({ principal }: { principal: Principal }) {
   const positionData = positions.data ?? [];
   const disputeData = disputes.data ?? [];
   const activePolicy = policyData.find((item) => item.status === "ACTIVE") ?? null;
-  const clearedTotal = entryData.reduce((sum, item) => sum + Number(item.cleared_amount), 0);
+  const clearedTotal = decimalAdd(...entryData.map((item) => item.cleared_amount));
   const participantCount = new Set(
     entryData.flatMap((item) => [item.debtor_member_id, item.creditor_member_id]),
   ).size;

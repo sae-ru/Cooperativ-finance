@@ -1,3 +1,4 @@
+import { decimalIsPositive } from "../shared/decimal";
 import { commandHeaders, request, requestDirect } from "./admin";
 
 export type SearchMode = "DIRECT" | "INDEXED" | "CACHED_OFFLINE";
@@ -257,7 +258,7 @@ export function publishOffer(draft: OfferDraft, sellerRef: string) {
 export function publishLogisticsQuote(draft: LogisticsQuoteDraft, carrierRef: string) {
   const signedAt = new Date();
   const costs: Record<string, string> = { transport: draft.transport_cost };
-  if (Number(draft.handling_cost) > 0) costs.handling = draft.handling_cost;
+  if (decimalIsPositive(draft.handling_cost)) costs.handling = draft.handling_cost;
   return request<CommandResult>("/api/v1/federation/logistics/quotes", {
     method: "POST",
     headers: commandHeaders(),

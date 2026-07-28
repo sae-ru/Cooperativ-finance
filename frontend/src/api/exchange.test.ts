@@ -8,6 +8,8 @@ import {
   getDeal,
   getDeals,
   getDisputes,
+  getEligibleFulfillmentSources,
+  getFulfillmentTraceability,
   getFulfillments,
   getLogisticsOrders,
   getObligations,
@@ -192,6 +194,8 @@ describe("exchange API", () => {
     await getDeal(deal.id);
     await getObligations();
     await getFulfillments(obligation.id);
+    await getEligibleFulfillmentSources(obligation.id);
+    await getFulfillmentTraceability();
     await getAcceptances();
     await getLogisticsOrders();
     await getDisputes();
@@ -201,6 +205,8 @@ describe("exchange API", () => {
       "/api/v1/exchange/deals/deal-1",
       "/api/v1/exchange/obligations",
       "/api/v1/exchange/obligations/obligation-1/fulfillments",
+      "/api/v1/exchange/obligations/obligation-1/eligible-sources",
+      "/api/v1/exchange/traceability",
       "/api/v1/exchange/acceptances",
       "/api/v1/exchange/logistics-orders",
       "/api/v1/exchange/disputes",
@@ -227,6 +233,7 @@ describe("exchange API", () => {
       location_text: "Склад",
       performed_at: fulfillment.performed_at,
       logistics_order_id: null,
+      source_redemption_id: null,
       evidence_ids: ["evidence-1"],
     });
     await acceptFulfillment(obligation, fulfillment, {

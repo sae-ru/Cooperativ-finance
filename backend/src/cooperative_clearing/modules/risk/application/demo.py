@@ -171,10 +171,10 @@ async def seed_demo_risk(session: AsyncSession, settings: Settings) -> None:
     if (
         policy.status != "ACTIVE"
         or account.status != "ACTIVE"
-        or account.balance != Decimal("100")
+        or account.balance < account.protected_amount
         or account.protected_amount != Decimal("40")
         or farmer_account.status != "ACTIVE"
-        or farmer_account.balance != Decimal("50")
+        or farmer_account.balance < farmer_account.protected_amount
         or farmer_account.protected_amount != Decimal("10")
         or commitment.status != "ACTIVE"
         or commitment.max_loss != Decimal("25")

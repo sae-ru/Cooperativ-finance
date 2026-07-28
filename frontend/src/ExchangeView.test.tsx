@@ -61,6 +61,7 @@ const ownerId = "90000000-0000-0000-0000-000000000001";
 const recipientId = "90000000-0000-0000-0000-000000000002";
 const adminId = "90000000-0000-0000-0000-000000000003";
 const unitId = "50000000-0000-0000-0000-000000000001";
+const productId = "51000000-0000-0000-0000-000000000001";
 
 const deal: exchange.Deal = {
   id: "40000000-0000-0000-0000-000000000001",
@@ -86,7 +87,7 @@ const obligation: exchange.Obligation = {
   debtor_member_id: ownerId,
   creditor_member_id: recipientId,
   subject_type: "PRODUCT",
-  subject_id: null,
+  subject_id: productId,
   description: "Капуста первого сорта",
   quality_criteria: "Свежая, без повреждений",
   fulfillment_place: "Основной склад",
@@ -280,6 +281,19 @@ describe("ExchangeView", () => {
       status: "ACTIVE",
       created_event_id: "60000000-0000-0000-0000-000000000005",
     }]);
+    vi.mocked(inventory.getProducts).mockResolvedValue([{
+      id: productId,
+      cooperative_id: cooperativeId,
+      sku: "CABBAGE",
+      name: "Капуста",
+      description: "Свежая капуста",
+      default_unit_id: unitId,
+      quantity_tolerance: "0.001",
+      requires_evidence: true,
+      shelf_life_required: false,
+      status: "ACTIVE",
+      created_event_id: "60000000-0000-0000-0000-000000000105",
+    }]);
     vi.mocked(inventory.uploadEvidence).mockResolvedValue("evidence-1");
     vi.mocked(exchange.getDeals).mockResolvedValue([deal]);
     vi.mocked(exchange.getDeal).mockResolvedValue({
@@ -313,6 +327,19 @@ describe("ExchangeView", () => {
     vi.mocked(exchange.getDisputes).mockResolvedValue([dispute]);
     vi.mocked(exchange.getFulfillments).mockResolvedValue([]);
     vi.mocked(exchange.getVisibleFulfillments).mockResolvedValue([]);
+    vi.mocked(exchange.getEligibleFulfillmentSources).mockResolvedValue([{
+      redemption_id: "redemption-source-1",
+      right_id: "right-source-1",
+      lot_id: "lot-source-1",
+      lot_number: "MILK-2026-001",
+      product_id: "product-milk-1",
+      product_name: "Fresh farm milk",
+      quantity: "8.000",
+      unit_id: unitId,
+      completed_at: "2026-07-24T09:00:00Z",
+      completed_event_id: "event-redemption-1",
+    }]);
+    vi.mocked(exchange.getFulfillmentTraceability).mockResolvedValue([]);
     vi.mocked(exchange.confirmDeal).mockResolvedValue({
       event_id: "event-confirm",
       object_id: deal.id,
@@ -396,7 +423,7 @@ describe("ExchangeView", () => {
     await user.type(screen.getByLabelText("Название сделки"), "Поставка овощей");
     await user.selectOptions(screen.getByLabelText("Должник"), ownerId);
     await user.selectOptions(screen.getByLabelText("Получатель"), recipientId);
-    await user.selectOptions(screen.getByLabelText("Единица"), unitId);
+    await user.selectOptions(screen.getByLabelText("Catalog product"), productId);
     await user.type(screen.getByLabelText("Количество"), "50.000");
     await user.type(screen.getByLabelText("Предмет"), "Пятьдесят килограммов овощей");
     await user.type(screen.getByLabelText("Критерии качества"), "Свежие, без повреждений");
@@ -411,6 +438,7 @@ describe("ExchangeView", () => {
         expect.objectContaining({
           debtor_member_id: ownerId,
           creditor_member_id: recipientId,
+          subject_id: productId,
           unit_id: unitId,
           quantity: "50.000",
         }),
@@ -419,7 +447,7 @@ describe("ExchangeView", () => {
   });
 
   it("submits fulfillment as the debtor and independently accepts it as the creditor", async () => {
-    const activeObligation = { ...obligation, status: "PARTIALLY_FULFILLED" };
+    const activeObligation = { ...obligation, subject_type: "OTHER", status: "PARTIALLY_FULFILLED" };
     vi.mocked(exchange.getObligations).mockResolvedValue([activeObligation]);
     const user = userEvent.setup();
     const debtorView = renderView(principal("DATA_STEWARD", ownerId));
@@ -562,7 +590,7 @@ describe("ExchangeView", () => {
           debtor_member_id: ownerId,
           creditor_member_id: recipientId,
           subject_type: "PRODUCT",
-          subject_id: null,
+          subject_id: productId,
           description: "Капуста первого сорта",
           quality_criteria: "Свежая, без повреждений",
           fulfillment_place: "Основной склад",
@@ -740,11 +768,12 @@ describe("ExchangeView", () => {
     const user = userEvent.setup();
     renderView(principal("EXCHANGE_PARTICIPANT", ownerId));
 
+    await screen.findByLabelText("Lot being handed over");
     const button = await screen.findByRole("button", { name: "Goods handed over" });
     expect(button).toBeDisabled();
     expect(screen.getByText("Pickup point")).toBeInTheDocument();
-    expect(screen.getByText("Ivan Seller · +1 555 010 1000")).toBeInTheDocument();
-    expect(screen.getByText("John Buyer · +1 555 010 2000")).toBeInTheDocument();
+    expect(screen.getByText("Ivan Seller / +1 555 010 1000")).toBeInTheDocument();
+    expect(screen.getByText("John Buyer / +1 555 010 2000")).toBeInTheDocument();
     const proof = new File(["handover"], "handover.txt", { type: "text/plain" });
     await user.upload(screen.getByLabelText("Add photo or handover record"), proof);
     await user.click(button);
@@ -759,9 +788,10 @@ describe("ExchangeView", () => {
       participantObligation,
     );
     expect(vi.mocked(exchange.submitFulfillment).mock.calls[0]?.[1]).toMatchObject({
-      quantity: "10",
+      quantity: "8.000",
       location_text: "Buyer barn",
       logistics_order_id: deliveredOrder.id,
+      source_redemption_id: "redemption-source-1",
       evidence_ids: ["evidence-1"],
     });
   });

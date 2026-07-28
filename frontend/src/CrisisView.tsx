@@ -16,6 +16,7 @@ import {
 import { getInventoryMembers, uploadEvidence } from "./api/inventory";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { formatDecimal } from "./shared/decimal";
 import "./crisis.css";
 
 type Section = "reserves" | "mandates" | "rationing" | "paper" | "reports";
@@ -45,9 +46,7 @@ function Status({ value }: { value: string }) {
 }
 
 function quantity(value: string | null) {
-  if (value === null) return "—";
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed.toLocaleString("ru-RU", { maximumFractionDigits: 12 }) : value;
+  return value === null ? "—" : formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function localInput(date: Date) {

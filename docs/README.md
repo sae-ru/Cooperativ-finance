@@ -104,6 +104,7 @@
 - [Реализованный Slice 28: fail-closed production deployment](implemented_slice_28.md)
 - [Реализованный Slice 29: локальная готовность узла и безопасная диагностика](implemented_slice_29.md)
 - [Реализованный Slice 30: финальная компенсация из личного паевого резерва](implemented_slice_30.md)
+- [Реализованный Slice 31: точная десятичная арифметика интерфейса](implemented_slice_31.md)
 - [Шаблоны внешних evidence](evidence_templates/production_readiness_decision.md)
 - [Production readiness](production_readiness.md)
 - [Правила разработки с ИИ](ai_development_rules.md)

@@ -434,6 +434,54 @@ class Fulfillment(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
 
+class FulfillmentProvenance(Base):
+    """Immutable physical source for a product fulfillment."""
+
+    __tablename__ = "fulfillment_provenance"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        UniqueConstraint("redemption_id", name="uq_fulfillment_provenance_redemption"),
+        UniqueConstraint("linked_event_id", name="uq_fulfillment_provenance_event"),
+        Index("ix_fulfillment_provenance_lot_created", "lot_id", "created_at"),
+        Index("ix_fulfillment_provenance_right_created", "right_id", "created_at"),
+        {"schema": "exchange"},
+    )
+
+    fulfillment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("exchange.fulfillments.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    cooperative_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
+    redemption_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("assets.commodity_right_redemptions.id", ondelete="RESTRICT"),
+    )
+    right_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assets.commodity_rights.id", ondelete="RESTRICT")
+    )
+    lot_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assets.inventory_lots.id", ondelete="RESTRICT")
+    )
+    product_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("assets.products.id", ondelete="RESTRICT")
+    )
+    source_owner_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    intended_recipient_member_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.members.id", ondelete="RESTRICT")
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(38, 12), nullable=False)
+    linked_event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
 class AcceptanceRecord(Base):
     __tablename__ = "acceptance_records"
     __table_args__ = (

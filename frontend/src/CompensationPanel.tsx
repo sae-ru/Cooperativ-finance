@@ -28,6 +28,7 @@ import {
 } from "./api/trust";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalMin, formatDecimal } from "./shared/decimal";
 
 const evidenceAccept = "application/pdf,image/jpeg,image/png,image/webp,text/plain";
 
@@ -47,11 +48,8 @@ function memberName(members: InventoryMember[], memberId: string): string {
     ?? memberId.slice(0, 8);
 }
 
-function exact(value: string | number, locale: string): string {
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(parsed)
-    : String(value);
+function exact(value: string, locale: string): string {
+  return formatDecimal(value, locale, { maximumFractionDigits: 12 });
 }
 
 function hasOperatorRole(principal: Principal): boolean {
@@ -129,9 +127,7 @@ export default function CompensationPanel({
   const suggestedAmount = useMemo(() => {
     const decision = eligibleDecisions.find((item) => item.id === decisionId);
     if (!selectedLiability?.assessed_loss || !decision?.established_loss) return "";
-    return String(
-      Math.min(Number(selectedLiability.assessed_loss), Number(decision.established_loss)),
-    );
+    return decimalMin(selectedLiability.assessed_loss, decision.established_loss);
   }, [decisionId, eligibleDecisions, selectedLiability]);
 
   const authorize = useMutation({
@@ -221,7 +217,7 @@ export default function CompensationPanel({
                 <option value="">{t("common.choose")}</option>
                 {assessed.map((item) => (
                   <option value={item.id} key={item.id}>
-                    {item.incident_reference} · {exact(item.assessed_loss ?? 0, locale)}
+                    {item.incident_reference} · {exact(item.assessed_loss ?? "0", locale)}
                   </option>
                 ))}
               </select>
@@ -252,7 +248,7 @@ export default function CompensationPanel({
                 {eligibleDecisions.map((item) => (
                   <option value={item.id} key={item.id}>
                     {t(`risk.compensation.decisionStage.${item.stage}`)} · {item.outcome}
-                    {" · "}{exact(item.established_loss ?? 0, locale)}
+                    {" · "}{exact(item.established_loss ?? "0", locale)}
                   </option>
                 ))}
               </select>

@@ -44,6 +44,7 @@ import {
 import { useSystemStatus } from "./features/system/use-system-status";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalIsPositive, formatDecimal } from "./shared/decimal";
 import "./federated-clearing.css";
 
 type Section = "cycles" | "obligations" | "policies";
@@ -111,10 +112,7 @@ function localDate(offsetDays: number) {
 }
 
 function formatAmount(value: string) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? parsed.toLocaleString("ru-RU", { maximumFractionDigits: 12 })
-    : value;
+  return formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function artifactForNode(items: FederatedArtifact[], nodeCode: string) {
@@ -305,7 +303,7 @@ export default function FederatedClearingView({ principal }: { principal: Princi
     pending: cycles.data?.filter((item) => ["COMMIT_CERTIFIED", "APPLYING", "COMMITTED_PENDING_APPLY"].includes(item.status)).length ?? 0,
     active: cycles.data?.filter((item) => !terminalStatuses.has(item.status)).length ?? 0,
     prepared: obligations.data?.filter((item) => item.status === "PREPARED").length ?? 0,
-    unsettled: obligations.data?.filter((item) => Number(item.outstanding_amount) > 0).length ?? 0,
+    unsettled: obligations.data?.filter((item) => decimalIsPositive(item.outstanding_amount)).length ?? 0,
   }), [cycles.data, obligations.data]);
 
   if (policies.isPending || obligations.isPending || cycles.isPending || system.isPending) {

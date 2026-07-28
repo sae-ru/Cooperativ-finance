@@ -8,6 +8,7 @@ import {
   Plus,
   RefreshCw,
   Route,
+  ScanLine,
   Send,
   TimerOff,
   Trash2,
@@ -25,6 +26,8 @@ import {
   getDeal,
   getDeals,
   getDisputes,
+  getEligibleFulfillmentSources,
+  getFulfillmentTraceability,
   getFulfillments,
   getLogisticsOrders,
   getVisibleFulfillments,
@@ -39,15 +42,23 @@ import {
   type Deal,
   type DealDetail,
   type Fulfillment,
+  type FulfillmentTraceability,
   type Obligation,
   type ObligationDraft,
 } from "./api/exchange";
 import { getPurchaseIntents, type PurchaseIntent } from "./api/discovery";
 import { getParticipantDashboard, type ParticipantObligation } from "./api/participant";
-import { getInventoryMembers, getUnits, uploadEvidence } from "./api/inventory";
+import {
+  getInventoryMembers,
+  getProducts,
+  getUnits,
+  type Product,
+  uploadEvidence,
+} from "./api/inventory";
 import "./i18n";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalCompare, decimalSubtract, formatDecimal } from "./shared/decimal";
 import "./exchange.css";
 
 type Section = "deals" | "editor" | "execution" | "logistics" | "disputes";
@@ -96,11 +107,8 @@ function shortId(value: string): string {
 }
 
 function formatQuantity(value: string): string {
-  const number = Number(value);
   const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
-  return Number.isFinite(number)
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 12 }).format(number)
-    : value;
+  return formatDecimal(value, locale, { maximumFractionDigits: 12 });
 }
 
 function localInputDate(value: Date): string {
@@ -177,11 +185,13 @@ function isEverydayParticipant(principal: Principal): boolean {
 }
 
 function participantRemaining(obligation: ParticipantObligation): string {
-  const remaining = Number(obligation.quantity_total)
-    - Number(obligation.quantity_submitted)
-    - Number(obligation.quantity_fulfilled)
-    - Number(obligation.quantity_cleared);
-  return Number.isFinite(remaining) ? String(Math.max(0, remaining)) : obligation.quantity_total;
+  const remaining = decimalSubtract(
+    obligation.quantity_total,
+    obligation.quantity_submitted,
+    obligation.quantity_fulfilled,
+    obligation.quantity_cleared,
+  );
+  return decimalCompare(remaining, "0") < 0 ? "0" : remaining;
 }
 
 type ParticipantDeliveryContact = {
@@ -211,12 +221,14 @@ function ParticipantFulfillmentCard({
   fulfillments,
   orders,
   contact,
+  traceability,
   onDone,
 }: {
   obligation: ParticipantObligation;
   fulfillments: Fulfillment[];
   orders: Awaited<ReturnType<typeof getLogisticsOrders>>;
   contact: ParticipantDeliveryContact | null;
+  traceability: FulfillmentTraceability | undefined;
   onDone: () => Promise<void>;
 }) {
   const { t } = useTranslation();
@@ -226,6 +238,16 @@ function ParticipantFulfillmentCard({
   const linkedOrders = orders.filter((item) => item.obligation_id === obligation.id);
   const deliveredOrder = linkedOrders.find((item) => item.status === "DELIVERED");
   const route = deliveredOrder ?? linkedOrders[0];
+  const seller = obligation.direction === "OWE";
+  const product = obligation.subject_type === "PRODUCT";
+  const service = obligation.subject_type === "SERVICE";
+  const operable = ["ACTIVE", "PARTIALLY_FULFILLED", "OVERDUE"].includes(obligation.status);
+  const sources = useQuery({
+    queryKey: ["exchange-eligible-sources", obligation.id],
+    queryFn: () => getEligibleFulfillmentSources(obligation.id),
+    enabled: seller && product && operable && !pending,
+  });
+  const [sourceId, setSourceId] = useState("");
   const [evidence, setEvidence] = useState<File | null>(null);
   const [acceptedQuantity, setAcceptedQuantity] = useState(pending?.quantity ?? "");
   const [condition, setCondition] = useState("ACCEPTED_AS_AGREED");
@@ -233,28 +255,39 @@ function ParticipantFulfillmentCard({
   useEffect(() => {
     setAcceptedQuantity(pending?.quantity ?? "");
   }, [pending?.id, pending?.quantity]);
+  useEffect(() => {
+    const available = sources.data ?? [];
+    setSourceId((current) => (
+      available.some((item) => item.redemption_id === current)
+        ? current
+        : available[0]?.redemption_id ?? ""
+    ));
+  }, [sources.data]);
 
-  const seller = obligation.direction === "OWE";
-  const service = obligation.subject_type === "SERVICE";
-  const operable = ["ACTIVE", "PARTIALLY_FULFILLED", "OVERDUE"].includes(obligation.status);
+  const selectedSource = sources.data?.find((item) => item.redemption_id === sourceId);
   const waitingForDelivery = linkedOrders.length > 0 && !deliveredOrder;
-  const quantity = participantRemaining(obligation);
+  const remaining = participantRemaining(obligation);
+  const quantity = product ? selectedSource?.quantity ?? "0" : remaining;
   const location = route?.destination_text
     ?? contact?.address
     ?? obligation.fulfillment_place;
   const destinationContact = [
     route?.destination_contact_name ?? contact?.name,
     route?.destination_contact_phone ?? contact?.phone,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" / ");
   const destinationInstructions = route?.destination_instructions ?? contact?.instructions;
   const originContact = [
     route?.origin_contact_name,
     route?.origin_contact_phone,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(" / ");
   const submit = useMutation({
     mutationFn: async () => {
-      if (!evidence) throw new Error("evidence");
-      const evidenceId = await uploadEvidence(obligation.cooperative_id, evidence, "FULFILLMENT_ACT");
+      if (!evidence || (product && !selectedSource)) throw new Error("evidence-or-source");
+      const evidenceId = await uploadEvidence(
+        obligation.cooperative_id,
+        evidence,
+        "FULFILLMENT_ACT",
+      );
       return submitFulfillment(obligation, {
         quantity,
         quality_claim: t(service
@@ -263,6 +296,7 @@ function ParticipantFulfillmentCard({
         location_text: location,
         performed_at: new Date().toISOString(),
         logistics_order_id: deliveredOrder?.id ?? null,
+        source_redemption_id: selectedSource?.redemption_id ?? null,
         evidence_ids: [evidenceId],
       });
     },
@@ -274,7 +308,11 @@ function ParticipantFulfillmentCard({
   const accept = useMutation({
     mutationFn: async () => {
       if (!pending || !evidence) throw new Error("evidence");
-      const evidenceId = await uploadEvidence(obligation.cooperative_id, evidence, "ACCEPTANCE_ACT");
+      const evidenceId = await uploadEvidence(
+        obligation.cooperative_id,
+        evidence,
+        "ACCEPTANCE_ACT",
+      );
       return acceptFulfillment(obligation, pending, {
         accepted_quantity: acceptedQuantity,
         quality_status: condition,
@@ -290,28 +328,104 @@ function ParticipantFulfillmentCard({
   const mutationError = submit.error ?? accept.error;
 
   return <article className="participant-fulfillment-card">
-    <header><div><span>{t(seller ? "participantFulfillment.youProvide" : "participantFulfillment.youReceive")}</span><h3>{obligation.description}</h3></div><span className={`status ${["FULFILLED", "CLOSED"].includes(obligation.status) ? "good" : "warn"}`}>{t(`member.responsibility.status.${obligation.status}`, { defaultValue: obligation.status })}</span></header>
+    <header>
+      <div>
+        <span>{t(seller ? "participantFulfillment.youProvide" : "participantFulfillment.youReceive")}</span>
+        <h3>{obligation.description}</h3>
+      </div>
+      <span className={`status ${["FULFILLED", "CLOSED"].includes(obligation.status) ? "good" : "warn"}`}>
+        {t(`member.responsibility.status.${obligation.status}`, { defaultValue: obligation.status })}
+      </span>
+    </header>
     <dl className="participant-route-details">
-      <div><dt>{t("participantFulfillment.quantity")}</dt><dd>{quantity} {obligation.unit_symbol}</dd></div>
-      {route ? <div className="span-two"><dt>{t("participantFulfillment.pickupPoint")}</dt><dd><strong>{route.origin_text}</strong>{originContact ? <small>{originContact}</small> : null}{route.origin_instructions ? <small>{route.origin_instructions}</small> : null}</dd></div> : null}
-      <div className={route || destinationContact || destinationInstructions ? "span-two" : undefined}><dt>{t(route ? "participantFulfillment.deliveryPoint" : "participantFulfillment.place")}</dt><dd><strong>{location}</strong>{destinationContact ? <small>{destinationContact}</small> : null}{destinationInstructions ? <small>{destinationInstructions}</small> : null}</dd></div>
+      <div>
+        <dt>{t("participantFulfillment.quantity")}</dt>
+        <dd>{formatQuantity(remaining)} {obligation.unit_symbol}</dd>
+      </div>
+      {route ? <div className="span-two">
+        <dt>{t("participantFulfillment.pickupPoint")}</dt>
+        <dd>
+          <strong>{route.origin_text}</strong>
+          {originContact ? <small>{originContact}</small> : null}
+          {route.origin_instructions ? <small>{route.origin_instructions}</small> : null}
+        </dd>
+      </div> : null}
+      <div className={route || destinationContact || destinationInstructions ? "span-two" : undefined}>
+        <dt>{t(route ? "participantFulfillment.deliveryPoint" : "participantFulfillment.place")}</dt>
+        <dd>
+          <strong>{location}</strong>
+          {destinationContact ? <small>{destinationContact}</small> : null}
+          {destinationInstructions ? <small>{destinationInstructions}</small> : null}
+        </dd>
+      </div>
     </dl>
-    {["FULFILLED", "CLOSED"].includes(obligation.status) ? <div className="participant-fulfillment-message good"><CheckCheck size={18} /><span>{t("participantFulfillment.completed")}</span></div> : seller && pending ? <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForBuyer")}</span></div> : seller && waitingForDelivery ? <div className="participant-fulfillment-message"><Route size={18} /><span>{t("participantFulfillment.waitingForDelivery")}</span></div> : seller && operable ? <form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}>
-      <p>{t(service ? "participantFulfillment.serviceHint" : "participantFulfillment.sellerHint")}</p>
-      <label className="participant-proof-upload"><Upload size={17} /><span>{evidence?.name ?? t("participantFulfillment.addHandoverProof")}</span><input aria-label={t("participantFulfillment.addHandoverProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} /></label>
-      <button className="primary-button" disabled={!evidence || submit.isPending}><PackageCheck size={17} />{t(service ? "participantFulfillment.confirmService" : "participantFulfillment.confirmHandover")}</button>
-    </form> : !seller && pending && operable ? <form onSubmit={(event) => { event.preventDefault(); accept.mutate(); }}>
-      <p>{t("participantFulfillment.buyerHint", { quantity: pending.quantity, unit: obligation.unit_symbol })}</p>
-      <label><span>{t("participantFulfillment.acceptedQuantity")}</span><input inputMode="decimal" value={acceptedQuantity} onChange={(event) => setAcceptedQuantity(event.target.value)} required /></label>
-      <label><span>{t("participantFulfillment.condition")}</span><select value={condition} onChange={(event) => { const next = event.target.value; setCondition(next); if (next === "REJECTED") setAcceptedQuantity("0"); else if (next === "ACCEPTED_AS_AGREED") setAcceptedQuantity(pending.quantity); }}><option value="ACCEPTED_AS_AGREED">{t("participantFulfillment.conditionGood")}</option><option value="SHORTAGE_OR_DAMAGE">{t("participantFulfillment.conditionIssue")}</option><option value="REJECTED">{t("participantFulfillment.conditionReject")}</option></select></label>
-      <label className="span-two"><span>{t("participantFulfillment.notes")}</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} required minLength={2} /></label>
-      <label className="participant-proof-upload span-two"><Upload size={17} /><span>{evidence?.name ?? t("participantFulfillment.addReceiptProof")}</span><input aria-label={t("participantFulfillment.addReceiptProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} /></label>
-      <button className="primary-button" disabled={!evidence || accept.isPending}><CheckCheck size={17} />{t("participantFulfillment.confirmReceipt")}</button>
-    </form> : <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForSeller")}</span></div>}
+    {traceability ? <div className="participant-traceability">
+      <ScanLine size={20} />
+      <div>
+        <strong>{t("participantFulfillment.traceTitle")}</strong>
+        <span>{t("participantFulfillment.traceRoute", {
+          product: traceability.product_name,
+          lot: traceability.lot_number,
+          recipient: traceability.accepted_by_name ?? traceability.intended_recipient_name,
+        })}</span>
+        <small>{t("participantFulfillment.traceProof", {
+          hash: traceability.proof_hash.slice(7, 19),
+        })}</small>
+      </div>
+    </div> : null}
+    {["FULFILLED", "CLOSED"].includes(obligation.status)
+      ? <div className="participant-fulfillment-message good"><CheckCheck size={18} /><span>{t("participantFulfillment.completed")}</span></div>
+      : seller && pending
+        ? <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForBuyer")}</span></div>
+        : seller && waitingForDelivery
+          ? <div className="participant-fulfillment-message"><Route size={18} /><span>{t("participantFulfillment.waitingForDelivery")}</span></div>
+          : seller && operable
+            ? <form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}>
+              <p>{t(service ? "participantFulfillment.serviceHint" : "participantFulfillment.sellerHint")}</p>
+              {product ? sources.isPending
+                ? <div className="participant-source-state"><RefreshCw className="spin" size={18} /><span>{t("participantFulfillment.sourceLoading")}</span></div>
+                : sources.isError
+                  ? <p className="form-error">{errorText(sources.error)}</p>
+                  : (sources.data?.length ?? 0) > 0
+                    ? <label className="span-two participant-source-select">
+                      <span>{t("participantFulfillment.sourceLabel")}</span>
+                      <select aria-label={t("participantFulfillment.sourceLabel")} value={sourceId} onChange={(event) => setSourceId(event.target.value)} required>
+                        {(sources.data ?? []).map((source) => <option key={source.redemption_id} value={source.redemption_id}>
+                          {t("participantFulfillment.sourceOption", {
+                            lot: source.lot_number,
+                            product: source.product_name,
+                            quantity: formatQuantity(source.quantity),
+                            unit: obligation.unit_symbol,
+                          })}
+                        </option>)}
+                      </select>
+                      <small>{t("participantFulfillment.sourceHint")}</small>
+                    </label>
+                    : <div className="participant-source-state warn"><AlertTriangle size={18} /><span>{t("participantFulfillment.sourceEmpty")}</span></div>
+                : null}
+              <label className="participant-proof-upload">
+                <Upload size={17} />
+                <span>{evidence?.name ?? t("participantFulfillment.addHandoverProof")}</span>
+                <input aria-label={t("participantFulfillment.addHandoverProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} />
+              </label>
+              <button className="primary-button" disabled={!evidence || submit.isPending || (product && !selectedSource)}>
+                <PackageCheck size={17} />
+                {t(service ? "participantFulfillment.confirmService" : "participantFulfillment.confirmHandover")}
+              </button>
+            </form>
+            : !seller && pending && operable
+              ? <form onSubmit={(event) => { event.preventDefault(); accept.mutate(); }}>
+                <p>{t("participantFulfillment.buyerHint", { quantity: pending.quantity, unit: obligation.unit_symbol })}</p>
+                <label><span>{t("participantFulfillment.acceptedQuantity")}</span><input inputMode="decimal" value={acceptedQuantity} onChange={(event) => setAcceptedQuantity(event.target.value)} required /></label>
+                <label><span>{t("participantFulfillment.condition")}</span><select value={condition} onChange={(event) => { const next = event.target.value; setCondition(next); if (next === "REJECTED") setAcceptedQuantity("0"); else if (next === "ACCEPTED_AS_AGREED") setAcceptedQuantity(pending.quantity); }}><option value="ACCEPTED_AS_AGREED">{t("participantFulfillment.conditionGood")}</option><option value="SHORTAGE_OR_DAMAGE">{t("participantFulfillment.conditionIssue")}</option><option value="REJECTED">{t("participantFulfillment.conditionReject")}</option></select></label>
+                <label className="span-two"><span>{t("participantFulfillment.notes")}</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} required minLength={2} /></label>
+                <label className="participant-proof-upload span-two"><Upload size={17} /><span>{evidence?.name ?? t("participantFulfillment.addReceiptProof")}</span><input aria-label={t("participantFulfillment.addReceiptProof")} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt" onChange={(event) => setEvidence(event.target.files?.[0] ?? null)} /></label>
+                <button className="primary-button" disabled={!evidence || accept.isPending}><CheckCheck size={17} />{t("participantFulfillment.confirmReceipt")}</button>
+              </form>
+              : <div className="participant-fulfillment-message"><RefreshCw size={18} /><span>{t("participantFulfillment.waitingForSeller")}</span></div>}
     {mutationError ? <p className="form-error">{errorText(mutationError)}</p> : null}
   </article>;
 }
-
 function ParticipantExchangeView() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -319,7 +433,11 @@ function ParticipantExchangeView() {
   const dashboard = useQuery({ queryKey: ["participant-dashboard"], queryFn: getParticipantDashboard });
   const fulfillments = useQuery({ queryKey: ["exchange-visible-fulfillments"], queryFn: getVisibleFulfillments });
   const logistics = useQuery({ queryKey: ["exchange-logistics"], queryFn: getLogisticsOrders });
-  const queries = [intents, dashboard, fulfillments, logistics];
+  const traceability = useQuery({
+    queryKey: ["exchange-traceability"],
+    queryFn: getFulfillmentTraceability,
+  });
+  const queries = [intents, dashboard, fulfillments, logistics, traceability];
   if (queries.some((query) => query.isPending)) {
     return <div className="view-stack"><div className="state"><RefreshCw className="spin" size={24} />{t("common.loading")}</div></div>;
   }
@@ -341,11 +459,8 @@ function ParticipantExchangeView() {
     "MILK.UHT.3_2": "market.milk",
   };
   const amount = (value: string, unit: string) => {
-    const number = Number(value);
     const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
-    const formatted = Number.isFinite(number)
-      ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(number)
-      : value;
+    const formatted = formatDecimal(value, locale, { maximumFractionDigits: 4 });
     return `${formatted} ${unit === "COOP" ? t("market.sharesUnit") : unit}`;
   };
   const refresh = async () => {
@@ -354,6 +469,8 @@ function ParticipantExchangeView() {
       queryClient.invalidateQueries({ queryKey: ["exchange-visible-fulfillments"] }),
       queryClient.invalidateQueries({ queryKey: ["exchange-logistics"] }),
       queryClient.invalidateQueries({ queryKey: ["exchange-obligations"] }),
+      queryClient.invalidateQueries({ queryKey: ["exchange-traceability"] }),
+      queryClient.invalidateQueries({ queryKey: ["exchange-eligible-sources"] }),
     ]);
   };
 
@@ -366,7 +483,7 @@ function ParticipantExchangeView() {
     </section>
     <section className="participant-fulfillment-section" aria-labelledby="participant-fulfillment-title">
       <div className="results-heading"><div><h2 id="participant-fulfillment-title">{t("participantFulfillment.title")}</h2><p>{t("participantFulfillment.subtitle")}</p></div><span>{physicalObligations.length}</span></div>
-      {!physicalObligations.length ? <div className="state"><Handshake size={22} /><span>{t("participantFulfillment.empty")}</span></div> : <div className="participant-fulfillment-grid">{physicalObligations.map((obligation) => <ParticipantFulfillmentCard key={obligation.id} obligation={obligation} fulfillments={fulfillments.data ?? []} orders={logistics.data ?? []} contact={participantDeliveryContact(obligation, rows, dashboard.data?.sales ?? [])} onDone={refresh} />)}</div>}
+      {!physicalObligations.length ? <div className="state"><Handshake size={22} /><span>{t("participantFulfillment.empty")}</span></div> : <div className="participant-fulfillment-grid">{physicalObligations.map((obligation) => <ParticipantFulfillmentCard key={obligation.id} obligation={obligation} fulfillments={fulfillments.data ?? []} orders={logistics.data ?? []} contact={participantDeliveryContact(obligation, rows, dashboard.data?.sales ?? [])} traceability={traceability.data?.find((item) => item.obligation_id === obligation.id)} onDone={refresh} />)}</div>}
     </section>
     <section className="participant-exchange-list" aria-label={t("participantDeals.listTitle")}>
       <div className="results-heading"><div><h2>{t("participantDeals.listTitle")}</h2></div><span>{rows.length}</span></div>
@@ -402,6 +519,7 @@ function OperatorExchangeView({ principal }: { principal: Principal }) {
   const disputes = useQuery({ queryKey: ["exchange-disputes"], queryFn: getDisputes });
   const members = useQuery({ queryKey: ["inventory-members"], queryFn: getInventoryMembers });
   const units = useQuery({ queryKey: ["inventory-units"], queryFn: getUnits });
+  const products = useQuery({ queryKey: ["inventory-products"], queryFn: getProducts });
   const cooperatives = useQuery({ queryKey: ["cooperatives"], queryFn: getCooperatives });
   const detail = useQuery({
     queryKey: ["exchange-deal", selectedDealId],
@@ -426,10 +544,10 @@ function OperatorExchangeView({ principal }: { principal: Principal }) {
   const obligationData = obligations.data ?? [];
   const logisticsData = logistics.data ?? [];
   const disputeData = disputes.data ?? [];
-  const loading = [deals, obligations, logistics, disputes, members, units, cooperatives].some(
+  const loading = [deals, obligations, logistics, disputes, members, units, products, cooperatives].some(
     (query) => query.isPending,
   );
-  const failed = [deals, obligations, logistics, disputes, members, units, cooperatives].find(
+  const failed = [deals, obligations, logistics, disputes, members, units, products, cooperatives].find(
     (query) => query.isError,
   );
 
@@ -469,7 +587,7 @@ function OperatorExchangeView({ principal }: { principal: Principal }) {
         {selected ? <section className="panel deal-detail"><div className="panel-heading"><h2>{selected.deal.title}</h2><Status value={selected.deal.status} /></div><div className="deal-terms-strip"><div><span>Версия</span><strong>{selected.deal.terms_version}</strong></div><div><span>Хэш условий</span><code>{selected.deal.terms_hash}</code></div><div><span>Стороны</span><strong>{selected.confirmations.length} / {selected.parties.length}</strong></div><div className="deal-actions">{selected.deal.status === "PROPOSED" && isCurrentParty && !alreadyConfirmed ? <button className="primary-button" onClick={() => confirm.mutate(selected.deal)} disabled={confirm.isPending}><CheckCheck size={16} />Подтвердить</button> : null}{canAdmin && selected.deal.status === "PROPOSED" ? <button className="secondary-button" onClick={() => { setEditing(selected); setSection("editor"); }}>Новая версия</button> : null}</div></div><div className="table-wrap"><table><thead><tr><th>№</th><th>Должник</th><th>Получатель</th><th>Предмет</th><th>Количество</th><th>Срок</th><th>Статус</th></tr></thead><tbody>{selected.obligations.length ? selected.obligations.map((item) => <ObligationRow key={item.id} item={item} members={members.data ?? []} units={units.data ?? []} />) : <tr><td colSpan={7}>Обязательства появятся после подтверждения всех сторон</td></tr>}</tbody></table></div>{confirm.isError ? <p className="form-error panel-error">{errorText(confirm.error)}</p> : null}</section> : null}
       </> : null}
 
-      {section === "editor" && canAdmin ? <DealEditor cooperativeId={cooperatives.data?.[0]?.id ?? ""} members={members.data ?? []} units={units.data ?? []} editing={editing} onDone={async () => { setEditing(null); setSection("deals"); await refresh(); }} /> : null}
+      {section === "editor" && canAdmin ? <DealEditor cooperativeId={cooperatives.data?.[0]?.id ?? ""} members={members.data ?? []} units={units.data ?? []} products={products.data ?? []} editing={editing} onDone={async () => { setEditing(null); setSection("deals"); await refresh(); }} /> : null}
       {section === "execution" ? <ExecutionPanel principal={principal} obligations={obligationData} members={members.data ?? []} units={units.data ?? []} logistics={logisticsData} onDone={refresh} /> : null}
       {section === "logistics" ? <LogisticsPanel principal={principal} obligations={obligationData} orders={logisticsData} members={members.data ?? []} units={units.data ?? []} canAdmin={canAdmin} canLogistics={canLogistics} onDone={refresh} /> : null}
       {section === "disputes" ? <DisputePanel principal={principal} cooperativeId={cooperatives.data?.[0]?.id ?? ""} obligations={obligationData} disputes={disputeData} members={members.data ?? []} canScan={canScan} canResolve={canResolve} onDone={refresh} /> : null}
@@ -483,7 +601,8 @@ function ObligationRow({ item, members, units }: { item: Obligation; members: Ar
   return <tr><td>{item.sequence_no}</td><td><strong>{member(item.debtor_member_id)}</strong></td><td><strong>{member(item.creditor_member_id)}</strong></td><td>{item.description}<small>{item.quality_criteria}</small></td><td><strong>{item.quantity_fulfilled} / {item.quantity_total} {unit}</strong><small>предъявлено {item.quantity_submitted} · зачтено {item.quantity_cleared}</small></td><td>{formatLocalDateTime(item.due_at)}</td><td><Status value={item.status} /></td></tr>;
 }
 
-function DealEditor({ cooperativeId, members, units, editing, onDone }: { cooperativeId: string; members: Array<{ member_id: string; display_name: string }>; units: Array<{ id: string; symbol: string; name: string }>; editing: DealDetail | null; onDone: () => Promise<void> }) {
+function DealEditor({ cooperativeId, members, units, products, editing, onDone }: { cooperativeId: string; members: Array<{ member_id: string; display_name: string }>; units: Array<{ id: string; symbol: string; name: string }>; products: Product[]; editing: DealDetail | null; onDone: () => Promise<void> }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(editing?.deal.title ?? "");
   const [drafts, setDrafts] = useState<DraftInput[]>(editing ? termsDrafts(editing) : [emptyDraft()]);
   useEffect(() => { setTitle(editing?.deal.title ?? ""); setDrafts(editing ? termsDrafts(editing) : [emptyDraft()]); }, [editing]);
@@ -492,7 +611,7 @@ function DealEditor({ cooperativeId, members, units, editing, onDone }: { cooper
     return editing ? reviseDeal(editing.deal, { title, obligations }) : proposeDeal({ cooperative_id: cooperativeId, title, obligations });
   }, onSuccess: onDone });
   const update = (key: number, patch: Partial<DraftInput>) => setDrafts((items) => items.map((item) => item.key === key ? { ...item, ...patch } : item));
-  return <section className="panel deal-editor"><div className="panel-heading"><h2>{editing ? `Новая версия условий v${editing.deal.terms_version + 1}` : "Предложить сделку"}</h2><span>{drafts.length} обязательств</span></div><form onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}><label className="deal-title">Название сделки<input value={title} onChange={(event) => setTitle(event.target.value)} required /></label>{drafts.map((draft, index) => <fieldset key={draft.key}><legend>Обязательство {index + 1}</legend><button type="button" className="icon-button remove-draft" title="Удалить обязательство" disabled={drafts.length === 1} onClick={() => setDrafts((items) => items.filter((item) => item.key !== draft.key))}><Trash2 size={15} /></button><label>Должник<select value={draft.debtor_member_id} onChange={(event) => update(draft.key, { debtor_member_id: event.target.value })} required><option value="">Выберите</option>{members.map((item) => <option key={item.member_id} value={item.member_id}>{item.display_name}</option>)}</select></label><label>Получатель<select value={draft.creditor_member_id} onChange={(event) => update(draft.key, { creditor_member_id: event.target.value })} required><option value="">Выберите</option>{members.map((item) => <option key={item.member_id} value={item.member_id}>{item.display_name}</option>)}</select></label><label>Тип<select value={draft.subject_type} onChange={(event) => update(draft.key, { subject_type: event.target.value as ObligationDraft["subject_type"] })}><option value="PRODUCT">Товар</option><option value="SERVICE">Услуга</option><option value="LOGISTICS">Логистика</option><option value="OTHER">Иное</option></select></label><label>Единица<select value={draft.unit_id} onChange={(event) => update(draft.key, { unit_id: event.target.value })} required><option value="">Выберите</option>{units.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.symbol}</option>)}</select></label><label>Количество<input inputMode="decimal" value={draft.quantity} onChange={(event) => update(draft.key, { quantity: event.target.value })} required /></label><label>Срок<input type="datetime-local" value={draft.due_at} onChange={(event) => update(draft.key, { due_at: event.target.value })} required /></label><label className="span-two">Предмет<input value={draft.description} onChange={(event) => update(draft.key, { description: event.target.value })} required /></label><label className="span-two">Критерии качества<input value={draft.quality_criteria} onChange={(event) => update(draft.key, { quality_criteria: event.target.value })} required /></label><label className="span-two">Место исполнения<input value={draft.fulfillment_place} onChange={(event) => update(draft.key, { fulfillment_place: event.target.value })} required /></label><label>Подтверждение<input value={draft.confirmation_method} onChange={(event) => update(draft.key, { confirmation_method: event.target.value })} required /></label><label>Источник оценки<input value={draft.valuation_source} onChange={(event) => update(draft.key, { valuation_source: event.target.value })} required /></label><label className="span-two">Замена предмета<input value={draft.substitute_policy} onChange={(event) => update(draft.key, { substitute_policy: event.target.value })} required /></label><label className="check-field"><input type="checkbox" checked={draft.partial_allowed} onChange={(event) => update(draft.key, { partial_allowed: event.target.checked })} />Частичное исполнение</label><label className="check-field"><input type="checkbox" checked={draft.evidence_required} onChange={(event) => update(draft.key, { evidence_required: event.target.checked })} />Доказательства обязательны</label><label className="check-field"><input type="checkbox" checked={draft.clearing_allowed} onChange={(event) => update(draft.key, { clearing_allowed: event.target.checked })} />Разрешить клиринг</label></fieldset>)}<div className="editor-actions"><button type="button" className="secondary-button" disabled={drafts.length >= 20} onClick={() => setDrafts((items) => [...items, emptyDraft()])}><Plus size={16} />Добавить обязательство</button><button className="primary-button" disabled={mutation.isPending}><Send size={16} />{editing ? "Создать версию" : "Предложить"}</button></div></form>{mutation.isError ? <p className="form-error panel-error">{errorText(mutation.error)}</p> : null}</section>;
+  return <section className="panel deal-editor"><div className="panel-heading"><h2>{editing ? `Новая версия условий v${editing.deal.terms_version + 1}` : "Предложить сделку"}</h2><span>{drafts.length} обязательств</span></div><form onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}><label className="deal-title">Название сделки<input value={title} onChange={(event) => setTitle(event.target.value)} required /></label>{drafts.map((draft, index) => <fieldset key={draft.key}><legend>Обязательство {index + 1}</legend><button type="button" className="icon-button remove-draft" title="Удалить обязательство" disabled={drafts.length === 1} onClick={() => setDrafts((items) => items.filter((item) => item.key !== draft.key))}><Trash2 size={15} /></button><label>Должник<select value={draft.debtor_member_id} onChange={(event) => update(draft.key, { debtor_member_id: event.target.value })} required><option value="">Выберите</option>{members.map((item) => <option key={item.member_id} value={item.member_id}>{item.display_name}</option>)}</select></label><label>Получатель<select value={draft.creditor_member_id} onChange={(event) => update(draft.key, { creditor_member_id: event.target.value })} required><option value="">Выберите</option>{members.map((item) => <option key={item.member_id} value={item.member_id}>{item.display_name}</option>)}</select></label><label>Тип<select value={draft.subject_type} onChange={(event) => { const subjectType = event.target.value as ObligationDraft["subject_type"]; update(draft.key, { subject_type: subjectType, subject_id: null, unit_id: subjectType === "PRODUCT" ? "" : draft.unit_id }); }}><option value="PRODUCT">Товар</option><option value="SERVICE">Услуга</option><option value="LOGISTICS">Логистика</option><option value="OTHER">Иное</option></select></label>{draft.subject_type === "PRODUCT" ? <label>{t("exchangeEditor.product")}<select value={draft.subject_id ?? ""} onChange={(event) => { const product = products.find((item) => item.id === event.target.value); update(draft.key, { subject_id: product?.id ?? null, unit_id: product?.default_unit_id ?? "" }); }} required><option value="">{t("exchangeEditor.selectProduct")}</option>{products.filter((item) => item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>{item.name} ({item.sku})</option>)}</select></label> : null}<label>Единица<select value={draft.unit_id} onChange={(event) => update(draft.key, { unit_id: event.target.value })} required disabled={draft.subject_type === "PRODUCT"}><option value="">Выберите</option>{units.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.symbol}</option>)}</select></label><label>Количество<input inputMode="decimal" value={draft.quantity} onChange={(event) => update(draft.key, { quantity: event.target.value })} required /></label><label>Срок<input type="datetime-local" value={draft.due_at} onChange={(event) => update(draft.key, { due_at: event.target.value })} required /></label><label className="span-two">Предмет<input value={draft.description} onChange={(event) => update(draft.key, { description: event.target.value })} required /></label><label className="span-two">Критерии качества<input value={draft.quality_criteria} onChange={(event) => update(draft.key, { quality_criteria: event.target.value })} required /></label><label className="span-two">Место исполнения<input value={draft.fulfillment_place} onChange={(event) => update(draft.key, { fulfillment_place: event.target.value })} required /></label><label>Подтверждение<input value={draft.confirmation_method} onChange={(event) => update(draft.key, { confirmation_method: event.target.value })} required /></label><label>Источник оценки<input value={draft.valuation_source} onChange={(event) => update(draft.key, { valuation_source: event.target.value })} required /></label><label className="span-two">Замена предмета<input value={draft.substitute_policy} onChange={(event) => update(draft.key, { substitute_policy: event.target.value })} required /></label><label className="check-field"><input type="checkbox" checked={draft.partial_allowed} onChange={(event) => update(draft.key, { partial_allowed: event.target.checked })} />Частичное исполнение</label><label className="check-field"><input type="checkbox" checked={draft.evidence_required} onChange={(event) => update(draft.key, { evidence_required: event.target.checked })} />Доказательства обязательны</label><label className="check-field"><input type="checkbox" checked={draft.clearing_allowed} onChange={(event) => update(draft.key, { clearing_allowed: event.target.checked })} />Разрешить клиринг</label></fieldset>)}<div className="editor-actions"><button type="button" className="secondary-button" disabled={drafts.length >= 20} onClick={() => setDrafts((items) => [...items, emptyDraft()])}><Plus size={16} />Добавить обязательство</button><button className="primary-button" disabled={mutation.isPending}><Send size={16} />{editing ? "Создать версию" : "Предложить"}</button></div></form>{mutation.isError ? <p className="form-error panel-error">{errorText(mutation.error)}</p> : null}</section>;
 }
 
 function ExecutionPanel({ principal, obligations, members, units, logistics, onDone }: { principal: Principal; obligations: Obligation[]; members: Array<{ member_id: string; display_name: string }>; units: Array<{ id: string; symbol: string }>; logistics: Awaited<ReturnType<typeof getLogisticsOrders>>; onDone: () => Promise<void> }) {
@@ -502,12 +621,24 @@ function ExecutionPanel({ principal, obligations, members, units, logistics, onD
     ? ["ACTIVE", "PARTIALLY_FULFILLED", "OVERDUE"].includes(selected.status)
     : false;
   const fulfillments = useQuery({ queryKey: ["exchange-fulfillments", selectedId], queryFn: () => getFulfillments(selectedId), enabled: Boolean(selectedId) });
+  const { t } = useTranslation();
   const [quantity, setQuantity] = useState(""); const [quality, setQuality] = useState(""); const [location, setLocation] = useState(""); const [logisticsId, setLogisticsId] = useState(""); const [submitFile, setSubmitFile] = useState<File | null>(null);
+  const [sourceId, setSourceId] = useState("");
+  const sources = useQuery({
+    queryKey: ["exchange-eligible-sources", selectedId],
+    queryFn: () => getEligibleFulfillmentSources(selectedId),
+    enabled: Boolean(selectedId && selected?.subject_type === "PRODUCT" && principal.member_id === selected.debtor_member_id),
+  });
+  useEffect(() => {
+    const available = sources.data ?? [];
+    setSourceId((current) => available.some((item) => item.redemption_id === current) ? current : available[0]?.redemption_id ?? "");
+  }, [sources.data]);
+  const selectedSource = sources.data?.find((item) => item.redemption_id === sourceId);
   const [acceptId, setAcceptId] = useState(""); const [accepted, setAccepted] = useState(""); const [qualityStatus, setQualityStatus] = useState(""); const [notes, setNotes] = useState(""); const [acceptFile, setAcceptFile] = useState<File | null>(null);
-  const submit = useMutation({ mutationFn: async () => { if (!selected || !submitFile) throw new Error("selection"); const evidenceId = await uploadEvidence(selected.cooperative_id, submitFile, "FULFILLMENT_ACT"); return submitFulfillment(selected, { quantity, quality_claim: quality, location_text: location, performed_at: new Date().toISOString(), logistics_order_id: logisticsId || null, evidence_ids: [evidenceId] }); }, onSuccess: async () => { setQuantity(""); setSubmitFile(null); await fulfillments.refetch(); await onDone(); } });
+  const submit = useMutation({ mutationFn: async () => { if (!selected || !submitFile) throw new Error("selection"); const evidenceId = await uploadEvidence(selected.cooperative_id, submitFile, "FULFILLMENT_ACT"); return submitFulfillment(selected, { quantity: selectedSource?.quantity ?? quantity, quality_claim: quality, location_text: location, performed_at: new Date().toISOString(), logistics_order_id: logisticsId || null, source_redemption_id: selectedSource?.redemption_id ?? null, evidence_ids: [evidenceId] }); }, onSuccess: async () => { setQuantity(""); setSubmitFile(null); await fulfillments.refetch(); await onDone(); } });
   const pending = (fulfillments.data ?? []).filter((item) => item.status === "SUBMITTED");
   const acceptance = useMutation({ mutationFn: async () => { const fulfillment = pending.find((item) => item.id === acceptId); if (!selected || !fulfillment || !acceptFile) throw new Error("selection"); const evidenceId = await uploadEvidence(selected.cooperative_id, acceptFile, "ACCEPTANCE_ACT"); return acceptFulfillment(selected, fulfillment, { accepted_quantity: accepted, quality_status: qualityStatus, notes, evidence_ids: [evidenceId] }); }, onSuccess: async () => { setAcceptId(""); setAcceptFile(null); await fulfillments.refetch(); await onDone(); } });
-  return <><section className="panel"><div className="panel-heading"><h2>Обязательства</h2><span>{obligations.length}</span></div><div className="exchange-selector"><label>Обязательство<select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">Выберите</option>{obligations.map((item) => <option key={item.id} value={item.id}>{shortId(item.id)} · {item.description}</option>)}</select></label></div><div className="table-wrap"><table><thead><tr><th>№</th><th>Должник</th><th>Получатель</th><th>Предмет</th><th>Количество</th><th>Срок</th><th>Статус</th></tr></thead><tbody>{selected ? <ObligationRow item={selected} members={members} units={units} /> : null}</tbody></table></div></section>{selected && operable && principal.member_id === selected.debtor_member_id ? <section className="panel exchange-command"><div className="panel-heading"><h2>Предъявить исполнение</h2><PackageCheck size={18} /></div><form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}><label>Количество<input value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label><label>Доставка<select value={logisticsId} onChange={(event) => setLogisticsId(event.target.value)}><option value="">Без заказа</option>{logistics.filter((item) => item.obligation_id === selected.id && item.status === "DELIVERED").map((item) => <option key={item.id} value={item.id}>{shortId(item.id)} · {item.quantity}</option>)}</select></label><label className="span-two">Качество<input value={quality} onChange={(event) => setQuality(event.target.value)} required /></label><label className="span-two">Место<input value={location} onChange={(event) => setLocation(event.target.value)} required /></label><label className="file-field span-two">Акт исполнения<input type="file" onChange={(event) => setSubmitFile(event.target.files?.[0] ?? null)} required /></label><button className="primary-button" disabled={submit.isPending}><Send size={16} />Предъявить</button></form>{submit.isError ? <p className="form-error panel-error">{errorText(submit.error)}</p> : null}</section> : null}{selected && operable && principal.member_id === selected.creditor_member_id ? <section className="panel exchange-command"><div className="panel-heading"><h2>Принять исполнение</h2><CheckCheck size={18} /></div><form onSubmit={(event) => { event.preventDefault(); acceptance.mutate(); }}><label className="span-two">Предъявление<select value={acceptId} onChange={(event) => setAcceptId(event.target.value)} required><option value="">Выберите</option>{pending.map((item) => <option value={item.id} key={item.id}>{item.quantity} · {formatLocalDateTime(item.performed_at)}</option>)}</select></label><label>Принято<input value={accepted} onChange={(event) => setAccepted(event.target.value)} required /></label><label>Оценка качества<input value={qualityStatus} onChange={(event) => setQualityStatus(event.target.value)} required /></label><label className="span-two">Примечание<input value={notes} onChange={(event) => setNotes(event.target.value)} required /></label><label className="file-field span-two">Акт приёмки<input type="file" onChange={(event) => setAcceptFile(event.target.files?.[0] ?? null)} required /></label><button className="primary-button" disabled={acceptance.isPending}><CheckCheck size={16} />Зафиксировать</button></form>{acceptance.isError ? <p className="form-error panel-error">{errorText(acceptance.error)}</p> : null}</section> : null}<section className="panel"><div className="panel-heading"><h2>Предъявления</h2><span>{fulfillments.data?.length ?? 0}</span></div><div className="table-wrap"><table><thead><tr><th>Статус</th><th>Количество</th><th>Качество</th><th>Время</th></tr></thead><tbody>{(fulfillments.data ?? []).map((item) => <tr key={item.id}><td><Status value={item.status} /></td><td><strong>{item.accepted_quantity} / {item.quantity}</strong></td><td>{item.quality_claim}</td><td>{formatLocalDateTime(item.performed_at)}</td></tr>)}</tbody></table></div></section></>;
+  return <><section className="panel"><div className="panel-heading"><h2>Обязательства</h2><span>{obligations.length}</span></div><div className="exchange-selector"><label>Обязательство<select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">Выберите</option>{obligations.map((item) => <option key={item.id} value={item.id}>{shortId(item.id)} · {item.description}</option>)}</select></label></div><div className="table-wrap"><table><thead><tr><th>№</th><th>Должник</th><th>Получатель</th><th>Предмет</th><th>Количество</th><th>Срок</th><th>Статус</th></tr></thead><tbody>{selected ? <ObligationRow item={selected} members={members} units={units} /> : null}</tbody></table></div></section>{selected && operable && principal.member_id === selected.debtor_member_id ? <section className="panel exchange-command"><div className="panel-heading"><h2>Предъявить исполнение</h2><PackageCheck size={18} /></div><form onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}>{selected.subject_type === "PRODUCT" ? <label>{t("participantFulfillment.sourceLabel")}<select aria-label={t("participantFulfillment.sourceLabel")} value={sourceId} onChange={(event) => setSourceId(event.target.value)} required><option value="">{t("participantFulfillment.sourceEmpty")}</option>{(sources.data ?? []).map((source) => <option key={source.redemption_id} value={source.redemption_id}>{t("participantFulfillment.sourceOption", { lot: source.lot_number, product: source.product_name, quantity: formatQuantity(source.quantity), unit: units.find((unit) => unit.id === source.unit_id)?.symbol ?? "" })}</option>)}</select></label> : <label>Количество<input value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label>}<label>Доставка<select value={logisticsId} onChange={(event) => setLogisticsId(event.target.value)}><option value="">Без заказа</option>{logistics.filter((item) => item.obligation_id === selected.id && item.status === "DELIVERED").map((item) => <option key={item.id} value={item.id}>{shortId(item.id)} · {item.quantity}</option>)}</select></label><label className="span-two">Качество<input value={quality} onChange={(event) => setQuality(event.target.value)} required /></label><label className="span-two">Место<input value={location} onChange={(event) => setLocation(event.target.value)} required /></label><label className="file-field span-two">Акт исполнения<input type="file" onChange={(event) => setSubmitFile(event.target.files?.[0] ?? null)} required /></label><button className="primary-button" disabled={submit.isPending || (selected.subject_type === "PRODUCT" && !selectedSource)}><Send size={16} />Предъявить</button></form>{submit.isError ? <p className="form-error panel-error">{errorText(submit.error)}</p> : null}</section> : null}{selected && operable && principal.member_id === selected.creditor_member_id ? <section className="panel exchange-command"><div className="panel-heading"><h2>Принять исполнение</h2><CheckCheck size={18} /></div><form onSubmit={(event) => { event.preventDefault(); acceptance.mutate(); }}><label className="span-two">Предъявление<select value={acceptId} onChange={(event) => setAcceptId(event.target.value)} required><option value="">Выберите</option>{pending.map((item) => <option value={item.id} key={item.id}>{item.quantity} · {formatLocalDateTime(item.performed_at)}</option>)}</select></label><label>Принято<input value={accepted} onChange={(event) => setAccepted(event.target.value)} required /></label><label>Оценка качества<input value={qualityStatus} onChange={(event) => setQualityStatus(event.target.value)} required /></label><label className="span-two">Примечание<input value={notes} onChange={(event) => setNotes(event.target.value)} required /></label><label className="file-field span-two">Акт приёмки<input type="file" onChange={(event) => setAcceptFile(event.target.files?.[0] ?? null)} required /></label><button className="primary-button" disabled={acceptance.isPending}><CheckCheck size={16} />Зафиксировать</button></form>{acceptance.isError ? <p className="form-error panel-error">{errorText(acceptance.error)}</p> : null}</section> : null}<section className="panel"><div className="panel-heading"><h2>Предъявления</h2><span>{fulfillments.data?.length ?? 0}</span></div><div className="table-wrap"><table><thead><tr><th>Статус</th><th>Количество</th><th>Качество</th><th>Время</th></tr></thead><tbody>{(fulfillments.data ?? []).map((item) => <tr key={item.id}><td><Status value={item.status} /></td><td><strong>{item.accepted_quantity} / {item.quantity}</strong></td><td>{item.quality_claim}</td><td>{formatLocalDateTime(item.performed_at)}</td></tr>)}</tbody></table></div></section></>;
 }
 
 function LogisticsPanel({ principal, obligations, orders, members, units, canAdmin, canLogistics, onDone }: { principal: Principal; obligations: Obligation[]; orders: Awaited<ReturnType<typeof getLogisticsOrders>>; members: Array<{ member_id: string; display_name: string }>; units: Array<{ id: string; symbol: string }>; canAdmin: boolean; canLogistics: boolean; onDone: () => Promise<void> }) {

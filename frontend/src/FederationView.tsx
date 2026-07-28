@@ -83,6 +83,7 @@ import FederationKeyRotations from "./FederationKeyRotations";
 import FederationPaperForms from "./FederationPaperForms";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { formatDecimal } from "./shared/decimal";
 import "./federation.css";
 
 type Section = "nodes" | "onboarding" | "liability" | "offline" | "sync" | "security";
@@ -148,11 +149,7 @@ function Hash({ value }: { value: string | null }) {
 }
 
 function amount(value: string | null) {
-  if (value === null) return "—";
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? parsed.toLocaleString("ru-RU", { maximumFractionDigits: 12 })
-    : value;
+  return value === null ? "—" : formatDecimal(value, "ru-RU", { maximumFractionDigits: 12 });
 }
 
 function localDate(offsetDays: number) {

@@ -219,6 +219,15 @@
     <message key="participantFulfillment.receiptNotesDefault">Quantity and condition were checked on receipt.</message>
     <message key="participantFulfillment.addReceiptProof">Add photo or receipt record</message>
     <message key="participantFulfillment.confirmReceipt">Confirm receipt</message>
+    <message key="participantFulfillment.sourceLoading">Checking available warehouse lots...</message>
+    <message key="participantFulfillment.sourceLabel">Lot being handed over</message>
+    <message key="participantFulfillment.sourceOption">Lot {{lot}} · {{product}} · {{quantity}} {{unit}}</message>
+    <message key="participantFulfillment.sourceHint">The quantity comes from a signed warehouse release and cannot be typed manually.</message>
+    <message key="participantFulfillment.sourceEmpty">No lot is ready. Ask the warehouse to issue and redeem a commodity right first.</message>
+    <message key="participantFulfillment.traceTitle">Origin verified</message>
+    <message key="participantFulfillment.traceRoute">{{product}}, lot {{lot}} → {{recipient}}</message>
+    <message key="participantFulfillment.traceProof">Verification code: {{hash}}</message>
+    <message key="exchangeEditor.product">Catalog product</message>
     <message key="market.sharesUnit">shares</message>
     <message key="language.ru">Russian</message>
     <message key="language.en">English</message>
@@ -392,6 +401,10 @@
     <message key="member.valuation.sourcesText">Available source records: {{count}}. Valuation is not an external currency and never writes off the primary share automatically.</message>
     <message key="errors.amountInvalid">Enter an amount greater than zero. Use digits and a decimal separator only.</message>
     <message key="errors.quantityInvalid">Enter a quantity greater than zero.</message>
+    <message key="errors.fulfillmentSourceRequired">Select a goods lot prepared by the warehouse.</message>
+    <message key="errors.fulfillmentSourceUsed">This warehouse lot has already been used for another handover. Select another lot.</message>
+    <message key="errors.fulfillmentSourceTiming">The warehouse release must be completed before the physical handover.</message>
+    <message key="errors.fulfillmentSourceInvalid">The selected lot does not match the product, owner, unit, or quantity of this handover.</message>
     <message key="errors.permissionDenied">You do not have permission to perform this action. Contact the cooperative administrator.</message>
     <message key="errors.authenticationFailed">The username or password is incorrect.</message>
     <message key="errors.stepUpRequired">Confirm your identity in Security before this important action.</message>

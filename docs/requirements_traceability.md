@@ -287,3 +287,14 @@ acceptance criteria и tests. Если строка карты меняется,
 | Повторяемые демоданные | production services, стабильные ids/idempotency keys, сохранение pending/settled state | repeated seed integration test |
 | Миграционная и API совместимость | revision `0035`, fail-closed downgrade с историей, 367-operation exact OpenAPI mirror | migration cycle и compatibility report |
 | Юридическая допустимость реального взыскания | не заявлена кодом; требуется утверждённый регламент и независимая проверка | открытый production governance gate |
+
+## Slice 31 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Нет float в количестве, оценке и покрытии | frontend decimal strings -> `BigInt` coefficient/scale; backend `Decimal`; PostgreSQL `Numeric` | unit boundary tests и repository scan |
+| Точные суммы и остатки | `decimalAdd`/`decimalSubtract` во всех агрегирующих представлениях | `0.1 + 0.2`, `Numeric(38,12)` carry и component regression |
+| Точные пределы и знаки | `decimalCompare`, `decimalMin`, positive/negative predicates | значения выше safe integer и отрицательные дроби |
+| RU/EN без потери цифр | строковое grouping и locale separators, half-up только для показа | RU/EN large-value test |
+| Защита от возврата ошибки | static source contract запрещает `Number`/`parseFloat` для business decimal fields | `decimal-boundary.test.ts` |
+| Совместимость | wire-format, OpenAPI и revision не менялись; отсутствующее старое `executed_amount` трактуется как `0` | RiskView regression и production build |

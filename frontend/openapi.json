@@ -2452,6 +2452,27 @@
         "title": "Collection[DiscrepancyResponse]",
         "type": "object"
       },
+      "Collection_EligibleFulfillmentSourceResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EligibleFulfillmentSourceResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Collection[EligibleFulfillmentSourceResponse]",
+        "type": "object"
+      },
       "Collection_EntryResponse_": {
         "properties": {
           "data": {
@@ -2492,6 +2513,27 @@
           "request_id"
         ],
         "title": "Collection[FulfillmentResponse]",
+        "type": "object"
+      },
+      "Collection_FulfillmentTraceabilityResponse_": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FulfillmentTraceabilityResponse"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Collection[FulfillmentTraceabilityResponse]",
         "type": "object"
       },
       "Collection_FundResponse_": {
@@ -6959,6 +7001,72 @@
         "title": "DisputeResolveRequest",
         "type": "object"
       },
+      "EligibleFulfillmentSourceResponse": {
+        "properties": {
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "completed_event_id": {
+            "format": "uuid",
+            "title": "Completed Event Id",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "lot_number": {
+            "title": "Lot Number",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "redemption_id": {
+            "format": "uuid",
+            "title": "Redemption Id",
+            "type": "string"
+          },
+          "right_id": {
+            "format": "uuid",
+            "title": "Right Id",
+            "type": "string"
+          },
+          "unit_id": {
+            "format": "uuid",
+            "title": "Unit Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "redemption_id",
+          "right_id",
+          "lot_id",
+          "lot_number",
+          "product_id",
+          "product_name",
+          "quantity",
+          "unit_id",
+          "completed_at",
+          "completed_event_id"
+        ],
+        "title": "EligibleFulfillmentSourceResponse",
+        "type": "object"
+      },
       "EligibleMemberRequest": {
         "properties": {
           "member_id": {
@@ -7780,6 +7888,38 @@
         "title": "FulfillmentAcceptRequest",
         "type": "object"
       },
+      "FulfillmentProvenanceReconcileRequest": {
+        "properties": {
+          "evidence_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "source_redemption_id": {
+            "format": "uuid",
+            "title": "Source Redemption Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_redemption_id",
+          "rationale",
+          "evidence_ids"
+        ],
+        "title": "FulfillmentProvenanceReconcileRequest",
+        "type": "object"
+      },
       "FulfillmentResponse": {
         "properties": {
           "accepted_event_id": {
@@ -7945,6 +8085,18 @@
               }
             ],
             "title": "Quantity"
+          },
+          "source_redemption_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Redemption Id"
           }
         },
         "required": [
@@ -7955,6 +8107,290 @@
           "expected_version"
         ],
         "title": "FulfillmentSubmitRequest",
+        "type": "object"
+      },
+      "FulfillmentTraceabilityResponse": {
+        "properties": {
+          "acceptance_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acceptance Event Id"
+          },
+          "accepted_by_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted By Member Id"
+          },
+          "accepted_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted By Name"
+          },
+          "accepted_quantity": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Quantity"
+          },
+          "carrier_member_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Member Id"
+          },
+          "carrier_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier Name"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deal_id": {
+            "format": "uuid",
+            "title": "Deal Id",
+            "type": "string"
+          },
+          "deal_title": {
+            "title": "Deal Title",
+            "type": "string"
+          },
+          "delivered_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered Event Id"
+          },
+          "destination_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Text"
+          },
+          "fulfillment_id": {
+            "format": "uuid",
+            "title": "Fulfillment Id",
+            "type": "string"
+          },
+          "fulfillment_quantity": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fulfillment Quantity",
+            "type": "string"
+          },
+          "fulfillment_status": {
+            "title": "Fulfillment Status",
+            "type": "string"
+          },
+          "intended_recipient_member_id": {
+            "format": "uuid",
+            "title": "Intended Recipient Member Id",
+            "type": "string"
+          },
+          "intended_recipient_name": {
+            "title": "Intended Recipient Name",
+            "type": "string"
+          },
+          "linked_event_id": {
+            "format": "uuid",
+            "title": "Linked Event Id",
+            "type": "string"
+          },
+          "logistics_order_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logistics Order Id"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "lot_number": {
+            "title": "Lot Number",
+            "type": "string"
+          },
+          "obligation_id": {
+            "format": "uuid",
+            "title": "Obligation Id",
+            "type": "string"
+          },
+          "origin_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Text"
+          },
+          "performed_at": {
+            "format": "date-time",
+            "title": "Performed At",
+            "type": "string"
+          },
+          "pickup_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pickup Event Id"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "product_name": {
+            "title": "Product Name",
+            "type": "string"
+          },
+          "proof_hash": {
+            "title": "Proof Hash",
+            "type": "string"
+          },
+          "redemption_completed_at": {
+            "format": "date-time",
+            "title": "Redemption Completed At",
+            "type": "string"
+          },
+          "redemption_event_id": {
+            "format": "uuid",
+            "title": "Redemption Event Id",
+            "type": "string"
+          },
+          "redemption_id": {
+            "format": "uuid",
+            "title": "Redemption Id",
+            "type": "string"
+          },
+          "right_id": {
+            "format": "uuid",
+            "title": "Right Id",
+            "type": "string"
+          },
+          "source_owner_member_id": {
+            "format": "uuid",
+            "title": "Source Owner Member Id",
+            "type": "string"
+          },
+          "source_owner_name": {
+            "title": "Source Owner Name",
+            "type": "string"
+          },
+          "submitted_event_id": {
+            "format": "uuid",
+            "title": "Submitted Event Id",
+            "type": "string"
+          },
+          "unit_id": {
+            "format": "uuid",
+            "title": "Unit Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proof_hash",
+          "fulfillment_id",
+          "fulfillment_status",
+          "fulfillment_quantity",
+          "performed_at",
+          "submitted_event_id",
+          "linked_event_id",
+          "obligation_id",
+          "deal_id",
+          "deal_title",
+          "product_id",
+          "product_name",
+          "unit_id",
+          "lot_id",
+          "lot_number",
+          "right_id",
+          "redemption_id",
+          "redemption_completed_at",
+          "redemption_event_id",
+          "source_owner_member_id",
+          "source_owner_name",
+          "intended_recipient_member_id",
+          "intended_recipient_name",
+          "accepted_by_member_id",
+          "accepted_by_name",
+          "accepted_quantity",
+          "acceptance_event_id",
+          "logistics_order_id",
+          "carrier_member_id",
+          "carrier_name",
+          "origin_text",
+          "destination_text",
+          "pickup_event_id",
+          "delivered_event_id",
+          "created_at"
+        ],
+        "title": "FulfillmentTraceabilityResponse",
         "type": "object"
       },
       "FundProposeRequest": {
@@ -32073,6 +32509,75 @@
         ]
       }
     },
+    "/api/v1/exchange/fulfillments/{fulfillment_id}/provenance": {
+      "post": {
+        "operationId": "reconcile_fulfillment_provenance_api_v1_exchange_fulfillments__fulfillment_id__provenance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fulfillment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fulfillment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FulfillmentProvenanceReconcileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/cooperative_clearing__api__identity_schemas__CommandEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reconcile Fulfillment Provenance",
+        "tags": [
+          "exchange"
+        ]
+      }
+    },
     "/api/v1/exchange/logistics-orders": {
       "get": {
         "operationId": "list_logistics_orders_api_v1_exchange_logistics_orders_get",
@@ -32335,6 +32840,54 @@
         ]
       }
     },
+    "/api/v1/exchange/obligations/{obligation_id}/eligible-sources": {
+      "get": {
+        "operationId": "list_eligible_fulfillment_sources_api_v1_exchange_obligations__obligation_id__eligible_sources_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "obligation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Obligation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_EligibleFulfillmentSourceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Eligible Fulfillment Sources",
+        "tags": [
+          "exchange"
+        ]
+      }
+    },
     "/api/v1/exchange/obligations/{obligation_id}/fulfillments": {
       "get": {
         "operationId": "list_fulfillments_api_v1_exchange_obligations__obligation_id__fulfillments_get",
@@ -32573,6 +33126,78 @@
           }
         ],
         "summary": "Mark Overdue",
+        "tags": [
+          "exchange"
+        ]
+      }
+    },
+    "/api/v1/exchange/traceability": {
+      "get": {
+        "operationId": "list_fulfillment_traceability_api_v1_exchange_traceability_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lot_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lot Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fulfillment_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fulfillment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection_FulfillmentTraceabilityResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Fulfillment Traceability",
         "tags": [
           "exchange"
         ]

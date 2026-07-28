@@ -52,6 +52,7 @@ import {
 import "./i18n";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalAdd, formatDecimal, requireDecimalString } from "./shared/decimal";
 import "./discovery.css";
 
 type Section = "search" | "sell" | "logistics" | "intents";
@@ -107,11 +108,8 @@ function errorText(error: unknown): string {
 
 function formatAmount(value: string | null, unit?: string, sharesUnit?: string): string {
   if (value === null) return "—";
-  const number = Number(value);
   const locale = document.documentElement.lang.startsWith("en") ? "en-US" : "ru-RU";
-  const formatted = Number.isFinite(number)
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(number)
-    : value;
+  const formatted = formatDecimal(value, locale, { maximumFractionDigits: 4 });
   const displayUnit = unit === "COOP" && sharesUnit ? sharesUnit : unit;
   return displayUnit ? `${formatted} ${displayUnit}` : formatted;
 }
@@ -482,7 +480,7 @@ function LogisticsQuotePanel({ principal, candidate, candidates, destination, re
     </section>
     <section className="logistics-own-quotes">
       <div className="panel-heading"><h2>{t("market.myQuotes")}</h2><span>{ownQuotes.length}</span></div>
-      {quotes.isPending ? <div className="state"><RefreshCw className="spin" size={20} />{t("common.loading")}</div> : !ownQuotes.length ? <div className="state"><Truck size={21} />{t("market.noQuotes")}</div> : <div className="rows">{ownQuotes.map((quote) => <article className="logistics-quote-row" key={quote.record_id}><div><strong>{quote.origin_region} → {quote.destination_region}</strong><span>{formatAmount(quote.capacity, t(`units.${quote.unit_code.toLowerCase()}`, { defaultValue: quote.unit_code }))}</span></div><div><span>{t("market.deliveryCost")}</span><strong>{Object.values(quote.cost_components).reduce<number>((sum, value) => sum + Number(value), 0).toLocaleString(document.documentElement.lang, { maximumFractionDigits: 2 })} {t("market.sharesUnit")}</strong></div><StatusBadge value="ACTIVE" label={t("market.quoteActive")} /></article>)}</div>}
+      {quotes.isPending ? <div className="state"><RefreshCw className="spin" size={20} />{t("common.loading")}</div> : !ownQuotes.length ? <div className="state"><Truck size={21} />{t("market.noQuotes")}</div> : <div className="rows">{ownQuotes.map((quote) => <article className="logistics-quote-row" key={quote.record_id}><div><strong>{quote.origin_region} → {quote.destination_region}</strong><span>{formatAmount(quote.capacity, t(`units.${quote.unit_code.toLowerCase()}`, { defaultValue: quote.unit_code }))}</span></div><div><span>{t("market.deliveryCost")}</span><strong>{formatDecimal(decimalAdd(...Object.values(quote.cost_components).map(requireDecimalString)), document.documentElement.lang || "en-US", { maximumFractionDigits: 2 })} {t("market.sharesUnit")}</strong></div><StatusBadge value="ACTIVE" label={t("market.quoteActive")} /></article>)}</div>}
     </section>
   </div>;
 }

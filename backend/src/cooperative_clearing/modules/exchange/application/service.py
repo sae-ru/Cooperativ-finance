@@ -37,6 +37,7 @@ from cooperative_clearing.modules.exchange.infrastructure.models import (
     DealParty,
     DealTermsVersion,
     Fulfillment,
+    FulfillmentProvenance,
     LogisticsOrder,
     Obligation,
     ObligationDispute,
@@ -57,16 +58,23 @@ from cooperative_clearing.modules.inventory.domain.types import (
 from cooperative_clearing.modules.inventory.infrastructure.models import (
     EvidenceBlob,
     EvidenceLink,
+    InventoryLot,
+    Product,
     UnitOfMeasure,
 )
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
+from cooperative_clearing.modules.rights.infrastructure.models import (
+    CommodityRight,
+    RightRedemption,
+)
 from cooperative_clearing.shared.core.config import Settings
 
 DEAL_OPERATOR_ROLES = {RoleCode.COOPERATIVE_ADMIN}
 LOGISTICS_ROLES = {RoleCode.LOGISTICS_OPERATOR}
 OVERDUE_ROLES = {RoleCode.COOPERATIVE_ADMIN, RoleCode.RISK_ADMIN, RoleCode.AUDITOR}
 DISPUTE_RESOLVER_ROLES = {RoleCode.COOPERATIVE_ADMIN, RoleCode.RISK_ADMIN, RoleCode.AUDITOR}
+PROVENANCE_RECONCILE_ROLES = {RoleCode.COOPERATIVE_ADMIN, RoleCode.RIGHTS_OPERATOR}
 
 
 @dataclass(frozen=True, slots=True)
@@ -396,6 +404,7 @@ class ExchangeService:
         location_text: str,
         performed_at: datetime,
         logistics_order_id: UUID | None,
+        source_redemption_id: UUID | None,
         evidence_ids: Sequence[UUID],
         expected_version: int,
         idempotency_key: str,
@@ -409,6 +418,9 @@ class ExchangeService:
             "location_text": self._text(location_text, "FULFILLMENT_LOCATION_INVALID", 500),
             "performed_at": performed_at.astimezone(UTC).isoformat(),
             "logistics_order_id": str(logistics_order_id) if logistics_order_id else None,
+            "source_redemption_id": (
+                str(source_redemption_id) if source_redemption_id else None
+            ),
             "evidence_ids": [str(value) for value in evidence_ids],
             "expected_version": expected_version,
         }
@@ -427,6 +439,13 @@ class ExchangeService:
         ensure_unit_scale(amount, unit.decimal_scale)
         amounts = self._amounts(obligation).submit(
             amount, partial_allowed=obligation.partial_allowed
+        )
+        source = await self._product_fulfillment_source(
+            session,
+            obligation=obligation,
+            amount=amount,
+            performed_at=performed_at,
+            source_redemption_id=source_redemption_id,
         )
         if logistics_order_id is not None:
             order = await session.get(LogisticsOrder, logistics_order_id)
@@ -475,6 +494,22 @@ class ExchangeService:
                 version=1,
             )
         )
+        if source is not None:
+            redemption, right, lot = source
+            session.add(
+                FulfillmentProvenance(
+                    fulfillment_id=fulfillment_id,
+                    cooperative_id=obligation.cooperative_id,
+                    redemption_id=redemption.id,
+                    right_id=right.id,
+                    lot_id=lot.id,
+                    product_id=lot.product_id,
+                    source_owner_member_id=right.owner_member_id,
+                    intended_recipient_member_id=obligation.creditor_member_id,
+                    quantity=amount,
+                    linked_event_id=event.event_id,
+                )
+            )
         obligation.quantity_submitted = amounts.submitted
         obligation.version += 1
         obligation.last_event_id = event.event_id
@@ -492,6 +527,110 @@ class ExchangeService:
         )
         return complete_exchange_command(record, event.event_id, fulfillment_id)
 
+    async def reconcile_fulfillment_provenance(
+        self,
+        session: AsyncSession,
+        *,
+        principal: Principal,
+        fulfillment_id: UUID,
+        source_redemption_id: UUID,
+        rationale: str,
+        evidence_ids: Sequence[UUID],
+        idempotency_key: str,
+        request_id: UUID | None,
+    ) -> ExchangeCommandResult:
+        payload = {
+            "fulfillment_id": str(fulfillment_id),
+            "source_redemption_id": str(source_redemption_id),
+            "rationale": self._text(rationale, "PROVENANCE_RATIONALE_INVALID", 2000),
+            "evidence_ids": [str(value) for value in evidence_ids],
+        }
+        record, replay = await begin_exchange_command(
+            session,
+            principal,
+            "EXCHANGE_RECONCILE_FULFILLMENT_PROVENANCE",
+            idempotency_key,
+            payload,
+        )
+        if replay is not None:
+            return replay
+        fulfillment = await session.get(Fulfillment, fulfillment_id, with_for_update=True)
+        if fulfillment is None:
+            raise exchange_error("FULFILLMENT_NOT_FOUND", 404)
+        obligation = await session.get(Obligation, fulfillment.obligation_id)
+        if obligation is None:
+            raise exchange_error("OBLIGATION_NOT_FOUND", 404)
+        actor = role_actor(principal, obligation.cooperative_id, PROVENANCE_RECONCILE_ROLES)
+        if await session.get(FulfillmentProvenance, fulfillment.id) is not None:
+            raise exchange_error("FULFILLMENT_PROVENANCE_EXISTS", 409)
+        source = await self._product_fulfillment_source(
+            session,
+            obligation=obligation,
+            amount=fulfillment.quantity,
+            performed_at=fulfillment.performed_at,
+            source_redemption_id=source_redemption_id,
+        )
+        if source is None:
+            raise exchange_error("FULFILLMENT_SOURCE_NOT_ALLOWED", 409)
+        evidence = await EvidenceService.require_ready(
+            session,
+            obligation.cooperative_id,
+            evidence_ids,
+            required=True,
+        )
+        redemption, right, lot = source
+        event = await self.journal.append(
+            session,
+            event_type="obligations.fulfillment_provenance_reconciled",
+            aggregate_type="fulfillment_provenance",
+            aggregate_id=fulfillment.id,
+            aggregate_version=1,
+            actor=actor,
+            payload={
+                **payload,
+                "obligation_id": str(obligation.id),
+                "deal_id": str(obligation.deal_id),
+                "right_id": str(right.id),
+                "lot_id": str(lot.id),
+                "product_id": str(lot.product_id),
+                "source_owner_member_id": str(right.owner_member_id),
+                "intended_recipient_member_id": str(obligation.creditor_member_id),
+                "quantity": decimal_text(fulfillment.quantity),
+                "evidence": self._evidence_payload(evidence),
+            },
+        )
+        session.add(
+            FulfillmentProvenance(
+                fulfillment_id=fulfillment.id,
+                cooperative_id=obligation.cooperative_id,
+                redemption_id=redemption.id,
+                right_id=right.id,
+                lot_id=lot.id,
+                product_id=lot.product_id,
+                source_owner_member_id=right.owner_member_id,
+                intended_recipient_member_id=obligation.creditor_member_id,
+                quantity=fulfillment.quantity,
+                linked_event_id=event.event_id,
+            )
+        )
+        self._link_evidence(
+            session,
+            evidence,
+            event.event_id,
+            "fulfillment_provenance",
+            fulfillment.id,
+        )
+        await self._audit(
+            session,
+            principal,
+            obligation.cooperative_id,
+            "FULFILLMENT_PROVENANCE_RECONCILED",
+            "FulfillmentProvenance",
+            fulfillment.id,
+            event.event_id,
+            request_id,
+        )
+        return complete_exchange_command(record, event.event_id, fulfillment.id)
     async def accept_fulfillment(
         self,
         session: AsyncSession,
@@ -1106,6 +1245,68 @@ class ExchangeService:
         )
         return complete_exchange_command(record, event.event_id, order.id)
 
+    async def _product_fulfillment_source(
+        self,
+        session: AsyncSession,
+        *,
+        obligation: Obligation,
+        amount: Decimal,
+        performed_at: datetime,
+        source_redemption_id: UUID | None,
+    ) -> tuple[RightRedemption, CommodityRight, InventoryLot] | None:
+        if obligation.subject_type != "PRODUCT":
+            if source_redemption_id is not None:
+                raise exchange_error("FULFILLMENT_SOURCE_NOT_ALLOWED", 409)
+            return None
+        if obligation.subject_id is None:
+            raise exchange_error("PRODUCT_SUBJECT_REQUIRED", 409)
+        if source_redemption_id is None:
+            raise exchange_error("FULFILLMENT_SOURCE_REQUIRED", 409)
+        redemption = await session.get(
+            RightRedemption,
+            source_redemption_id,
+            with_for_update=True,
+        )
+        if (
+            redemption is None
+            or redemption.status != "COMPLETED"
+            or redemption.completed_event_id is None
+            or redemption.completed_at is None
+        ):
+            raise exchange_error("FULFILLMENT_SOURCE_NOT_COMPLETED", 409)
+        used_by = (
+            await session.execute(
+                select(FulfillmentProvenance.fulfillment_id).where(
+                    FulfillmentProvenance.redemption_id == redemption.id
+                )
+            )
+        ).scalar_one_or_none()
+        if used_by is not None:
+            raise exchange_error("FULFILLMENT_SOURCE_ALREADY_USED", 409)
+        right = await session.get(CommodityRight, redemption.right_id)
+        lot = await session.get(InventoryLot, redemption.lot_id)
+        if right is None or lot is None:
+            raise exchange_error("FULFILLMENT_SOURCE_BROKEN", 409)
+        if (
+            right.status != "REDEEMED"
+            or right.redeemed_event_id != redemption.completed_event_id
+            or redemption.right_id != right.id
+            or redemption.lot_id != right.lot_id
+            or right.lot_id != lot.id
+            or redemption.owner_member_id != right.owner_member_id
+            or right.owner_member_id != obligation.debtor_member_id
+            or right.cooperative_id != obligation.cooperative_id
+            or lot.cooperative_id != obligation.cooperative_id
+            or lot.product_id != obligation.subject_id
+            or right.unit_id != obligation.unit_id
+            or lot.unit_id != obligation.unit_id
+            or redemption.quantity != right.quantity
+            or redemption.quantity != amount
+        ):
+            raise exchange_error("FULFILLMENT_SOURCE_MISMATCH", 409)
+        if redemption.completed_at > performed_at.astimezone(UTC):
+            raise exchange_error("FULFILLMENT_SOURCE_AFTER_PERFORMANCE", 409)
+        return redemption, right, lot
     async def _terms_payload(
         self,
         session: AsyncSession,
@@ -1128,6 +1329,18 @@ class ExchangeService:
             subject_type = self._text(draft.subject_type, "SUBJECT_TYPE_INVALID", 32).upper()
             if subject_type not in {"PRODUCT", "SERVICE", "LOGISTICS", "OTHER"}:
                 raise exchange_error("SUBJECT_TYPE_INVALID")
+            if subject_type == "PRODUCT":
+                if draft.subject_id is None:
+                    raise exchange_error("PRODUCT_SUBJECT_REQUIRED")
+                product = await session.get(Product, draft.subject_id)
+                if (
+                    product is None
+                    or product.cooperative_id != cooperative_id
+                    or product.status != "ACTIVE"
+                ):
+                    raise exchange_error("PRODUCT_NOT_AVAILABLE", 409)
+                if product.default_unit_id != draft.unit_id:
+                    raise exchange_error("PRODUCT_UNIT_MISMATCH", 409)
             liquidity_class = draft.liquidity_class.upper()
             if liquidity_class not in {"UNASSESSED", "A", "B", "C", "D", "E"}:
                 raise exchange_error("LIQUIDITY_CLASS_INVALID")

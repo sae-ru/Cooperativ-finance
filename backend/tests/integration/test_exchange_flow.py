@@ -123,7 +123,7 @@ async def test_exchange_flow_is_versioned_personal_and_two_phase() -> None:
         draft = ObligationDraft(
             debtor_member_id=members["owner"],
             creditor_member_id=members["custodian_a"],
-            subject_type="PRODUCT",
+            subject_type="OTHER",
             subject_id=None,
             description="Deliver ten sealed boxes",
             quality_criteria="Dry, sealed and undamaged",
@@ -315,6 +315,7 @@ async def test_exchange_flow_is_versioned_personal_and_two_phase() -> None:
                 location_text="Integration warehouse",
                 performed_at=now + timedelta(hours=2),
                 logistics_order_id=order.object_id,
+                source_redemption_id=None,
                 evidence_ids=[fulfillment_evidence],
                 expected_version=obligation_version,
                 idempotency_key=str(uuid4()),

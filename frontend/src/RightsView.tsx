@@ -41,6 +41,7 @@ import {
 } from "./api/rights";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
+import { decimalIsPositive } from "./shared/decimal";
 import "./rights.css";
 
 type Section = "registry" | "backing" | "issue" | "operations" | "fulfill" | "control";
@@ -179,7 +180,7 @@ export default function RightsView({ principal }: { principal: Principal }) {
   const issuedTotal = rightData.filter((item) => item.status !== "REDEEMED").length;
   const pendingTotal = redemptionData.filter((item) => item.status === "REQUESTED").length;
   const frozenTotal = rightData.filter((item) => item.status === "FROZEN").length;
-  const shortfallTotal = balanceData.filter((item) => Number(item.backing_shortfall_quantity) > 0).length;
+  const shortfallTotal = balanceData.filter((item) => decimalIsPositive(item.backing_shortfall_quantity)).length;
 
   return (
     <div className="view-stack rights-view">
@@ -203,7 +204,7 @@ export default function RightsView({ principal }: { principal: Principal }) {
 
 function IssueForm({ balances, lots, members, products, warehouses, onDone }: { balances: Awaited<ReturnType<typeof getLotBalances>>; lots: Awaited<ReturnType<typeof getLots>>; members: Awaited<ReturnType<typeof getInventoryMembers>>; products: Awaited<ReturnType<typeof getProducts>>; warehouses: Awaited<ReturnType<typeof getWarehouses>>; onDone: () => Promise<void> }) {
   const [lotId, setLotId] = useState(""); const [ownerId, setOwnerId] = useState(""); const [quantity, setQuantity] = useState(""); const [validUntil, setValidUntil] = useState("");
-  const available = balances.filter((item) => Number(item.available_quantity) > 0 && lots.find((lot) => lot.id === item.lot_id)?.status === "VERIFIED");
+  const available = balances.filter((item) => decimalIsPositive(item.available_quantity) && lots.find((lot) => lot.id === item.lot_id)?.status === "VERIFIED");
   const mutation = useMutation({ mutationFn: () => { const balance = balances.find((item) => item.lot_id === lotId); const lot = lots.find((item) => item.id === lotId); if (!balance || !lot) throw new Error("balance"); return issueCommodityRight({ lot_id: lotId, owner_member_id: ownerId, quantity, redeem_warehouse_id: lot.warehouse_id, valid_until: validUntil ? new Date(validUntil).toISOString() : null, expected_balance_version: balance.version }); }, onSuccess: async () => { setQuantity(""); await onDone(); } });
   return <section className="rights-command panel"><div className="panel-heading"><h2>Выпустить обеспеченное право</h2><BadgeCheck size={18} /></div><form className="rights-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}><label className="span-two">Партия<select value={lotId} onChange={(event) => setLotId(event.target.value)} required><option value="">Выберите</option>{available.map((balance) => { const lot = lots.find((item) => item.id === balance.lot_id); return <option value={balance.lot_id} key={balance.lot_id}>{lot?.lot_number} · {products.find((item) => item.id === lot?.product_id)?.name} · доступно {balance.available_quantity}</option>; })}</select></label><label>Получатель<select value={ownerId} onChange={(event) => setOwnerId(event.target.value)} required><option value="">Выберите</option>{members.map((item) => <option value={item.member_id} key={item.member_id}>{item.display_name} · {item.member_number}</option>)}</select></label><label>Количество<input inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} required /></label><label>Действует до<input type="datetime-local" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} /></label><label>Место выдачи<input value={warehouses.find((item) => item.id === lots.find((lot) => lot.id === lotId)?.warehouse_id)?.name ?? ""} readOnly /></label><button className="primary-button" disabled={mutation.isPending}><BadgeCheck size={17} />Выпустить</button></form>{mutation.isError ? <p className="form-error" role="alert">{errorText(mutation.error)}</p> : null}</section>;
 }
