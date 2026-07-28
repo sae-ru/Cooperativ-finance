@@ -54,6 +54,7 @@ class _Party:
     member_id: UUID
     user_id: UUID
     role_assignment_id: UUID
+    role_cooperative_id: UUID | None = None
 
 
 class FederatedPurchaseBridge:
@@ -121,6 +122,10 @@ class FederatedPurchaseBridge:
         cooperative_id = await self._common_cooperative(
             session, {party.member_id for party in parties}
         )
+        if any(
+            party.role_cooperative_id not in {None, cooperative_id} for party in parties
+        ):
+            raise exchange_error("PURCHASE_PARTY_ROLE_SCOPE_MISMATCH", 409)
         goods_unit = await self._unit(session, cooperative_id, intent.unit_code)
         valuation_unit = await self._valuation_unit(session, cooperative_id, offer.valuation_unit)
 
@@ -466,7 +471,7 @@ class FederatedPurchaseBridge:
         user = await session.get(UserAccount, assignment.user_id)
         if user is None or user.status != "ACTIVE" or user.member_id != member_id:
             raise exchange_error("PURCHASE_PARTY_INACTIVE", 409)
-        return _Party(member_id, user.id, assignment.id)
+        return _Party(member_id, user.id, assignment.id, assignment.cooperative_id)
 
     @staticmethod
     def _unique_parties(parties: tuple[_Party, ...]) -> tuple[_Party, ...]:

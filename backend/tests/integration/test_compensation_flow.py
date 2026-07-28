@@ -1,5 +1,6 @@
 """Final arbitration can settle bounded compensation without touching protected shares."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -499,6 +500,27 @@ async def test_affirmed_appeal_settles_bounded_share_compensation() -> None:
             assert commitment.executed_amount == Decimal("15")
             transfer_version = transfer.version
 
+        async def accept_once(attempt: str) -> str:
+            async with database.session() as session:
+                try:
+                    await compensation_service.accept(
+                        session,
+                        principal=people["controller"],
+                        transfer_id=transfer_result.object_id,
+                        expected_version=transfer_version,
+                        idempotency_key=f"{suffix}-concurrent-accept-{attempt}",
+                        request_id=uuid4(),
+                    )
+                    await session.commit()
+                    return "SETTLED"
+                except DomainError as exc:
+                    await session.rollback()
+                    return exc.code
+
+        acceptance_outcomes = await asyncio.gather(accept_once("a"), accept_once("b"))
+        assert acceptance_outcomes.count("SETTLED") == 1
+        assert acceptance_outcomes.count("RISK_VERSION_CONFLICT") == 1
+
         app = create_app(settings, manage_runtime=False)
         app.state.database = database
 
@@ -512,12 +534,13 @@ async def test_affirmed_appeal_settles_bounded_share_compensation() -> None:
             assert [item["id"] for item in visible.json()["data"]] == [
                 str(transfer_result.object_id)
             ]
-            accepted = client.post(
+            stale = client.post(
                 f"/api/v1/risk/compensations/{transfer_result.object_id}/acceptance",
                 headers={"Idempotency-Key": str(uuid4())},
                 json={"expected_version": transfer_version},
             )
-            assert accepted.status_code == 201, accepted.text
+            assert stale.status_code == 409
+            assert stale.json()["error"]["code"] == "RISK_VERSION_CONFLICT"
 
         async with database.session() as session:
             transfer = await session.get(CompensationTransfer, transfer_result.object_id)

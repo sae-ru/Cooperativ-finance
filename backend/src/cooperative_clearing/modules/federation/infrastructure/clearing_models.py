@@ -190,6 +190,9 @@ class FederatedClearingCycle(Base):
     created_role_assignment_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("identity.role_assignments.id", ondelete="RESTRICT")
     )
+    created_actor_organization_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("identity.cooperatives.id", ondelete="RESTRICT")
+    )
     created_event_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("journal.signed_events.event_id", ondelete="RESTRICT")
     )

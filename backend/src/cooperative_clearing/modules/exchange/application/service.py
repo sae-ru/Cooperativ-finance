@@ -63,6 +63,12 @@ from cooperative_clearing.modules.inventory.infrastructure.models import (
     UnitOfMeasure,
 )
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.rights.infrastructure.models import (
     CommodityRight,
@@ -463,6 +469,13 @@ class ExchangeService:
             required=obligation.evidence_required,
         )
         fulfillment_id = uuid4()
+        evidence_refs = (
+            *self._evidence_payload(evidence),
+            {
+                "event_id": str(obligation.last_event_id),
+                "kind": "OBLIGATION_STATE",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="obligations.fulfillment_recorded",
@@ -474,8 +487,19 @@ class ExchangeService:
                 **payload,
                 "fulfillment_id": str(fulfillment_id),
                 "remaining_after_submission": decimal_text(amounts.remaining),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.OBLIGATION,
+                    effect=ExposureEffect.EXECUTE,
+                    subject_type="obligation",
+                    subject_id=obligation.id,
+                    amount=amount,
+                    unit=str(obligation.unit_id),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             Fulfillment(
@@ -683,6 +707,13 @@ class ExchangeService:
         overdue = obligation.due_at < datetime.now(UTC)
         next_status = obligation_status_for(amounts, overdue=overdue)
         acceptance_id = uuid4()
+        evidence_refs = (
+            *self._evidence_payload(evidence),
+            {
+                "event_id": str(fulfillment.submitted_event_id),
+                "kind": "FULFILLMENT_SUBMISSION",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="obligations.fulfillment_accepted",
@@ -696,8 +727,20 @@ class ExchangeService:
                 "decision": decision.value,
                 "quantity_fulfilled_after": decimal_text(amounts.fulfilled),
                 "quantity_remaining_after": decimal_text(amounts.remaining),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.OBLIGATION,
+                    effect=ExposureEffect.REDUCE,
+                    subject_type="obligation",
+                    subject_id=obligation.id,
+                    amount=accepted if accepted > 0 else None,
+                    unit=str(obligation.unit_id) if accepted > 0 else None,
+                    basis_refs=(str(fulfillment.submitted_event_id),),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             AcceptanceRecord(

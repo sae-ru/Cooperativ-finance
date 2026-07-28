@@ -20,6 +20,12 @@ from cooperative_clearing.modules.inventory.application.evidence import Evidence
 from cooperative_clearing.modules.inventory.domain.types import decimal_text
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.risk.application.antifraud_enforcement import (
     require_antifraud_action_allowed,
@@ -448,6 +454,7 @@ class RiskService:
             session, account.cooperative_id, evidence_ids, required=True
         )
         entry_id = uuid4()
+        evidence_refs = tuple(self._evidence_payload(evidence))
         event = await self.journal.append(
             session,
             event_type="shares.contribution_recorded",
@@ -460,8 +467,19 @@ class RiskService:
                 "contribution_id": str(entry_id),
                 "balance_before": decimal_text(account.balance),
                 "balance_after": decimal_text(new_balance),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.CREATE,
+                    subject_type="share_account",
+                    subject_id=account.id,
+                    amount=contribution,
+                    unit=account.denomination,
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             ShareContribution(
@@ -961,6 +979,12 @@ class RiskService:
                 commitment.debtor_member_id,
                 policy.max_guarantee_chain_depth,
             )
+        evidence_refs = (
+            {
+                "event_id": str(commitment.proposed_event_id),
+                "kind": "EXPOSURE_PROPOSAL",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="shares.exposure_reserved",
@@ -978,6 +1002,18 @@ class RiskService:
                 "max_loss": decimal_text(commitment.max_loss),
                 "exposure_preview": self._preview_payload(preview),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="exposure_commitment",
+                    subject_id=commitment.id,
+                    amount=commitment.amount_reserved,
+                    unit=account.denomination,
+                    maximum_loss=commitment.max_loss,
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         commitment.status = CommitmentStatus.ACTIVE.value
         commitment.accepted_by_user_id = principal.user_id
@@ -1035,6 +1071,10 @@ class RiskService:
         evidence = await EvidenceService.require_ready(
             session, commitment.cooperative_id, evidence_ids, required=True
         )
+        account = await session.get(ShareAccount, commitment.account_id)
+        if account is None:
+            raise risk_error("ACCOUNT_NOT_FOUND", 404)
+        evidence_refs = tuple(self._evidence_payload(evidence))
         target = (
             CommitmentStatus.CANCELLED
             if commitment.status == CommitmentStatus.PROPOSED.value
@@ -1055,8 +1095,20 @@ class RiskService:
                 **payload,
                 "from_status": commitment.status,
                 "to_status": target.value,
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.RELEASE,
+                    subject_type="exposure_commitment",
+                    subject_id=commitment.id,
+                    amount=commitment.amount_reserved,
+                    unit=account.denomination,
+                    maximum_loss=commitment.max_loss,
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         commitment.status = target.value
         commitment.released_by_user_id = principal.user_id

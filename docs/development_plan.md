@@ -496,3 +496,31 @@ production gates.
 
 Доказательства и границы: [implemented_slice_31.md](implemented_slice_31.md).
 Срез не требует миграции или изменения OpenAPI.
+
+## Slice 32. Сквозная прослеживаемость товарного исполнения
+
+PRODUCT-исполнение теперь требует неизрасходованный завершённый источник:
+`InventoryLot -> CommodityRight -> RightRedemption -> FulfillmentProvenance`.
+Сервис проверяет товар, единицу, кооператив, владельца, количество и порядок
+времени; уникальное погашение нельзя использовать повторно. Получатель и
+фактическая приёмка продолжают цепочку, а API отдаёт scoped trace с
+воспроизводимым SHA-256.
+
+Историческая запись связывается только явной операторской reconciliation-командой
+с причиной, evidence и подписанным событием. Миграция `0036` создаёт
+append-only таблицу и останавливает downgrade при наличии истории.
+
+Доказательства и границы: [implemented_slice_32.md](implemented_slice_32.md).
+Физическое качество, юридический статус актов и внешний аудит полномочий
+остаются production gates.
+## Slice 33. Exactly-once для хозяйственных активов
+
+Конкурентные PostgreSQL-сценарии теперь явно покрывают выпуск товарного права и
+финальный settlement паевой компенсации в дополнение к уже существовавшим
+гонкам погашения, risk/solidarity/crisis reservation, клиринга и inter-node
+apply. Row locks, optimistic versions, exact balance state machines,
+idempotency и DB constraints дают один хозяйственный результат и один
+подписанный след.
+
+Доказательства и остаточная DBA-граница:
+[implemented_slice_33.md](implemented_slice_33.md).

@@ -38,7 +38,7 @@ async def seed_demo_responsibility(
     )
     auditor = _principal(
         "auditor",
-        "demo-member-boris",
+        "demo-member-pavel",
         cooperative_id,
         (("bootstrap-role", "auditor:AUDITOR", RoleCode.AUDITOR),),
         global_scope=True,

@@ -347,3 +347,36 @@ tests, TypeScript typecheck и production PWA build. OpenAPI и migration cycle 
 схему данных. Пересобранный Docker frontend и пять healthy Compose services
 прошли RU/EN desktop/mobile smoke без horizontal overflow и browser console
 errors.
+
+## Проверки Slice 32
+
+Отдельный PostgreSQL integration-тест поднимает production demo-команды и
+проверяет цепочку `lot -> right -> redemption -> fulfillment -> acceptance`.
+Он сопоставляет cooperative, product, unit, owner, debtor, creditor, количества
+и signed event IDs, затем пытается повторно использовать то же погашение и
+ожидает доменный отказ.
+
+Тот же тест читает private trace API от имени получателя, проверяет SHA-256 и
+частичную приёмку, а затем подтверждает, что посторонний участник не видит
+запись. В конце заново проверяется весь подписанный журнал узла.
+
+Проверенный checkpoint 28 июля 2026 года: Ruff, strict mypy по `264` source
+files, `252 passed, 1 deselected`; `69` frontend test files / `196` tests,
+TypeScript typecheck и production PWA build. Живой Docker-узел отвечает
+`READY`, имеет revision `0036_fulfillment_traceability`, две provenance-записи
+и валидный журнал из `434` событий. Этот технический gate не заменяет
+физическую сверку партии и независимую проверку актов в пилоте.
+## Проверки Slice 33
+
+В существующий commodity-right integration добавлена реальная гонка двух
+выпусков с одной balance version. Проверяются один успешный выпуск, один
+`VERSION_CONFLICT` и точные поля `available`/`rights_issued` до и после
+конкурентного погашения.
+
+Compensation E2E запускает две одновременные acceptance-команды. Проверяются
+ровно один `SETTLED`, один `RISK_VERSION_CONFLICT`, единственный атомарный
+debit/credit, неизменный protected amount и повторный отказ через HTTP API.
+Вместе с clearing, risk, solidarity и crisis concurrency tests это покрывает
+четыре класса exactly-once из production-readiness.
+
+Checkpoint на заново созданной test-БД: Ruff и `252 passed, 1 deselected`.

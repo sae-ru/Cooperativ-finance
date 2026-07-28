@@ -378,3 +378,24 @@ allowlist соответствует реальному egress внешней п
 | локаль меняет само значение | разделители применяются после точного расчёта только при отображении | ручной ввод с неоднозначными разделителями регулируется отдельной validation policy |
 | разработчик возвращает `Number` для хозяйственного поля | static source contract и repository scan | новое имя поля нужно добавить в guarded vocabulary |
 | старый cache не содержит нового decimal-поля | ограниченный fallback `executed_amount ?? "0"` | несовместимое изменение другого обязательного поля должно fail-closed |
+
+## Прослеживаемость исполнения Slice 32
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| должник указывает чужую или другую партию | сверка cooperative, product, unit, owner и debtor под row lock | ложные исходные складские данные требуют физической проверки |
+| одно погашение подтверждает две поставки | service rejection и unique constraint по `redemption_id` | привилегированный прямой доступ к БД вне приложения |
+| право погашено после заявленного исполнения | обязательное `completed_at <= performed_at` | неверные часы узла контролируются отдельным readiness gate |
+| reconciliation переписывает историю | исходное исполнение не меняется; новая связь, rationale, evidence и signed event | сговор оператора и автора ложного evidence |
+| посторонний видит адреса и участников поставки | private participant/carrier/admin scope | авторизованный участник может раскрыть увиденное вне системы |
+| rollback удаляет provenance | downgrade `0036` fail-closed при наличии строк | аварийное восстановление требует утверждённого ручного плана |
+## Exactly-once Slice 33
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| два оператора выпускают права на один остаток | lot/balance row locks, expected version и exact allocation constraint | прямое изменение БД привилегированным DBA |
+| две сессии погашают одно право | redemption/right/lot locks, terminal status и unique movement event | повреждённый restore из несогласованных компонентов |
+| параллельные резервы превышают доступное | сериализация общего account/bucket/snapshot и повторный расчёт внутри lock | новая команда может не использовать общий locking contract |
+| повтор settlement дважды двигает паи | transfer lock, version, active-case uniqueness и атомарный debit/credit | компромисс runtime DB-role вместе с приложением |
+| сетевой retry создаёт второй результат | scoped idempotency registry с payload hash | клиент теряет ключ и намеренно создаёт новую команду; доменные locks всё равно ограничивают итог |
+| событие есть без хозяйственного результата или наоборот | event, state, audit и command record в одной DB transaction | внешнее evidence/blob storage требует отдельной reconciliation |

@@ -15,6 +15,12 @@ from cooperative_clearing.modules.inventory.application.evidence import Evidence
 from cooperative_clearing.modules.inventory.domain.types import decimal_text
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.risk.application.common import (
     RiskCommandResult,
     begin_risk_command,
@@ -207,6 +213,18 @@ class CompensationService:
                 "status": CompensationStatus.PENDING_ACCEPTANCE.value,
                 "evidence": refs,
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="compensation_transfer",
+                    subject_id=transfer_id,
+                    amount=compensation_amount,
+                    unit=source.denomination,
+                    maximum_loss=commitment.max_loss,
+                ),
+                evidence_refs=tuple(refs),
+            ),
         )
         source.executed_not_settled += compensation_amount
         source.last_event_id = event.event_id
@@ -292,6 +310,12 @@ class CompensationService:
         destination_before = destination.balance
         source_after = exact_amount(source_before - transfer.amount, allow_zero=True)
         destination_after = exact_amount(destination_before + transfer.amount, allow_zero=True)
+        evidence_refs = (
+            {
+                "event_id": str(transfer.authorized_event_id),
+                "kind": "COMPENSATION_AUTHORIZATION",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="liability.compensation_settled",
@@ -311,6 +335,17 @@ class CompensationService:
                 "destination_balance_before": decimal_text(destination_before),
                 "destination_balance_after": decimal_text(destination_after),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.TRANSFER,
+                    subject_type="compensation_transfer",
+                    subject_id=transfer.id,
+                    amount=transfer.amount,
+                    unit=transfer.denomination,
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         now = datetime.now(UTC)
         source.balance = source_after
@@ -407,6 +442,13 @@ class CompensationService:
             session, transfer.cooperative_id, evidence_ids, required=True
         )
         refs = self._evidence_payload(evidence)
+        evidence_refs = (
+            *refs,
+            {
+                "event_id": str(transfer.authorized_event_id),
+                "kind": "COMPENSATION_AUTHORIZATION",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="liability.compensation_voided",
@@ -421,6 +463,17 @@ class CompensationService:
                 "commitment_id": str(commitment.id),
                 "evidence": refs,
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SHARE,
+                    effect=ExposureEffect.RELEASE,
+                    subject_type="compensation_transfer",
+                    subject_id=transfer.id,
+                    amount=transfer.amount,
+                    unit=transfer.denomination,
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         now = datetime.now(UTC)
         source.executed_not_settled -= transfer.amount

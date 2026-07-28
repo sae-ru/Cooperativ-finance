@@ -48,6 +48,12 @@ from cooperative_clearing.modules.journal.application.service import (
     SignedJournalService,
     signer_from_settings,
 )
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import canonicalize, payload_hash
 from cooperative_clearing.modules.journal.infrastructure.models import NodeChainState
 from cooperative_clearing.modules.node.domain.node_code import NodeCode
@@ -281,6 +287,7 @@ class InterNodeClearingService:
             created_by_user_id=user_id,
             created_by_member_id=actor.person_id,
             created_role_assignment_id=actor.role_assignment_id,
+            created_actor_organization_id=actor.organization_id,
             created_event_id=event.event_id,
         )
         session.add(row)
@@ -537,6 +544,27 @@ class InterNodeClearingService:
             aggregate_version=cycle.version + 1,
             actor=actor,
             payload=document,
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.NODE,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="federated_clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(
+                        input_hash,
+                        snapshot_hash,
+                        str(document["receipt_hash"]),
+                    ),
+                ),
+                evidence_refs=(
+                    {
+                        "input_hash": input_hash,
+                        "snapshot_hash": snapshot_hash,
+                        "receipt_hash": document["receipt_hash"],
+                        "kind": "NODE_PREPARE_RECEIPT",
+                    },
+                ),
+            ),
         )
         for row in rows:
             row.status = "PREPARED"
@@ -891,6 +919,27 @@ class InterNodeClearingService:
             aggregate_version=cycle.version + 1,
             actor=_actor_from_cycle(cycle),
             payload=document,
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.NODE,
+                    effect=ExposureEffect.FINALIZE,
+                    subject_type="federated_clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(
+                        cycle.input_hash,
+                        cycle.result_hash,
+                        str(document["certificate_hash"]),
+                    ),
+                ),
+                evidence_refs=(
+                    {
+                        "input_hash": cycle.input_hash,
+                        "result_hash": cycle.result_hash,
+                        "certificate_hash": document["certificate_hash"],
+                        "kind": "COMMIT_CERTIFICATE",
+                    },
+                ),
+            ),
         )
         row = FederatedCommitCertificate(
             id=uuid4(),
@@ -1027,6 +1076,25 @@ class InterNodeClearingService:
                 "certificate_hash": certificate.certificate_hash,
                 "local_obligation_ids": [str(row.id) for row in rows],
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.NODE,
+                    effect=ExposureEffect.EXECUTE,
+                    subject_type="federated_clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(
+                        certificate.certificate_hash,
+                        str(proposal.proposal_payload["result_hash"]),
+                    ),
+                ),
+                evidence_refs=(
+                    {
+                        "certificate_hash": certificate.certificate_hash,
+                        "result_hash": proposal.proposal_payload["result_hash"],
+                        "kind": "LOCAL_CERTIFICATE_APPLY",
+                    },
+                ),
+            ),
         )
         for row in rows:
             item = clearing_by_id[str(row.id)]
@@ -1269,6 +1337,25 @@ class InterNodeClearingService:
             aggregate_version=cycle.version + 1,
             actor=_actor_from_cycle(cycle),
             payload=document,
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.NODE,
+                    effect=ExposureEffect.FINALIZE,
+                    subject_type="federated_clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(
+                        str(document["certificate_hash"]),
+                        str(document["proof_hash"]),
+                    ),
+                ),
+                evidence_refs=(
+                    {
+                        "certificate_hash": document["certificate_hash"],
+                        "proof_hash": document["proof_hash"],
+                        "kind": "RECONCILIATION_PROOF",
+                    },
+                ),
+            ),
         )
         row = FederatedClearingProof(
             id=uuid4(),
@@ -1697,7 +1784,7 @@ def _application_payload(row: FederatedObligationApplication) -> dict[str, objec
 def _actor_from_cycle(cycle: FederatedClearingCycle) -> ActorClaim:
     return ActorClaim(
         person_id=cycle.created_by_member_id,
-        organization_id=None,
+        organization_id=cycle.created_actor_organization_id,
         role_assignment_id=cycle.created_role_assignment_id,
     )
 

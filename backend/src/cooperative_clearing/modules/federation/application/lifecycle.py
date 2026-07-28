@@ -44,6 +44,12 @@ from cooperative_clearing.modules.federation.infrastructure.models import (
     OfflineEpoch,
 )
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import (
     payload_hash,
     sha256_ref,
@@ -1371,6 +1377,14 @@ class NodeTrustService(FederationService):
         )
         exposure_id = exposure.id if exposure is not None else uuid4()
         version = exposure.version + 1 if exposure is not None else 1
+        limit_event_id = limit.approved_event_id or limit.proposed_event_id
+        evidence_refs = (
+            {
+                "event_id": str(limit_event_id),
+                "terms_hash": limit.terms_hash,
+                "kind": "ACTIVE_BILATERAL_LIMIT",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="federation.node_exposure_reserved",
@@ -1385,6 +1399,18 @@ class NodeTrustService(FederationService):
                 "exposure_after": str(preview.after),
                 "limit": str(preview.limit),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.NODE,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="node_exposure",
+                    subject_id=exposure_id,
+                    amount=amount,
+                    unit=unit_code,
+                    basis_refs=(limit.terms_hash,),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         now = datetime.now(UTC)
         if exposure is None:

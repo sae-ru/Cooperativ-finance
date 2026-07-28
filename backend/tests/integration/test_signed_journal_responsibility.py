@@ -18,7 +18,17 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     UserAccount,
 )
 from cooperative_clearing.modules.journal.application.outbox import dispatch_outbox_batch
-from cooperative_clearing.modules.journal.application.service import verify_journal
+from cooperative_clearing.modules.journal.application.service import (
+    ActorClaim,
+    SignedJournalService,
+    verify_journal,
+)
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.infrastructure.models import (
     ConsumerReceipt,
     OutboxMessage,
@@ -36,6 +46,7 @@ from cooperative_clearing.modules.responsibility.infrastructure.models import (
 )
 from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
+from cooperative_clearing.shared.domain.errors import DomainError
 from cooperative_clearing.shared.infrastructure.database import Database
 
 
@@ -594,5 +605,196 @@ async def test_outbox_retries_then_quarantines_invalid_message() -> None:
                 .where(ConsumerReceipt.event_id == proposed.event_id)
             )
             assert receipt_count == 0
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.integration
+async def test_signed_event_rejects_forged_actor_role_and_scope() -> None:
+    settings = Settings(service_name="journal-actor-assurance-integration")
+    await initialize_node(settings)
+    database = Database.from_settings(settings)
+    try:
+        target_member_id, creator, _approver, target = await create_people_and_roles(
+            database
+        )
+        cooperative_id = creator.roles[0].cooperative_id
+        assert cooperative_id is not None
+        assert creator.member_id is not None
+        journal = SignedJournalService(settings)
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as forged_person:
+                await journal.append(
+                    session,
+                    event_type="assurance.forged_person_rejected",
+                    aggregate_type="assurance_probe",
+                    aggregate_id=uuid4(),
+                    aggregate_version=1,
+                    actor=ActorClaim(
+                        person_id=target_member_id,
+                        organization_id=cooperative_id,
+                        role_assignment_id=creator.roles[0].assignment_id,
+                    ),
+                    payload={"expected": "rejected"},
+                )
+            assert forged_person.value.code == "ACTOR_PERSON_MISMATCH"
+            await session.rollback()
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as forged_scope:
+                await journal.append(
+                    session,
+                    event_type="assurance.forged_scope_rejected",
+                    aggregate_type="assurance_probe",
+                    aggregate_id=uuid4(),
+                    aggregate_version=1,
+                    actor=ActorClaim(
+                        person_id=creator.member_id,
+                        organization_id=uuid4(),
+                        role_assignment_id=creator.roles[0].assignment_id,
+                    ),
+                    payload={"expected": "rejected"},
+                )
+            assert forged_scope.value.code == "ACTOR_SCOPE_MISMATCH"
+            await session.rollback()
+
+        async with database.session() as session:
+            assignment = await session.get(
+                RoleAssignment, target.roles[0].assignment_id, with_for_update=True
+            )
+            assert assignment is not None
+            assignment.status = "REVOKED"
+            await session.commit()
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as inactive_role:
+                await journal.append(
+                    session,
+                    event_type="assurance.inactive_role_rejected",
+                    aggregate_type="assurance_probe",
+                    aggregate_id=uuid4(),
+                    aggregate_version=1,
+                    actor=ActorClaim(
+                        person_id=target_member_id,
+                        organization_id=cooperative_id,
+                        role_assignment_id=target.roles[0].assignment_id,
+                    ),
+                    payload={"expected": "rejected"},
+                )
+            assert inactive_role.value.code == "ACTOR_ROLE_INACTIVE"
+            await session.rollback()
+    finally:
+        await database.dispose()
+
+@pytest.mark.integration
+async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -> None:
+    settings = Settings(service_name="journal-command-assurance-integration")
+    await initialize_node(settings)
+    database = Database.from_settings(settings)
+    try:
+        _target_member_id, creator, _approver, _target = await create_people_and_roles(
+            database
+        )
+        cooperative_id = creator.roles[0].cooperative_id
+        assert cooperative_id is not None
+        assert creator.member_id is not None
+        actor = ActorClaim(
+            person_id=creator.member_id,
+            organization_id=cooperative_id,
+            role_assignment_id=creator.roles[0].assignment_id,
+        )
+        journal = SignedJournalService(settings)
+        subject_id = uuid4()
+        exposure = ExposureClaim(
+            category=ExposureCategory.SHARE,
+            effect=ExposureEffect.CREATE,
+            subject_type="share_account",
+            subject_id=subject_id,
+            amount=Decimal("5.00"),
+            unit="SHARE",
+            maximum_loss=Decimal("5.00"),
+        )
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as missing:
+                await journal.append(
+                    session,
+                    event_type="shares.contribution_recorded",
+                    aggregate_type="share_account",
+                    aggregate_id=subject_id,
+                    aggregate_version=1,
+                    actor=actor,
+                    payload={"amount": "5.00"},
+                )
+            assert missing.value.code == "CRITICAL_COMMAND_ASSURANCE_REQUIRED"
+            await session.rollback()
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as no_evidence:
+                await journal.append(
+                    session,
+                    event_type="shares.contribution_recorded",
+                    aggregate_type="share_account",
+                    aggregate_id=subject_id,
+                    aggregate_version=1,
+                    actor=actor,
+                    payload={"amount": "5.00"},
+                    assurance=CommandAssurance(exposure=exposure, evidence_refs=()),
+                )
+            assert no_evidence.value.code == "CRITICAL_COMMAND_EVIDENCE_REQUIRED"
+            await session.rollback()
+
+        evidence = ({"event_id": str(uuid4()), "kind": "SHARE_CONTRIBUTION_SOURCE"},)
+        async with database.session() as session:
+            appended = await journal.append(
+                session,
+                event_type="shares.contribution_recorded",
+                aggregate_type="share_account",
+                aggregate_id=subject_id,
+                aggregate_version=1,
+                actor=actor,
+                payload={"amount": "5.00"},
+                assurance=CommandAssurance(exposure=exposure, evidence_refs=evidence),
+            )
+            await session.commit()
+
+        async with database.session() as session:
+            event = await session.get(SignedEvent, appended.event_id)
+            assert event is not None
+            assurance = event.payload["_command_assurance"]
+            assert isinstance(assurance, dict)
+            assert assurance["format"] == "critical-command-assurance-v1"
+            assert assurance["actor"] == {
+                "person_id": str(creator.member_id),
+                "user_id": str(creator.user_id),
+            }
+            assert assurance["role"] == {
+                "assignment_id": str(creator.roles[0].assignment_id),
+                "code": creator.roles[0].role.value,
+                "source": "ASSIGNMENT",
+            }
+            assert assurance["scope"] == {
+                "actor_organization_id": str(cooperative_id),
+                "role_cooperative_id": str(cooperative_id),
+            }
+            assert assurance["exposure"] == {
+                "category": "SHARE",
+                "effect": "CREATE",
+                "subject_type": "share_account",
+                "subject_id": str(subject_id),
+                "amount": "5.00",
+                "unit": "SHARE",
+                "maximum_loss": "5.00",
+                "basis_refs": [],
+            }
+            assert event.evidence == list(evidence)
+            node = (
+                await session.execute(
+                    select(NodeProfile).where(NodeProfile.node_code == settings.node_code)
+                )
+            ).scalar_one()
+            report = await verify_journal(session, node.id)
+            assert report.ok
     finally:
         await database.dispose()

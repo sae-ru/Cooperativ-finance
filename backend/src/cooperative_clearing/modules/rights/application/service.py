@@ -37,6 +37,12 @@ from cooperative_clearing.modules.journal.application.service import (
     ActorClaim,
     SignedJournalService,
 )
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.rights.domain.types import (
     FREEZABLE_RIGHT_STATUSES,
     BalanceState,
@@ -119,6 +125,12 @@ class CommodityRightsService:
         actor = actor_claim(principal, lot.cooperative_id, ISSUE_ROLES)
         right_id = uuid4()
         reservation_id = uuid4()
+        backing_evidence = (
+            {
+                "event_id": str(lot.verified_event_id),
+                "kind": "LOT_VERIFICATION",
+            },
+        )
         reservation_event = await self.journal.append(
             session,
             event_type="inventory.quantity_reserved",
@@ -135,6 +147,17 @@ class CommodityRightsService:
                 "expires_at": valid_until.isoformat() if valid_until else None,
                 "available_before": decimal_text(balance.available_quantity),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.COMMODITY,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="inventory_lot",
+                    subject_id=lot.id,
+                    amount=amount,
+                    unit=str(lot.unit_id),
+                ),
+                evidence_refs=backing_evidence,
+            ),
         )
         issued_event = await self.journal.append(
             session,
@@ -152,6 +175,17 @@ class CommodityRightsService:
                 "available_after": decimal_text(state.available),
                 "rights_issued_after": decimal_text(state.issued),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.COMMODITY,
+                    effect=ExposureEffect.CREATE,
+                    subject_type="commodity_right",
+                    subject_id=right_id,
+                    amount=amount,
+                    unit=str(lot.unit_id),
+                ),
+                evidence_refs=backing_evidence,
+            ),
         )
         session.add(
             InventoryReservation(
@@ -242,6 +276,7 @@ class CommodityRightsService:
         )
         actor = actor_claim(principal, right.cooperative_id, ISSUE_ROLES)
         transfer_id = uuid4()
+        evidence_refs = tuple(self._evidence_payload(evidence))
         event = await self.journal.append(
             session,
             event_type="rights.commodity_right_transferred",
@@ -253,8 +288,19 @@ class CommodityRightsService:
                 **payload,
                 "transfer_id": str(transfer_id),
                 "quantity": decimal_text(right.quantity),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.COMMODITY,
+                    effect=ExposureEffect.TRANSFER,
+                    subject_type="commodity_right",
+                    subject_id=right.id,
+                    amount=right.quantity,
+                    unit=str(right.unit_id),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             RightTransfer(
@@ -547,6 +593,7 @@ class CommodityRightsService:
             REDEMPTION_ROLES,
             exact_assignment_id=role.id,
         )
+        evidence_refs = tuple(self._evidence_payload(evidence))
         event = await self.journal.append(
             session,
             event_type="rights.commodity_right_redeemed",
@@ -563,8 +610,19 @@ class CommodityRightsService:
                 "custodian_assignment_id": str(lot.custodian_assignment_id),
                 "quantity": decimal_text(redemption.quantity),
                 "lot_quantity_after": decimal_text(lot.current_quantity - redemption.quantity),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.COMMODITY,
+                    effect=ExposureEffect.EXECUTE,
+                    subject_type="commodity_right",
+                    subject_id=right.id,
+                    amount=redemption.quantity,
+                    unit=str(right.unit_id),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         self._apply_state(balance, state)
         balance.version += 1

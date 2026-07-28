@@ -15,8 +15,8 @@
 
 - [ ] Все инварианты ТЗ покрыты DB constraints и/или transaction tests.
 - [x] Нет float в количестве, оценке и покрытии ([evidence](implemented_slice_31.md)).
-- [ ] Партия прослеживается до права, исполнения и получателя.
-- [ ] Нет двойного выпуска, погашения, резервирования и execution.
+- [x] Партия прослеживается до права, исполнения и получателя ([evidence](implemented_slice_32.md)).
+- [x] Нет двойного выпуска, погашения, резервирования и execution ([evidence](implemented_slice_33.md)).
 - [x] Protected amount и solidarity contour недоступны взысканию.
 - [ ] Каждая critical command имеет actor/role/scope/evidence/exposure.
 - [x] Appeal и compensation проверены end-to-end ([evidence](implemented_slice_30.md)).

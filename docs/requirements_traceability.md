@@ -298,3 +298,26 @@ acceptance criteria и tests. Если строка карты меняется,
 | RU/EN без потери цифр | строковое grouping и locale separators, half-up только для показа | RU/EN large-value test |
 | Защита от возврата ошибки | static source contract запрещает `Number`/`parseFloat` для business decimal fields | `decimal-boundary.test.ts` |
 | Совместимость | wire-format, OpenAPI и revision не менялись; отсутствующее старое `executed_amount` трактуется как `0` | RiskView regression и production build |
+
+## Slice 32 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Партия прослеживается до получателя | immutable `FulfillmentProvenance` связывает lot/right/redemption/fulfillment и creditor | PostgreSQL integration и private API |
+| Нельзя подменить товар или единицу | product, unit, cooperative и debtor owner сверяются транзакционно | mismatch service tests и полный demo trace |
+| Нельзя повторно использовать отпуск | unique `redemption_id` плюс row lock и service rejection | `FULFILLMENT_SOURCE_ALREADY_USED` regression |
+| Источник существовал до исполнения | `completed_at <= performed_at`, завершённые статусы и совпавшее signed event | integration assertions |
+| Приёмка продолжает цепочку | acceptance actor обязан быть creditor, количество сохраняется отдельно | demo partial acceptance `6` из `8` |
+| Приватность доказательств | стороны, перевозчик и назначенные роли; посторонний получает пустую выборку | API principal override test |
+| История не переписывается | reconciliation требует роль, rationale, evidence и новое signed event | demo legacy reconciliation и migration guard |
+| Проверяемое представление | canonical payload получает `sha256:` proof hash | API format assertion и journal verification |
+## Slice 33 trace
+
+| Требование | Сериализация | DB-backstop | Конкурентная проверка |
+|---|---|---|---|
+| Нет двойного выпуска | lot/balance row locks и expected version | allocation check, unique right-reservation | один success, один `VERSION_CONFLICT` |
+| Нет двойного погашения | redemption/right/lot/balance row locks и status | unique open redemption и movement event | один completion, один `REDEMPTION_NOT_PENDING` |
+| Нет двойного резервирования | account/bucket/snapshot locks и exact available bound | partial unique indexes и balance checks | risk, solidarity и crisis races |
+| Нет двойного execution | transfer/cycle/accounts locks и expected version | active-case, proof и receipt uniqueness | один settlement/finalize, один conflict |
+| Повтор после ответа | command registry по actor/type/key/payload | unique command key | replay либо fail-closed conflict |
+| Один доказательный след | event append в той же транзакции | unique event refs и chain sequence | journal verification |

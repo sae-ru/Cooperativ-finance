@@ -15,6 +15,12 @@ from cooperative_clearing.modules.journal.application.service import (
     ActorClaim,
     SignedJournalService,
 )
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.solidarity.application.common import (
     SolidarityCommandResult,
@@ -955,6 +961,28 @@ class SolidarityService:
                 raise solidarity_error("ALLOCATION_EXCEEDS_VERIFIED_BALANCE")
         decision = "APPROVED" if approved else "REJECTED"
         approval_id = uuid4()
+        assurance = (
+            CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SOLIDARITY,
+                    effect=ExposureEffect.RESERVE,
+                    subject_type="aid_allocation",
+                    subject_id=allocation.id,
+                    amount=allocation.quantity,
+                    unit=allocation.unit_code,
+                    basis_refs=(allocation.allocation_hash,),
+                ),
+                evidence_refs=(
+                    {
+                        "event_id": str(allocation.proposed_event_id),
+                        "allocation_hash": allocation.allocation_hash,
+                        "kind": "ALLOCATION_PROPOSAL",
+                    },
+                ),
+            )
+            if approved
+            else None
+        )
         event = await self.journal.append(
             session,
             event_type=(
@@ -965,6 +993,7 @@ class SolidarityService:
             aggregate_version=allocation.version + 1,
             actor=actor,
             payload={**payload, "approval_id": str(approval_id), "decision": decision},
+            assurance=assurance,
         )
         session.add(
             AllocationApproval(
@@ -1059,6 +1088,13 @@ class SolidarityService:
         )
         refs = evidence_payload(evidence)
         delivery_id = uuid4()
+        evidence_refs = (
+            *refs,
+            {
+                "event_id": str(approval.decided_event_id),
+                "kind": "ALLOCATION_APPROVAL",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="solidarity.aid_delivered",
@@ -1072,6 +1108,18 @@ class SolidarityService:
                 "recipient_member_id": str(allocation.recipient_member_id),
                 "evidence": refs,
             },
+            assurance=CommandAssurance(
+                exposure=ExposureClaim(
+                    category=ExposureCategory.SOLIDARITY,
+                    effect=ExposureEffect.EXECUTE,
+                    subject_type="aid_allocation",
+                    subject_id=allocation.id,
+                    amount=allocation.quantity,
+                    unit=allocation.unit_code,
+                    basis_refs=(allocation.allocation_hash,),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             AidDelivery(

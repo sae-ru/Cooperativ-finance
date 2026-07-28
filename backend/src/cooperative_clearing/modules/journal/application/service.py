@@ -8,6 +8,15 @@ from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from cooperative_clearing.modules.identity.infrastructure.models import (
+    RoleAssignment,
+    UserAccount,
+)
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CRITICAL_EVENT_TYPES,
+    CommandAssurance,
+    ExposureClaim,
+)
 from cooperative_clearing.modules.journal.domain.crypto import (
     CANONICALIZATION_PROFILE,
     SIGNATURE_ALGORITHM,
@@ -145,6 +154,7 @@ class SignedJournalService:
         actor: ActorClaim,
         payload: dict[str, object],
         evidence: list[object] | None = None,
+        assurance: CommandAssurance | None = None,
         occurred_at: datetime | None = None,
         schema_version: int = 1,
         offline_epoch_id: UUID | None = None,
@@ -155,6 +165,19 @@ class SignedJournalService:
                 message_key="errors.journal.event_envelope_invalid",
                 status_code=422,
             )
+        assignment, user = await self._validate_actor_claim(session, actor)
+        evidence_items = list(assurance.evidence_refs) if assurance is not None else evidence or []
+        event_payload = self._assured_payload(
+            event_type=event_type,
+            payload=payload,
+            evidence=evidence_items,
+            assurance=assurance,
+            actor=actor,
+            role_code=assignment.role_code,
+            role_source=assignment.source,
+            user_id=user.id,
+            role_cooperative_id=assignment.cooperative_id,
+        )
         profile = (
             await session.execute(
                 select(NodeProfile).where(NodeProfile.node_code == self.settings.node_code)
@@ -185,7 +208,7 @@ class SignedJournalService:
 
         event_id = uuid4()
         timestamp = (occurred_at or datetime.now(UTC)).astimezone(UTC)
-        payload_digest = payload_hash(payload)
+        payload_digest = payload_hash(event_payload)
         envelope = build_envelope(
             event_id=event_id,
             event_type=event_type,
@@ -197,8 +220,8 @@ class SignedJournalService:
             aggregate_version=aggregate_version,
             actor=actor,
             occurred_at=timestamp,
-            payload=payload,
-            evidence=evidence or [],
+            payload=event_payload,
+            evidence=evidence_items,
             previous_event_hash=chain.last_event_hash,
             payload_digest=payload_digest,
             offline_epoch_id=offline_epoch_id,
@@ -223,8 +246,8 @@ class SignedJournalService:
             actor_organization_id=actor.organization_id,
             actor_role_assignment_id=actor.role_assignment_id,
             occurred_at=timestamp,
-            payload=payload,
-            evidence=evidence or [],
+            payload=event_payload,
+            evidence=evidence_items,
             previous_event_hash=chain.last_event_hash,
             payload_hash=payload_digest,
             event_hash=event_digest,
@@ -262,6 +285,79 @@ class SignedJournalService:
         chain.last_event_hash = event_digest
         chain.updated_at = datetime.now(UTC)
         return AppendedEvent(event_id, event_digest, sequence)
+
+    @staticmethod
+    async def _validate_actor_claim(
+        session: AsyncSession, actor: ActorClaim
+    ) -> tuple[RoleAssignment, UserAccount]:
+        assignment = await session.get(RoleAssignment, actor.role_assignment_id)
+        if assignment is None or assignment.status != "ACTIVE":
+            raise _actor_error("ACTOR_ROLE_INACTIVE")
+        user = await session.get(UserAccount, assignment.user_id)
+        if user is None or user.status != "ACTIVE":
+            raise _actor_error("ACTOR_USER_INACTIVE")
+        if user.member_id != actor.person_id:
+            raise _actor_error("ACTOR_PERSON_MISMATCH")
+        if (
+            assignment.cooperative_id is not None
+            and assignment.cooperative_id != actor.organization_id
+        ):
+            raise _actor_error("ACTOR_SCOPE_MISMATCH")
+        return assignment, user
+
+    @staticmethod
+    def _assured_payload(
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        evidence: list[object],
+        assurance: CommandAssurance | None,
+        actor: ActorClaim,
+        role_code: str,
+        role_source: str,
+        user_id: UUID,
+        role_cooperative_id: UUID | None,
+    ) -> dict[str, object]:
+        if "_command_assurance" in payload:
+            raise _actor_error("COMMAND_ASSURANCE_RESERVED")
+        if event_type in CRITICAL_EVENT_TYPES and assurance is None:
+            raise _actor_error("CRITICAL_COMMAND_ASSURANCE_REQUIRED")
+        if assurance is None:
+            return payload
+        if not evidence:
+            raise _actor_error("CRITICAL_COMMAND_EVIDENCE_REQUIRED")
+        return {
+            **payload,
+            "_command_assurance": {
+                "format": "critical-command-assurance-v1",
+                "actor": {
+                    "person_id": str(actor.person_id),
+                    "user_id": str(user_id),
+                },
+                "role": {
+                    "assignment_id": str(actor.role_assignment_id),
+                    "code": role_code,
+                    "source": role_source,
+                },
+                "scope": {
+                    "actor_organization_id": (
+                        str(actor.organization_id)
+                        if actor.organization_id is not None
+                        else None
+                    ),
+                    "role_cooperative_id": (
+                        str(role_cooperative_id)
+                        if role_cooperative_id is not None
+                        else None
+                    ),
+                },
+                "evidence": {
+                    "count": len(evidence),
+                    "digest": sha256_ref(canonicalize(evidence)),
+                },
+                "exposure": _exposure_payload(assurance.exposure),
+            },
+        }
 
 
 def build_envelope(
@@ -410,3 +506,39 @@ def _service_error(code: str) -> DomainError:
         message_key=f"errors.journal.{code.lower()}",
         status_code=503,
     )
+
+
+def _actor_error(code: str) -> DomainError:
+    return DomainError(
+        code=code,
+        message_key=f"errors.journal.{code.lower()}",
+        status_code=409,
+    )
+
+
+def _exposure_payload(claim: ExposureClaim) -> dict[str, object]:
+    subject_type = claim.subject_type.strip()
+    unit = claim.unit.strip() if claim.unit is not None else None
+    basis_refs = tuple(item.strip() for item in claim.basis_refs if item.strip())
+    if not subject_type:
+        raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
+    if claim.amount is not None and claim.amount <= 0:
+        raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
+    if claim.maximum_loss is not None and claim.maximum_loss < 0:
+        raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
+    if (claim.amount is None) != (unit is None):
+        raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
+    if claim.amount is None and not basis_refs:
+        raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
+    return {
+        "category": claim.category.value,
+        "effect": claim.effect.value,
+        "subject_type": subject_type,
+        "subject_id": str(claim.subject_id),
+        "amount": format(claim.amount, "f") if claim.amount is not None else None,
+        "unit": unit,
+        "maximum_loss": (
+            format(claim.maximum_loss, "f") if claim.maximum_loss is not None else None
+        ),
+        "basis_refs": list(basis_refs),
+    }

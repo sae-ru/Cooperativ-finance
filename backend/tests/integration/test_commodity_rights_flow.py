@@ -179,6 +179,38 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
             await session.commit()
 
         rights = CommodityRightsService(settings)
+        issue_outcomes: list[object] = []
+
+        async def issue_once(attempt: str) -> None:
+            try:
+                async with database.session() as session:
+                    result = await rights.issue(
+                        session,
+                        principal=operator,
+                        lot_id=registered.object_id,
+                        owner_member_id=members["owner"],
+                        quantity=Decimal("1"),
+                        redeem_warehouse_id=warehouse.object_id,
+                        valid_until=None,
+                        expected_balance_version=1,
+                        idempotency_key=f"{suffix}-concurrent-issue-{attempt}",
+                        request_id=uuid4(),
+                    )
+                    await session.commit()
+                    issue_outcomes.append(result)
+            except DomainError as exc:
+                issue_outcomes.append(exc)
+
+        await asyncio.gather(issue_once("a"), issue_once("b"))
+        assert len(
+            [item for item in issue_outcomes if not isinstance(item, DomainError)]
+        ) == 1
+        issue_conflicts = [
+            item for item in issue_outcomes if isinstance(item, DomainError)
+        ]
+        assert len(issue_conflicts) == 1
+        assert issue_conflicts[0].code == "VERSION_CONFLICT"
+
         async with database.session() as session:
             pending = await rights.issue(
                 session,
@@ -188,7 +220,7 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
                 quantity=Decimal("25"),
                 redeem_warehouse_id=warehouse.object_id,
                 valid_until=None,
-                expected_balance_version=1,
+                expected_balance_version=2,
                 idempotency_key=str(uuid4()),
                 request_id=uuid4(),
             )
@@ -200,7 +232,7 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
                 quantity=Decimal("10"),
                 redeem_warehouse_id=warehouse.object_id,
                 valid_until=None,
-                expected_balance_version=2,
+                expected_balance_version=3,
                 idempotency_key=str(uuid4()),
                 request_id=uuid4(),
             )
@@ -212,7 +244,7 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
                 quantity=Decimal("5"),
                 redeem_warehouse_id=warehouse.object_id,
                 valid_until=None,
-                expected_balance_version=3,
+                expected_balance_version=4,
                 idempotency_key=str(uuid4()),
                 request_id=uuid4(),
             )
@@ -272,8 +304,8 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
             assert balance is not None
             pending_version = pending_right.version
             balance_version = balance.version
-            assert balance.available_quantity == 60
-            assert balance.rights_issued_quantity == 40
+            assert balance.available_quantity == 59
+            assert balance.rights_issued_quantity == 41
 
         outcomes: list[object] = []
 
@@ -310,8 +342,8 @@ async def test_commodity_rights_are_backed_signed_and_redeemed_once() -> None:
             assert lot is not None
             assert balance is not None
             assert lot.current_quantity == balance.verified_quantity == 75
-            assert balance.available_quantity == 60
-            assert balance.rights_issued_quantity == 15
+            assert balance.available_quantity == 59
+            assert balance.rights_issued_quantity == 16
             assert balance.version == balance_version + 1
             node = (
                 await session.execute(

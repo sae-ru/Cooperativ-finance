@@ -70,7 +70,7 @@ cat > "$destination/manifest.json" <<EOF
   "repeat_count": $repeats,
   "duration_seconds": $duration_seconds,
   "previous_schema": "0034_custody_continuity",
-  "current_schema": "0036_fulfillment_traceability",
+  "current_schema": "0037_actor_assurance",
   "openapi_baseline": "0.1.0"
 }
 EOF

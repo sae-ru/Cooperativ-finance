@@ -61,6 +61,12 @@ from cooperative_clearing.modules.inventory.infrastructure.models import (
     UnitOfMeasure,
 )
 from cooperative_clearing.modules.journal.application.service import SignedJournalService
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+)
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.shared.core.config import Settings
 
@@ -1010,6 +1016,14 @@ class ClearingService:
                 raise clearing_error("FINALIZE_INPUT_VERSION_CONFLICT", 409)
             if entry.cleared_amount <= 0:
                 continue
+            evidence_refs = (
+                {
+                    "cycle_id": str(cycle.id),
+                    "input_hash": cycle.input_hash,
+                    "result_hash": result.result_hash,
+                    "kind": "CLEARING_RESULT",
+                },
+            )
             event = await self.journal.append(
                 session,
                 event_type="obligations.obligation_cleared",
@@ -1025,6 +1039,17 @@ class ClearingService:
                     "amount_after": decimal_string(entry.amount_after),
                     "result_hash": result.result_hash,
                 },
+                assurance=CommandAssurance(
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.OBLIGATION,
+                        effect=ExposureEffect.REDUCE,
+                        subject_type="obligation",
+                        subject_id=obligation.id,
+                        amount=entry.cleared_amount,
+                        unit=str(obligation.unit_id),
+                    ),
+                    evidence_refs=evidence_refs,
+                ),
             )
             obligation.quantity_cleared += entry.cleared_amount
             amounts = ExchangeService._amounts(obligation)
