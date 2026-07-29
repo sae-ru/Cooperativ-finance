@@ -85,6 +85,11 @@ Domain не импортирует FastAPI, SQLAlchemy, HTTP-клиенты ил
 Ответ не сообщает об успехе до commit. Сбой worker после commit не отменяет
 хозяйственное событие.
 
+На commit PostgreSQL deferred trigger независимо требует для каждого нового
+signed event ровно одну NODE signature и одну canonical outbox row. Worker
+блокирует только outbox, сверяет её с immutable event и атомарно сохраняет
+идемпотентную consumer receipt вместе со статусом публикации.
+
 ## Контуры данных
 
 1. Операционный: изменяемые таблицы актуального состояния.

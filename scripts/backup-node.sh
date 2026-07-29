@@ -16,6 +16,7 @@ if [ -z "$release" ] && [ -f "$root_dir/.env" ]; then
   release="$(sed -n 's/^COOP_RELEASE=//p' "$root_dir/.env" | tail -n 1)"
 fi
 release="${release:-0.1.0-dev}"
+consistency_verifier_release="${COOP_BACKUP_VERIFIER_RELEASE:-$release}"
 verified_release_bundle="${COOP_VERIFIED_RELEASE_BUNDLE:-$(runtime_setting COOP_VERIFIED_RELEASE_BUNDLE)}"
 release_public_key="${COOP_RELEASE_PUBLIC_KEY:-$(runtime_setting COOP_RELEASE_PUBLIC_KEY)}"
 policy_sha256="${COOP_RELEASE_LICENSE_POLICY_SHA256:-$(runtime_setting COOP_RELEASE_LICENSE_POLICY_SHA256)}"
@@ -61,8 +62,6 @@ if [ -z "$api_container" ] || [ -z "$worker_container" ] ||
   echo "API and worker must be running before a coordinated backup." >&2
   exit 1
 fi
-"${compose[@]}" exec -T api coopctl verify-journal > "$work_dir/journal-verification.json"
-
 if [ -n "$verified_release_bundle" ]; then
   verified_release_bundle="$(realpath "$verified_release_bundle")"
   if [ -z "$release_public_key" ]; then
@@ -93,6 +92,20 @@ fi
 docker stop "$api_container" "$worker_container" >/dev/null
 services_stopped=1
 
+COOP_RELEASE="$consistency_verifier_release" "${compose[@]}" run --rm --no-deps api \
+  coopctl verify-restore-consistency > "$work_dir/restore-consistency.json"
+"${compose[@]}" run --rm --no-deps api \
+  coopctl verify-journal > "$work_dir/journal-verification.json"
+
+"${compose[@]}" exec -T postgres psql -X -qAt -v ON_ERROR_STOP=1 \
+  -U coop_migrator -d cooperative_clearing -f - \
+  < "$root_dir/infra/postgres/verify-secret-storage.sql" \
+  > "$work_dir/secret-storage-verification.txt"
+if ! grep -qx 'secret_storage=PASS' "$work_dir/secret-storage-verification.txt"; then
+  echo "Secret storage verification did not produce PASS." >&2
+  exit 1
+fi
+
 "${compose[@]}" exec -T postgres sh -ec '
   export PGPASSWORD="$(cat /run/secrets/postgres_migrator_password)"
   exec pg_dump -h 127.0.0.1 -U coop_migrator -d cooperative_clearing --format=custom --compress=9 --no-owner
@@ -117,6 +130,8 @@ if [ -n "${COOP_ENCRYPTED_RECOVERY_BUNDLE:-}" ]; then
   cp "$recovery_bundle" "$work_dir/recovery.bundle.enc"
   recovery_material="included-encrypted"
 fi
+"$python_bin" "$root_dir/scripts/supply_secret_audit.py" backup \
+  --directory "$work_dir" > "$work_dir/backup-secret-audit.json"
 backup_kind="DATA_ONLY"
 if [ "$recovery_material" = "included-encrypted" ] &&
    [ "$release_material" = "included-verified" ]; then
@@ -124,22 +139,26 @@ if [ "$recovery_material" = "included-encrypted" ] &&
 fi
 
 cat > "$work_dir/manifest.env" <<EOF
-format=cooperative-clearing-backup-v1
+format=cooperative-clearing-backup-v2
 backup_id=$backup_id
 backup_kind=$backup_kind
 created_at=$timestamp
 release=$release
+consistency_verifier_release=$consistency_verifier_release
 schema=$(tr '\n' ' ' < "$work_dir/schema.txt" | sed 's/[[:space:]]\+/ /g')
 database=database.dump
 blobs=blobs.tar.gz
 recovery_material=$recovery_material
 release_material=$release_material
 release_manifest_sha256=$release_manifest_sha256
+secret_storage_verification=secret-storage-verification.txt
+backup_secret_audit=backup-secret-audit.json
+restore_consistency=restore-consistency.json
 EOF
 
 (
   cd "$work_dir"
-  files=(database.dump blobs.tar.gz journal-verification.json schema.txt compose.yaml manifest.env)
+  files=(database.dump blobs.tar.gz journal-verification.json restore-consistency.json schema.txt compose.yaml manifest.env secret-storage-verification.txt backup-secret-audit.json)
   if [ -f runtime.env ]; then
     files+=(runtime.env)
   fi

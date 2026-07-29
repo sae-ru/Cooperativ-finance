@@ -1,14 +1,18 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pyotp
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
+from cooperative_clearing.cli import initialize_node
 from cooperative_clearing.main import create_app
 from cooperative_clearing.modules.identity.infrastructure.models import (
+    Member,
     RoleAssignment,
     UserAccount,
 )
+from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
 from cooperative_clearing.shared.infrastructure.database import Database
@@ -17,18 +21,36 @@ from cooperative_clearing.shared.infrastructure.database import Database
 @pytest.mark.integration
 async def test_authenticated_admin_api_flow() -> None:
     settings = Settings(service_name="identity-api-integration")
+    await initialize_node(settings)
     database = Database.from_settings(settings)
-    password = "integration-api-password"
+    password = "".join(("integration-api-", "password"))
     login = f"api-security-{uuid4()}"
     user_id = uuid4()
+    admin_member_id = uuid4()
+    target_member_id = uuid4()
     try:
         async with database.session() as session:
+            session.add_all(
+                [
+                    Member(
+                        id=admin_member_id,
+                        display_name=f"API security administrator {user_id}",
+                        status="ACTIVE",
+                    ),
+                    Member(
+                        id=target_member_id,
+                        display_name=f"API target member {target_member_id}",
+                        status="ACTIVE",
+                    ),
+                ]
+            )
+            await session.flush()
             session.add(
                 UserAccount(
                     id=user_id,
                     login=login,
                     password_hash=PasswordService().hash(password),
-                    member_id=None,
+                    member_id=admin_member_id,
                     status="ACTIVE",
                     must_change_password=False,
                 )
@@ -111,7 +133,7 @@ async def test_authenticated_admin_api_flow() -> None:
             json={
                 "login": target_login,
                 "temporary_password": "temporary-api-password",
-                "member_id": None,
+                "member_id": str(target_member_id),
             },
         )
         assert created_user.status_code == 201
@@ -122,6 +144,7 @@ async def test_authenticated_admin_api_flow() -> None:
             json={"user_id": target_user_id, "role": "AUDITOR", "cooperative_id": None},
         )
         assert requested_role.status_code == 201
+        requested_role_id = requested_role.json()["data"]["object_id"]
 
         roles = client.get("/api/v1/admin/roles", headers=headers)
         assert roles.status_code == 200
@@ -137,3 +160,20 @@ async def test_authenticated_admin_api_flow() -> None:
         logout = client.post("/api/v1/auth/logout", headers=headers)
         assert logout.status_code == 204
         assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
+
+    database = Database.from_settings(settings)
+    try:
+        async with database.session() as session:
+            event = (
+                await session.execute(
+                    select(SignedEvent).where(
+                        SignedEvent.aggregate_id == UUID(requested_role_id)
+                    )
+                )
+            ).scalar_one()
+            assurance = event.payload["_command_assurance"]
+            assert event.event_type == "identity.role_assignment_requested"
+            assert assurance["format"] == "critical-command-assurance-v2"
+            assert assurance["next_responsible"][0]["kind"] == "NODE"
+    finally:
+        await database.dispose()

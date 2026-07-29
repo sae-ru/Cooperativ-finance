@@ -12,6 +12,7 @@ from cooperative_clearing.modules.journal.application.service import OUTBOX_TOPI
 from cooperative_clearing.modules.journal.infrastructure.models import (
     ConsumerReceipt,
     OutboxMessage,
+    SignedEvent,
 )
 
 LOCAL_CONSUMER = "local-journal-projector-v1"
@@ -42,24 +43,25 @@ async def dispatch_outbox_batch(
             OutboxMessage.lease_expires_at <= now,
         ),
     )
-    messages = list(
+    rows = list(
         (
             await session.execute(
-                select(OutboxMessage)
+                select(OutboxMessage, SignedEvent)
+                .join(SignedEvent, SignedEvent.event_id == OutboxMessage.event_id)
                 .where(ready)
                 .order_by(OutboxMessage.available_at, OutboxMessage.id)
                 .limit(batch_size)
-                .with_for_update(skip_locked=True)
+                .with_for_update(skip_locked=True, of=OutboxMessage)
             )
-        ).scalars()
+        ).all()
     )
     published = retried = quarantined = 0
-    for message in messages:
+    for message, event in rows:
         message.status = "PROCESSING"
         message.lease_owner = instance_id
         message.lease_expires_at = now + timedelta(seconds=lease_seconds)
         message.attempt_count += 1
-        error_code = _validate_message(message)
+        error_code = _validate_message(message, event)
         if error_code is None:
             receipt = (
                 insert(ConsumerReceipt)
@@ -90,12 +92,20 @@ async def dispatch_outbox_batch(
             delay_seconds = min(300, 2 ** min(message.attempt_count, 8))
             message.available_at = now + timedelta(seconds=delay_seconds)
             retried += 1
-    return DispatchResult(len(messages), published, retried, quarantined)
+    return DispatchResult(len(rows), published, retried, quarantined)
 
 
-def _validate_message(message: OutboxMessage) -> str | None:
+def _validate_message(message: OutboxMessage, event: SignedEvent) -> str | None:
     if message.topic != OUTBOX_TOPIC:
         return "OUTBOX_TOPIC_UNSUPPORTED"
     if str(message.payload.get("event_id")) != str(message.event_id):
         return "OUTBOX_EVENT_ID_MISMATCH"
+    expected_payload = {
+        "event_type": event.event_type,
+        "event_hash": event.event_hash,
+        "node_id": str(event.node_id),
+        "local_sequence": event.local_sequence,
+    }
+    if any(message.payload.get(key) != value for key, value in expected_payload.items()):
+        return "OUTBOX_EVENT_ENVELOPE_MISMATCH"
     return None

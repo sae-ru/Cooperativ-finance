@@ -872,6 +872,7 @@ async def assign_role(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     if payload.role in {
         RoleCode.SECURITY_ADMIN,
@@ -895,7 +896,7 @@ async def assign_role(
             request_id=_request_uuid(),
         )
         try:
-            result = await IdentityAdminService().assign_role(
+            result = await IdentityAdminService(settings=settings).assign_role(
                 session,
                 principal=principal,
                 user_id=payload.user_id,
@@ -918,6 +919,7 @@ async def decide_role(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     require_permanent_role(principal, {RoleCode.SECURITY_ADMIN, RoleCode.AUDITOR})
     async with database.session() as session:
@@ -928,7 +930,7 @@ async def decide_role(
             emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
             request_id=_request_uuid(),
         )
-        result = await IdentityAdminService().decide_role(
+        result = await IdentityAdminService(settings=settings).decide_role(
             session,
             principal=principal,
             assignment_id=assignment_id,
@@ -948,6 +950,7 @@ async def revoke_role(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     require_permanent_role(principal, {RoleCode.SECURITY_ADMIN})
     async with database.session() as session:
@@ -958,7 +961,7 @@ async def revoke_role(
             emergency_roles=frozenset({RoleCode.SECURITY_ADMIN}),
             request_id=_request_uuid(),
         )
-        result = await IdentityAdminService().revoke_role(
+        result = await IdentityAdminService(settings=settings).revoke_role(
             session,
             principal=principal,
             assignment_id=assignment_id,

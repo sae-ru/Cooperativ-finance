@@ -17,6 +17,12 @@
 
 Частичный commit запрещён.
 
+Migration `0038_atomic_event_outbox` проверяет это на границе БД. Deferred
+constraint trigger разрешает промежуточный flush события, но в момент commit
+требует ровно одну NODE signature и ровно одну canonical outbox row. Поэтому
+ошибка приложения, прямой SQL или injected failure не могут оставить
+зафиксированное событие без доставки; нарушение откатывает и доменные строки.
+
 ## Уровень изоляции и блокировки
 
 По умолчанию используется `READ COMMITTED` с явными row locks и условными
@@ -70,6 +76,36 @@ request body. Повтор с тем же hash возвращает сохран
 `recorded_at` является локальным полем хранения и не входит в утверждение
 исполнителя. Исправление часов фиксируется отдельным событием.
 
+Для event type из канонического critical registry payload обязательно содержит
+`_command_assurance.format = critical-command-assurance-v2`. Снимок включает
+проверенные `performed_by`, `on_behalf_of`, role/scope, evidence digest, точную
+exposure, attesters, approvers и `next_responsible`. И payload, и полный список
+evidence входят в canonical envelope, поэтому любое изменение обнаруживается
+проверкой hash/signature.
+
+Формат v1 и события до введения реестра остаются неизменной историей. Они не
+backfill-ятся через UPDATE и рассматриваются как legacy findings при
+операторском review.
+
+Для lifecycle роли request передаёт следующий шаг cooperative/node scope,
+activation и approval — целевому member, rejection и revoke — обратно владельцу
+scope. Requester и независимый decider сохраняются как attester/approver, а
+изменение `RoleAssignment` и signed event фиксируются одной транзакцией.
+
+Для trust/crisis команд exposure различает `GOVERNANCE`, `SANCTION`,
+`REPUTATION` и `CRISIS`. Решения сохраняют независимого actor как approver,
+предыдущих участников цепочки как attesters и затронутого member/cooperative
+как `next_responsible`. Положительные количества резервов и выдачи содержат
+exact Decimal и unit; нулевой физический остаток остаётся доказанным payload
+без ложной положительной exposure.
+
+Для node authority представляемой стороной является локальный `NODE`, а
+внешний узел и все его действующие именованные ответственные входят в
+`next_responsible`. Onboarding сохраняет принятие ролей и challenge history;
+trust/limit/bond — terms/evidence и точный maximum loss; incident/key lifecycle
+— fingerprints, continuity и независимое решение; offline/exposure — внешний
+node, лимиты, reconciliation, Decimal amount и unit.
+
 ## Канонизация и подпись
 
 - подписывается каноническое представление envelope без `signatures`;
@@ -92,6 +128,12 @@ Worker выбирает готовые строки небольшими пак�
 фиксирует lease, обрабатывает идемпотентно и записывает результат. После
 ограниченного числа попыток запись получает `QUARANTINED`; хозяйственная
 транзакция остаётся действительной, а оператор получает alert.
+
+Блокировка применяется только к `outbox_messages`. Связанное immutable событие
+читается для сверки `event_id`, `event_type`, `event_hash`, `node_id` и
+`local_sequence`. Consumer receipt и `PUBLISHED` находятся в одной worker
+transaction: crash до commit откатывает оба, а повторный worker безопасно
+забирает `PENDING` или строку с истекшим lease.
 
 ## Inbox и импорт
 
@@ -118,3 +160,16 @@ RECEIVED -> VERIFIED -> SIMULATED -> APPLIED
 Read model можно удалить и перестроить из операционных таблиц и журнала. У него
 есть `projection_version` и cursor последнего события. Отчёт показывает время
 актуальности. Read model не подписывает хозяйственное утверждение.
+
+## Заранее выделенный event UUID
+
+Команда, которая должна записать event FK во все изменяемые строки, может заранее
+выделить UUID и передать его `SignedJournalService.append(event_id=...)`. До
+вызова append этот UUID ставится в state rows; journal validation выполняется
+внутри `session.no_autoflush`, затем explicit flush видит и event, и state.
+
+FK должен быть `DEFERRABLE INITIALLY DEFERRED`, а commit-level journal trigger
+по-прежнему требует NODE signature и outbox. Эта схема используется адресной
+книгой, где одна команда может одновременно снять прежний default и создать
+новый. UUID не считается событием до успешного commit; любой отказ откатывает
+весь набор строк.

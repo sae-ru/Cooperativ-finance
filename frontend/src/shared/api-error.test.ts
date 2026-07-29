@@ -23,6 +23,18 @@ describe("userErrorMessage", () => {
       userErrorMessage(new AdminApiError("AMOUNT_INVALID", "request-1", 422), "en"),
     ).toBe("Enter an amount greater than zero. Use digits and a decimal separator only.");
   });
+  it("explains a failed critical-command responsibility check", () => {
+    expect(
+      userErrorMessage(
+        new AdminApiError(
+          "CRITICAL_COMMAND_ASSURANCE_REQUIRED",
+          "request-assurance",
+          409,
+        ),
+        "ru",
+      ),
+    ).toBe(i18n.getFixedT("ru")("errors.commandAssuranceFailed"));
+  });
 
   it("explains why emergency access cannot delegate permanent roles", () => {
     expect(

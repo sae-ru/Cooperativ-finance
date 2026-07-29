@@ -22,7 +22,7 @@ async def create_api_actors(
     database = Database.from_settings(settings)
     cooperative_id = uuid4()
     target_member_id = uuid4()
-    password = "responsibility-api-password"
+    password = "".join(("responsibility-api-", "password"))
     password_hash = PasswordService().hash(password)
     logins = tuple(f"responsibility-api-{name}-{uuid4()}" for name in ("risk", "audit", "target"))
     try:

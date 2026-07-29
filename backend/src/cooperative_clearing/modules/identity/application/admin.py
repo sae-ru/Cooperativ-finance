@@ -43,10 +43,26 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     RoleAssignment,
     UserAccount,
 )
+from cooperative_clearing.modules.journal.application.service import (
+    ActorClaim,
+    SignedJournalService,
+)
+from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    actor_party,
+    member_party,
+    node_party,
+)
 from cooperative_clearing.modules.trust.application.enforcement import (
     ROLE_ASSIGNMENT_CREATE,
     require_member_action_allowed,
 )
+from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService, private_value_hash
 from cooperative_clearing.shared.domain.errors import DomainError
 
@@ -58,9 +74,20 @@ class CommandResult:
     replayed: bool
 
 
+ROLE_ADMIN_ACTOR_ROLES = frozenset(
+    {RoleCode.SECURITY_ADMIN, RoleCode.COOPERATIVE_ADMIN, RoleCode.AUDITOR}
+)
+
+
 class IdentityAdminService:
-    def __init__(self, passwords: PasswordService | None = None) -> None:
+    def __init__(
+        self,
+        passwords: PasswordService | None = None,
+        settings: Settings | None = None,
+    ) -> None:
         self.passwords = passwords or PasswordService()
+        self.settings = settings or Settings()
+        self.journal = SignedJournalService(self.settings)
 
     async def create_cooperative(
         self,
@@ -632,24 +659,28 @@ class IdentityAdminService:
                 message_key="errors.identity.user_not_active",
                 status_code=409,
             )
-        if target_user.member_id is not None:
-            target_member = await session.get(Member, target_user.member_id)
-            if target_member is None or target_member.status != MemberStatus.ACTIVE.value:
-                raise DomainError(
-                    code="MEMBER_NOT_ACTIVE",
-                    message_key="errors.identity.member_not_active",
-                    status_code=409,
-                )
+        if target_user.member_id is None:
+            raise DomainError(
+                code="PERSONAL_ACTOR_REQUIRED",
+                message_key="errors.identity.personal_actor_required",
+                status_code=403,
+            )
+        target_member = await session.get(Member, target_user.member_id)
+        if target_member is None or target_member.status != MemberStatus.ACTIVE.value:
+            raise DomainError(
+                code="MEMBER_NOT_ACTIVE",
+                message_key="errors.identity.member_not_active",
+                status_code=409,
+            )
         if cooperative_id is not None and await session.get(Cooperative, cooperative_id) is None:
             raise self._not_found("COOPERATIVE_NOT_FOUND")
-        if target_user.member_id is not None:
-            await require_member_action_allowed(
-                session,
-                cooperative_id=cooperative_id,
-                member_ids={target_user.member_id},
-                action=ROLE_ASSIGNMENT_CREATE,
-                target_role=role.value,
-            )
+        await require_member_action_allowed(
+            session,
+            cooperative_id=cooperative_id,
+            member_ids={target_user.member_id},
+            action=ROLE_ASSIGNMENT_CREATE,
+            target_role=role.value,
+        )
         status = (
             AssignmentStatus.PENDING_APPROVAL
             if role in PRIVILEGED_ROLES
@@ -662,10 +693,63 @@ class IdentityAdminService:
             cooperative_id=cooperative_id,
             status=status.value,
             granted_by_user_id=principal.user_id,
-            approved_by_user_id=None,
+            approved_by_user_id=(
+                principal.user_id if status is AssignmentStatus.ACTIVE else None
+            ),
+            approved_at=(
+                datetime.now(UTC) if status is AssignmentStatus.ACTIVE else None
+            ),
         )
         session.add(assignment)
-        event_id = await AuditRepository(session).record(
+        actor = self._role_actor(principal, cooperative_id)
+        scope_party = self._role_scope_party(actor)
+        target_party = self._role_target_party(target_user)
+        signed_event = await self.journal.append(
+            session,
+            event_type=(
+                "identity.role_assignment_requested"
+                if status is AssignmentStatus.PENDING_APPROVAL
+                else "identity.role_assignment_activated"
+            ),
+            aggregate_type="role_assignment",
+            aggregate_id=assignment.id,
+            aggregate_version=1,
+            actor=actor,
+            payload={
+                "target_user_id": str(user_id),
+                "target_member_id": str(target_user.member_id),
+                "role": role.value,
+                "cooperative_id": str(cooperative_id) if cooperative_id else None,
+                "status": status.value,
+            },
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=(
+                        ExposureEffect.REQUEST
+                        if status is AssignmentStatus.PENDING_APPROVAL
+                        else ExposureEffect.CREATE
+                    ),
+                    subject_type="role_assignment",
+                    subject_id=assignment.id,
+                    basis_refs=(role.value, record.request_hash),
+                ),
+                evidence_refs=self._role_evidence(record, principal),
+                next_responsible=(
+                    (scope_party,)
+                    if status is AssignmentStatus.PENDING_APPROVAL
+                    else (target_party,)
+                ),
+                attesters=(actor_party(actor),),
+                approvers=(
+                    (actor_party(actor),)
+                    if status is AssignmentStatus.ACTIVE
+                    else ()
+                ),
+            ),
+        )
+        await AuditRepository(session).record(
             action="ROLE_ASSIGNMENT_REQUESTED" if role in PRIVILEGED_ROLES else "ROLE_ASSIGNED",
             object_type="RoleAssignment",
             object_id=assignment.id,
@@ -675,7 +759,7 @@ class IdentityAdminService:
             request_id=request_id,
             payload={"target_user_id": str(user_id), "role": role.value, "status": status.value},
         )
-        return self._complete(record, event_id, assignment.id)
+        return self._complete(record, signed_event.event_id, assignment.id)
 
     async def decide_role(
         self,
@@ -715,11 +799,63 @@ class IdentityAdminService:
                 message_key="errors.identity.independent_approver_required",
                 status_code=403,
             )
+        target_user = await session.get(UserAccount, assignment.user_id)
+        requester = (
+            await session.get(UserAccount, assignment.granted_by_user_id)
+            if assignment.granted_by_user_id is not None
+            else None
+        )
+        if target_user is None or requester is None:
+            raise self._not_found("USER_NOT_FOUND")
+        target_party = self._role_target_party(target_user)
+        requester_party = self._role_target_party(requester)
         assignment.status = "ACTIVE" if approve else "REJECTED"
         assignment.approved_by_user_id = principal.user_id
         assignment.approved_at = datetime.now(UTC)
         assignment.version += 1
-        event_id = await AuditRepository(session).record(
+        actor = self._role_actor(principal, assignment.cooperative_id)
+        scope_party = self._role_scope_party(actor)
+        signed_event = await self.journal.append(
+            session,
+            event_type=(
+                "identity.role_assignment_approved"
+                if approve
+                else "identity.role_assignment_rejected"
+            ),
+            aggregate_type="role_assignment",
+            aggregate_id=assignment.id,
+            aggregate_version=assignment.version,
+            actor=actor,
+            payload={
+                "target_user_id": str(assignment.user_id),
+                "target_member_id": str(target_user.member_id),
+                "role": assignment.role_code,
+                "cooperative_id": (
+                    str(assignment.cooperative_id)
+                    if assignment.cooperative_id is not None
+                    else None
+                ),
+                "reason_code": reason_code,
+                "status": assignment.status,
+            },
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=(
+                        ExposureEffect.APPROVE if approve else ExposureEffect.REJECT
+                    ),
+                    subject_type="role_assignment",
+                    subject_id=assignment.id,
+                    basis_refs=(assignment.role_code, reason_code, record.request_hash),
+                ),
+                evidence_refs=self._role_evidence(record, principal, reason_code),
+                next_responsible=(target_party,) if approve else (scope_party,),
+                attesters=(requester_party,),
+                approvers=(actor_party(actor),),
+            ),
+        )
+        await AuditRepository(session).record(
             action="ROLE_ASSIGNMENT_APPROVED" if approve else "ROLE_ASSIGNMENT_REJECTED",
             object_type="RoleAssignment",
             object_id=assignment.id,
@@ -730,7 +866,7 @@ class IdentityAdminService:
             request_id=request_id,
             payload={"target_user_id": str(assignment.user_id), "role": assignment.role_code},
         )
-        return self._complete(record, event_id, assignment.id)
+        return self._complete(record, signed_event.event_id, assignment.id)
 
     async def revoke_role(
         self,
@@ -763,10 +899,48 @@ class IdentityAdminService:
                 message_key="errors.identity.role_assignment_not_active",
                 status_code=409,
             )
+        target_user = await session.get(UserAccount, assignment.user_id)
+        if target_user is None:
+            raise self._not_found("USER_NOT_FOUND")
         assignment.status = "REVOKED"
         assignment.revoked_at = datetime.now(UTC)
         assignment.version += 1
-        event_id = await AuditRepository(session).record(
+        actor = self._role_actor(principal, assignment.cooperative_id)
+        scope_party = self._role_scope_party(actor)
+        signed_event = await self.journal.append(
+            session,
+            event_type="identity.role_assignment_revoked",
+            aggregate_type="role_assignment",
+            aggregate_id=assignment.id,
+            aggregate_version=assignment.version,
+            actor=actor,
+            payload={
+                "target_user_id": str(assignment.user_id),
+                "target_member_id": str(target_user.member_id),
+                "role": assignment.role_code,
+                "cooperative_id": (
+                    str(assignment.cooperative_id)
+                    if assignment.cooperative_id is not None
+                    else None
+                ),
+                "reason_code": reason_code,
+                "status": assignment.status,
+            },
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=ExposureEffect.REVOKE,
+                    subject_type="role_assignment",
+                    subject_id=assignment.id,
+                    basis_refs=(assignment.role_code, reason_code, record.request_hash),
+                ),
+                evidence_refs=self._role_evidence(record, principal, reason_code),
+                next_responsible=(scope_party,),
+                approvers=(actor_party(actor),),
+            ),
+        )
+        await AuditRepository(session).record(
             action="ROLE_REVOKED",
             object_type="RoleAssignment",
             object_id=assignment.id,
@@ -777,7 +951,7 @@ class IdentityAdminService:
             request_id=request_id,
             payload={"target_user_id": str(assignment.user_id), "role": assignment.role_code},
         )
-        return self._complete(record, event_id, assignment.id)
+        return self._complete(record, signed_event.event_id, assignment.id)
 
     async def revoke_session(
         self,
@@ -812,6 +986,66 @@ class IdentityAdminService:
             payload={"target_user_id": str(auth_session.user_id)},
         )
         return self._complete(record, event_id, auth_session.id)
+
+    def _role_actor(
+        self,
+        principal: Principal,
+        cooperative_id: UUID | None,
+    ) -> ActorClaim:
+        if principal.member_id is None:
+            raise DomainError(
+                code="PERSONAL_ACTOR_REQUIRED",
+                message_key="errors.identity.personal_actor_required",
+                status_code=403,
+            )
+        for grant in principal.roles:
+            if (
+                grant.source is RoleGrantSource.ASSIGNMENT
+                and grant.role in ROLE_ADMIN_ACTOR_ROLES
+                and (cooperative_id is None or grant.cooperative_id in {None, cooperative_id})
+            ):
+                return ActorClaim(
+                    person_id=principal.member_id,
+                    organization_id=cooperative_id,
+                    role_assignment_id=grant.assignment_id,
+                )
+        raise DomainError(
+            code="PERMANENT_ROLE_REQUIRED",
+            message_key="errors.identity.permanent_role_required",
+            status_code=403,
+        )
+
+    def _role_scope_party(self, actor: ActorClaim) -> AccountabilityParty:
+        if actor.organization_id is not None:
+            return AccountabilityParty(
+                kind=AccountabilityPartyKind.COOPERATIVE,
+                reference=str(actor.organization_id),
+            )
+        return node_party(self.settings.node_code)
+
+    @staticmethod
+    def _role_target_party(user: UserAccount) -> AccountabilityParty:
+        if user.member_id is None:
+            raise DomainError(
+                code="PERSONAL_ACTOR_REQUIRED",
+                message_key="errors.identity.personal_actor_required",
+                status_code=403,
+            )
+        return member_party(user.member_id)
+
+    @staticmethod
+    def _role_evidence(
+        record: IdempotencyRecord,
+        principal: Principal,
+        reason_code: str | None = None,
+    ) -> tuple[object, ...]:
+        evidence: list[object] = [
+            {"idempotency_record_id": str(record.id)},
+            {"authenticated_session_id": str(principal.session_id)},
+        ]
+        if reason_code is not None:
+            evidence.append({"reason_code": reason_code})
+        return tuple(evidence)
 
     @staticmethod
     async def _begin(

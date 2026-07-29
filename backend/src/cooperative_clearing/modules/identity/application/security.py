@@ -39,6 +39,17 @@ from cooperative_clearing.modules.journal.application.service import (
     ActorClaim,
     SignedJournalService,
 )
+from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    actor_party,
+    member_party,
+    node_party,
+)
 from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.secrets import read_text_secret
 from cooperative_clearing.shared.core.security import PasswordService
@@ -472,6 +483,7 @@ class IdentitySecurityService:
         )
         session.add(recovery)
         actor = self._security_actor(principal)
+        scope_party = self._security_scope_party(actor)
         event = await self.journal.append(
             session,
             event_type="identity.account_recovery_requested",
@@ -485,7 +497,19 @@ class IdentitySecurityService:
                 "reason_code": reason_code,
                 "expires_at": recovery.expires_at.isoformat(),
             },
-            evidence=[{"evidence_id": evidence_id}],
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.IDENTITY,
+                    effect=ExposureEffect.REQUEST,
+                    subject_type="user_account",
+                    subject_id=target.id,
+                    basis_refs=(f"recovery:{recovery.id}", evidence_id),
+                ),
+                evidence_refs=({"evidence_id": evidence_id},),
+                next_responsible=(scope_party,),
+                attesters=(actor_party(actor),),
+            ),
         )
         await AuditRepository(session).record(
             action="ACCOUNT_RECOVERY_REQUESTED",
@@ -532,13 +556,16 @@ class IdentitySecurityService:
             recovery.status = "EXPIRED"
             recovery.version += 1
             raise _error("ACCOUNT_RECOVERY_EXPIRED", 409)
+        target = await session.get(UserAccount, recovery.target_user_id, with_for_update=True)
+        requester = await session.get(UserAccount, recovery.requested_by_user_id)
+        if target is None or requester is None:
+            raise _error("USER_NOT_FOUND", 404)
+        target_party = self._user_party(target)
+        requester_party = self._user_party(requester)
         recovery.decided_by_user_id = principal.user_id
         recovery.decided_at = now
         recovery.version += 1
         if approve:
-            target = await session.get(UserAccount, recovery.target_user_id, with_for_update=True)
-            if target is None:
-                raise _error("USER_NOT_FOUND", 404)
             target.password_hash = recovery.temporary_password_hash
             target.status = "ACTIVE"
             target.must_change_password = True
@@ -567,6 +594,8 @@ class IdentitySecurityService:
             recovery.status = "REJECTED"
             action = "ACCOUNT_RECOVERY_REJECTED"
             outcome = "DENIED"
+        actor = self._security_actor(principal)
+        scope_party = self._security_scope_party(actor)
         event = await self.journal.append(
             session,
             event_type=(
@@ -577,7 +606,7 @@ class IdentitySecurityService:
             aggregate_type="account_recovery_request",
             aggregate_id=recovery.id,
             aggregate_version=recovery.version,
-            actor=self._security_actor(principal),
+            actor=actor,
             payload={
                 "target_user_id": str(recovery.target_user_id),
                 "requester_user_id": str(recovery.requested_by_user_id),
@@ -585,7 +614,28 @@ class IdentitySecurityService:
                 "reason_code": reason_code,
                 "status": recovery.status,
             },
-            evidence=[{"evidence_id": recovery.evidence_id}],
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.IDENTITY,
+                    effect=(
+                        ExposureEffect.EXECUTE if approve else ExposureEffect.REJECT
+                    ),
+                    subject_type="user_account",
+                    subject_id=target.id,
+                    basis_refs=(
+                        f"recovery:{recovery.id}",
+                        recovery.evidence_id,
+                    ),
+                ),
+                evidence_refs=(
+                    {"evidence_id": recovery.evidence_id},
+                    {"recovery_id": str(recovery.id)},
+                ),
+                next_responsible=(target_party,) if approve else (),
+                attesters=(requester_party,),
+                approvers=(actor_party(actor),),
+            ),
         )
         await AuditRepository(session).record(
             action=action,
@@ -668,13 +718,15 @@ class IdentitySecurityService:
             granted_by_user_id=principal.user_id,
         )
         session.add_all((grant, authority))
+        actor = self._security_actor(principal, cooperative_id)
+        scope_party = self._security_scope_party(actor)
         event = await self.journal.append(
             session,
             event_type="identity.break_glass_requested",
             aggregate_type="break_glass_grant",
             aggregate_id=grant.id,
             aggregate_version=1,
-            actor=self._security_actor(principal, cooperative_id),
+            actor=actor,
             payload={
                 "target_user_id": str(target_user_id),
                 "role": role.value,
@@ -682,7 +734,24 @@ class IdentitySecurityService:
                 "reason_code": reason_code,
                 "approval_expires_at": approval_expires_at.isoformat(),
             },
-            evidence=[{"evidence_id": evidence_id}],
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=ExposureEffect.REQUEST,
+                    subject_type="break_glass_grant",
+                    subject_id=grant.id,
+                    basis_refs=(
+                        role.value,
+                        str(target.id),
+                        str(duration_minutes),
+                        evidence_id,
+                    ),
+                ),
+                evidence_refs=({"evidence_id": evidence_id},),
+                next_responsible=(scope_party,),
+                attesters=(actor_party(actor),),
+            ),
         )
         await AuditRepository(session).record(
             action="BREAK_GLASS_REQUESTED",
@@ -735,6 +804,12 @@ class IdentitySecurityService:
             grant.status = "EXPIRED"
             grant.version += 1
             raise _error("BREAK_GLASS_REQUEST_EXPIRED", 409)
+        target = await session.get(UserAccount, grant.target_user_id)
+        requester = await session.get(UserAccount, grant.requested_by_user_id)
+        if target is None or requester is None:
+            raise _error("USER_NOT_FOUND", 404)
+        target_party = self._user_party(target)
+        requester_party = self._user_party(requester)
         grant.approved_by_user_id = principal.user_id
         grant.approved_at = now
         grant.version += 1
@@ -744,7 +819,6 @@ class IdentitySecurityService:
             authority.status = "ACTIVE"
             authority.expires_at = grant.expires_at
             action = "BREAK_GLASS_ACTIVATED"
-            event_type = "identity.break_glass_activated"
             outcome = "SUCCESS"
         else:
             grant.status = "REJECTED"
@@ -752,18 +826,23 @@ class IdentitySecurityService:
             authority.status = "REJECTED"
             authority.expires_at = None
             action = "BREAK_GLASS_REJECTED"
-            event_type = "identity.break_glass_rejected"
             outcome = "DENIED"
         authority.approved_by_user_id = principal.user_id
         authority.approved_at = now
         authority.version += 1
+        actor = self._security_actor(principal, grant.cooperative_id)
+        scope_party = self._security_scope_party(actor)
         event = await self.journal.append(
             session,
-            event_type=event_type,
+            event_type=(
+                "identity.break_glass_activated"
+                if approve
+                else "identity.break_glass_rejected"
+            ),
             aggregate_type="break_glass_grant",
             aggregate_id=grant.id,
             aggregate_version=grant.version,
-            actor=self._security_actor(principal, grant.cooperative_id),
+            actor=actor,
             payload={
                 "target_user_id": str(grant.target_user_id),
                 "role": grant.role_code,
@@ -773,7 +852,27 @@ class IdentitySecurityService:
                 "status": grant.status,
                 "expires_at": grant.expires_at.isoformat() if grant.expires_at else None,
             },
-            evidence=[{"evidence_id": grant.evidence_id}],
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=ExposureEffect.CREATE if approve else ExposureEffect.REJECT,
+                    subject_type="break_glass_grant",
+                    subject_id=grant.id,
+                    basis_refs=(
+                        grant.role_code,
+                        str(grant.requested_duration_minutes),
+                        grant.evidence_id,
+                    ),
+                ),
+                evidence_refs=(
+                    {"evidence_id": grant.evidence_id},
+                    {"grant_id": str(grant.id)},
+                ),
+                next_responsible=(target_party,) if approve else (),
+                attesters=(requester_party,),
+                approvers=(actor_party(actor),),
+            ),
         )
         await AuditRepository(session).record(
             action=action,
@@ -829,13 +928,15 @@ class IdentitySecurityService:
         authority.revoked_at = now
         authority.expires_at = now
         authority.version += 1
+        actor = self._security_actor(principal, grant.cooperative_id)
+        scope_party = self._security_scope_party(actor)
         event = await self.journal.append(
             session,
             event_type="identity.break_glass_revoked",
             aggregate_type="break_glass_grant",
             aggregate_id=grant.id,
             aggregate_version=grant.version,
-            actor=self._security_actor(principal, grant.cooperative_id),
+            actor=actor,
             payload={
                 "target_user_id": str(grant.target_user_id),
                 "role": grant.role_code,
@@ -843,7 +944,22 @@ class IdentitySecurityService:
                 "reason_code": reason_code,
                 "status": grant.status,
             },
-            evidence=[{"evidence_id": grant.evidence_id}],
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.AUTHORITY,
+                    effect=ExposureEffect.REVOKE,
+                    subject_type="break_glass_grant",
+                    subject_id=grant.id,
+                    basis_refs=(grant.role_code, grant.evidence_id),
+                ),
+                evidence_refs=(
+                    {"evidence_id": grant.evidence_id},
+                    {"grant_id": str(grant.id)},
+                ),
+                next_responsible=(scope_party,),
+                approvers=(actor_party(actor),),
+            ),
         )
         await AuditRepository(session).record(
             action="BREAK_GLASS_REVOKED",
@@ -861,6 +977,20 @@ class IdentitySecurityService:
             },
         )
         return self._complete(record, event.event_id, grant.id)
+
+    def _security_scope_party(self, actor: ActorClaim) -> AccountabilityParty:
+        if actor.organization_id is not None:
+            return AccountabilityParty(
+                kind=AccountabilityPartyKind.COOPERATIVE,
+                reference=str(actor.organization_id),
+            )
+        return node_party(self.settings.node_code)
+
+    @staticmethod
+    def _user_party(user: UserAccount) -> AccountabilityParty:
+        if user.member_id is None:
+            raise _error("PERSONAL_ACTOR_REQUIRED", 403)
+        return member_party(user.member_id)
 
     @staticmethod
     def _security_actor(principal: Principal, cooperative_id: UUID | None = None) -> ActorClaim:

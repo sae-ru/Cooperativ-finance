@@ -3,6 +3,7 @@ import {
   ChevronDown,
   CircleCheck,
   Database,
+  FilePenLine,
   ImagePlus,
   ListChecks,
   MapPin,
@@ -11,11 +12,14 @@ import {
   RadioTower,
   RefreshCw,
   Search,
+  Save,
   ShieldCheck,
   ShoppingCart,
   Store,
+  Trash2,
   Wrench,
   Truck,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +57,15 @@ import "./i18n";
 import { userErrorMessage } from "./shared/api-error";
 import { formatLocalDateTime } from "./shared/date-time";
 import { decimalAdd, formatDecimal, requireDecimalString } from "./shared/decimal";
+import {
+  browserDraftAttachmentFile,
+  deleteBrowserOfferDraft,
+  isBrowserDraftStorageAvailable,
+  listBrowserOfferDrafts,
+  saveBrowserOfferDraft,
+  type BrowserOfferDraft,
+} from "./shared/browser-drafts";
+import { useOnlineStatus } from "./shared/use-online-status";
 import "./discovery.css";
 
 type Section = "search" | "sell" | "logistics" | "intents";
@@ -486,7 +499,12 @@ function LogisticsQuotePanel({ principal, candidate, candidates, destination, re
 }
 function SellPanel({ principal, addresses, onViewMarket }: { principal: Principal; addresses: ParticipantAddress[]; onViewMarket: (productCode: string, unitCode: string) => void }) {
   const { t } = useTranslation();
+  const online = useOnlineStatus();
+  const storageAvailable = isBrowserDraftStorageAvailable();
   const [file, setFile] = useState<File | null>(null);
+  const [browserDrafts, setBrowserDrafts] = useState<BrowserOfferDraft[]>([]);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [draftStorageError, setDraftStorageError] = useState(false);
   const imagePreview = useMemo(() => file ? URL.createObjectURL(file) : null, [file]);
   useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
   const [draft, setDraft] = useState<OfferDraft>(() => ({
@@ -523,6 +541,47 @@ function SellPanel({ principal, addresses, onViewMarket }: { principal: Principa
   }, [draft.pickup_address_text, pickupAddressId, pickupAddresses]);
   const canPublish = principal.roles.some((grant) => ["EXCHANGE_PARTICIPANT", "NODE_BUSINESS_OPERATOR"].includes(grant.role));
   const cooperativeId = principal.roles.find((grant) => grant.cooperative_id)?.cooperative_id ?? null;
+  useEffect(() => {
+    let active = true;
+    setBrowserDrafts([]);
+    setActiveDraftId(null);
+    setDraftStorageError(false);
+    if (!storageAvailable || !cooperativeId) return () => { active = false; };
+    void listBrowserOfferDrafts(principal.user_id, cooperativeId).then((records) => {
+      if (active) setBrowserDrafts(records);
+    }).catch(() => {
+      if (active) setDraftStorageError(true);
+    });
+    return () => { active = false; };
+  }, [cooperativeId, principal.user_id, storageAvailable]);
+
+  const saveDraftMutation = useMutation({
+    mutationFn: async () => {
+      if (!cooperativeId) throw new Error("COOPERATIVE_MEMBERSHIP_REQUIRED");
+      return saveBrowserOfferDraft({
+        draft_id: activeDraftId ?? undefined,
+        owner_user_id: principal.user_id,
+        cooperative_id: cooperativeId,
+        payload: { ...draft, image_evidence_id: null },
+        attachment: file,
+      });
+    },
+    onSuccess: (saved) => {
+      setActiveDraftId(saved.draft_id);
+      setBrowserDrafts((records) => [saved, ...records.filter((record) => record.draft_id !== saved.draft_id)]);
+      setDraftStorageError(false);
+    },
+    onError: () => setDraftStorageError(true),
+  });
+  const deleteDraftMutation = useMutation({
+    mutationFn: (record: BrowserOfferDraft) => deleteBrowserOfferDraft(record.draft_id, principal.user_id, record.cooperative_id).then(() => record),
+    onSuccess: (deleted) => {
+      setBrowserDrafts((records) => records.filter((record) => record.draft_id !== deleted.draft_id));
+      if (activeDraftId === deleted.draft_id) setActiveDraftId(null);
+      setDraftStorageError(false);
+    },
+    onError: () => setDraftStorageError(true),
+  });
   const mutation = useMutation({
     mutationFn: async () => {
       if (!cooperativeId) throw new Error("COOPERATIVE_MEMBERSHIP_REQUIRED");
@@ -542,7 +601,27 @@ function SellPanel({ principal, addresses, onViewMarket }: { principal: Principa
         principal.member_id ?? principal.login,
       );
     },
+    onSuccess: async () => {
+      if (!activeDraftId) return;
+      try {
+        if (!cooperativeId) throw new Error("COOPERATIVE_MEMBERSHIP_REQUIRED");
+        await deleteBrowserOfferDraft(activeDraftId, principal.user_id, cooperativeId);
+        setBrowserDrafts((records) => records.filter((record) => record.draft_id !== activeDraftId));
+        setActiveDraftId(null);
+      } catch {
+        setDraftStorageError(true);
+      }
+    },
   });
+
+  function reviewBrowserDraft(record: BrowserOfferDraft) {
+    setDraft(record.payload);
+    setFile(browserDraftAttachmentFile(record));
+    setPickupAddressId("");
+    setActiveDraftId(record.draft_id);
+    mutation.reset();
+    saveDraftMutation.reset();
+  }
 
   function selectPickupAddress(addressId: string) {
     setPickupAddressId(addressId);
@@ -599,6 +678,8 @@ function SellPanel({ principal, addresses, onViewMarket }: { principal: Principa
   }
 
   const visual = draft.kind === "SERVICE" ? "service" : visualFor(draft.product_code);
+  const actionPending = mutation.isPending || saveDraftMutation.isPending;
+  const canSaveDraft = Boolean(cooperativeId && storageAvailable);
   return (
     <section className="sell-layout" aria-labelledby="sell-title">
       <div className="sell-product-visual">
@@ -610,11 +691,14 @@ function SellPanel({ principal, addresses, onViewMarket }: { principal: Principa
       <div className="sell-workspace">
         <div className="results-heading"><div><h2 id="sell-title">{t(draft.kind === "SERVICE" ? "market.sellServiceTitle" : "market.sellTitle")}</h2><p>{t(draft.kind === "SERVICE" ? "market.sellServiceSubtitle" : "market.sellSubtitle")}</p></div><Store size={22} /></div>
         {!canPublish ? <div className="seller-permission" role="note"><ShieldCheck size={20} /><span>{t("market.sellPermission")}</span></div> : null}
+        {!online ? <div className="browser-draft-notice offline" role="status"><WifiOff size={20} /><div><strong>{t("market.offlineTitle")}</strong><span>{t("market.offlineDraftHint")}</span></div></div> : null}
+        {activeDraftId ? <div className="browser-draft-notice" role="status"><FilePenLine size={20} /><div><strong>{t("market.localDraftLoaded")}</strong><span>{t("market.localDraftReviewHint")}</span></div></div> : null}
+        {browserDrafts.length ? <div className="browser-draft-list" aria-label={t("market.localDrafts")}><div className="browser-draft-heading"><strong>{t("market.localDrafts")}</strong><span>{browserDrafts.length}</span></div>{browserDrafts.map((record) => <div className={record.draft_id === activeDraftId ? "browser-draft-row active" : "browser-draft-row"} key={record.draft_id}><div><strong data-i18n-ignore="true">{record.payload.description}</strong><span>{t("market.savedOnDeviceAt", { date: formatLocalDateTime(record.updated_at) })}</span></div><div><button type="button" onClick={() => reviewBrowserDraft(record)}><FilePenLine size={16} />{t("market.reviewDraft")}</button><button className="icon-action danger" type="button" title={t("market.deleteDraft")} aria-label={t("market.deleteDraft")} disabled={deleteDraftMutation.isPending} onClick={() => deleteDraftMutation.mutate(record)}><Trash2 size={16} /></button></div></div>)}</div> : null}
         <div className="offer-kind-switch" role="group" aria-label={t("market.offerKind")}>
           <button type="button" className={draft.kind === "PRODUCT" ? "active" : ""} onClick={() => selectKind("PRODUCT")}><Store size={17} />{t("market.product")}</button>
           <button type="button" className={draft.kind === "SERVICE" ? "active" : ""} onClick={() => selectKind("SERVICE")}><Wrench size={17} />{t("market.service")}</button>
         </div>
-        <form className="sell-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}>
+        <form className="sell-form" onSubmit={(event) => { event.preventDefault(); if (online) mutation.mutate(); else saveDraftMutation.mutate(); }}>
           {draft.kind === "PRODUCT" ? <label className="sell-product-field"><span>{t("market.listingProduct")}</span><select value={draft.product_code} onChange={(event) => selectProduct(event.target.value)}>{productPresets.filter((preset) => preset.kind === "PRODUCT").map((preset) => <option key={preset.code} value={preset.code}>{t(preset.key)}</option>)}<option value="CUSTOM.PRODUCT">{t("market.otherProduct")}</option></select></label> : null}
           {draft.kind === "SERVICE" ? <label className="sell-product-field"><span>{t("market.listingService")}</span><select value={draft.product_code} onChange={(event) => selectProduct(event.target.value)}>{productPresets.filter((preset) => preset.kind === "SERVICE").map((preset) => <option key={preset.code} value={preset.code}>{t(preset.key)}</option>)}<option value="SERVICE.CUSTOM">{t("market.otherService")}</option></select></label> : null}
           <label className="sell-description-field"><span>{t(draft.kind === "SERVICE" ? "market.serviceName" : "market.listingDescription")}</span><input value={draft.description} onChange={(event) => setDraft((value) => ({ ...value, description: event.target.value }))} placeholder={t(draft.kind === "SERVICE" ? "market.serviceNamePlaceholder" : "market.productNamePlaceholder")} required /></label>
@@ -632,9 +716,11 @@ function SellPanel({ principal, addresses, onViewMarket }: { principal: Principa
             <label><span>{t("market.contactPhone")}</span><span className="field-with-icon"><Phone size={18} /><input type="tel" value={draft.pickup_contact_phone} onChange={(event) => setDraft((value) => ({ ...value, pickup_contact_phone: event.target.value }))} placeholder={t("market.contactPhonePlaceholder")} required minLength={5} /></span></label>
             <label className="span-two"><span>{t("market.pickupInstructions")}</span><textarea value={draft.pickup_instructions} onChange={(event) => setDraft((value) => ({ ...value, pickup_instructions: event.target.value }))} placeholder={t("market.pickupInstructionsPlaceholder")} rows={3} /></label>
           </fieldset>
-          <button className="buy-button sell-submit" type="submit" disabled={!canPublish || mutation.isPending}>{mutation.isPending ? <RefreshCw className="spin" size={18} /> : <Store size={18} />}{mutation.isPending ? t(file ? "market.uploadingAndPublishing" : "market.publishing") : t("market.publish")}</button>
+          <div className="sell-actions"><button className="secondary-action" type="button" disabled={!canSaveDraft || actionPending} onClick={() => saveDraftMutation.mutate()}><Save size={18} />{t("market.saveLocalDraft")}</button><button className="buy-button sell-submit" type="submit" disabled={online ? !canPublish || actionPending : !canSaveDraft || actionPending}>{actionPending ? <RefreshCw className="spin" size={18} /> : online ? <Store size={18} /> : <Save size={18} />}{actionPending ? t(online ? file ? "market.uploadingAndPublishing" : "market.publishing" : "market.savingDraft") : t(online ? "market.publish" : "market.saveOnDevice")}</button></div>
         </form>
         {mutation.isError ? <p className="form-error" role="alert">{errorText(mutation.error)}</p> : null}
+        {draftStorageError ? <p className="form-error" role="alert">{t("market.draftStorageError")}</p> : null}
+        {saveDraftMutation.isSuccess ? <div className="sell-success local" role="status"><CircleCheck size={22} /><div><strong>{t("market.localDraftSaved")}</strong><span>{t("market.localDraftNotPublished")}</span></div></div> : null}
         {mutation.isSuccess ? <div className="sell-success" role="status"><CircleCheck size={22} /><div><strong>{t("market.published")}</strong><button type="button" onClick={() => onViewMarket(draft.product_code, draft.unit_code)}>{t("market.viewMarket")}</button></div></div> : null}
       </div>
     </section>

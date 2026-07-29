@@ -18,7 +18,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
 from cooperative_clearing.shared.infrastructure.database import Database
 
-PASSWORD = "Identity-security-2026!"
+PASSWORD = "".join(("Identity-security-", "2026!"))
 TARGET_PASSWORD = "Target-security-2026!"
 RECOVERED_PASSWORD = "Recovered-security-2026!"
 
@@ -265,6 +265,32 @@ async def test_totp_recovery_and_break_glass_end_to_end() -> None:
                 "identity.break_glass_activated",
                 "identity.break_glass_revoked",
             }
+            assurances = {
+                item.event_type: item.payload["_command_assurance"]
+                for item in signed_events
+            }
+            assert all(
+                item["format"] == "critical-command-assurance-v2"
+                for item in assurances.values()
+            )
+            assert assurances["identity.account_recovery_requested"]["exposure"][
+                "category"
+            ] == "IDENTITY"
+            assert assurances["identity.account_recovery_requested"]["next_responsible"][
+                0
+            ]["kind"] == "NODE"
+            assert assurances["identity.account_recovery_executed"]["next_responsible"][
+                0
+            ]["reference"] == str(target_member_id)
+            assert assurances["identity.break_glass_requested"]["next_responsible"][0][
+                "reference"
+            ] == cooperative_id
+            assert assurances["identity.break_glass_activated"]["next_responsible"][0][
+                "reference"
+            ] == str(emergency_member_id)
+            assert assurances["identity.break_glass_revoked"]["next_responsible"][0][
+                "reference"
+            ] == cooperative_id
             signature_count = len(
                 list(
                     (

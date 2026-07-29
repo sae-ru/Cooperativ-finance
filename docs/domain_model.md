@@ -103,9 +103,22 @@
 
 ## Сквозная ответственность
 
-Критическая команда содержит `performed_by`, `on_behalf_of`,
-`role_assignment_id`, `scope`, `risk_exposure`, `evidence_refs`, обязательных
-attesters/approvers и ожидаемого следующего ответственного.
+Критическая команда содержит подписанный `critical-command-assurance-v2`:
+`performed_by`, `on_behalf_of`, `role_assignment_id`, `scope`,
+`exposure`, digest и исходные `evidence_refs`, обязательных
+attesters/approvers и список ожидаемых следующих ответственных. Список может
+содержать несколько узлов; пустой список допустим только для терминального
+хозяйственного шага.
+
+Канонический fail-closed реестр сейчас охватывает 112 событий: экономическую
+финализацию, recovery, break-glass, emergency custody, lifecycle ролей,
+governance, disputes, sanctions, appeals, reputation, rehabilitation, crisis и
+node authority/key lifecycle. Канонический software gate закрыт для текущего
+реестра; юридические и эксплуатационные gates остаются отдельными. Границы
+перечислены в
+[Slice 34](implemented_slice_34.md), [Slice 35](implemented_slice_35.md),
+[Slice 36](implemented_slice_36.md), [Slice 37](implemented_slice_37.md) и
+[Slice 38](implemented_slice_38.md).
 
 Передача сохранности атомарно закрывает ответственность передающего и открывает
 ответственность принимающего. Без подтверждения принимающего ответственным

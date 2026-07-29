@@ -22,6 +22,16 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
 )
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import ActorClaim
+from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    actor_party,
+    member_party,
+)
 from cooperative_clearing.modules.trust.domain.types import trust_error
 
 
@@ -30,6 +40,132 @@ class TrustCommandResult:
     event_id: UUID
     object_id: UUID
     replayed: bool
+
+
+TRUST_ASSURANCE_EVENTS = {
+    "trust.policy_proposed": (ExposureCategory.GOVERNANCE, ExposureEffect.REQUEST, False),
+    "trust.policy_superseded": (ExposureCategory.GOVERNANCE, ExposureEffect.REVOKE, True),
+    "trust.policy_approved": (ExposureCategory.GOVERNANCE, ExposureEffect.APPROVE, True),
+    "disputes.dispute_opened": (ExposureCategory.GOVERNANCE, ExposureEffect.REQUEST, False),
+    "disputes.response_recorded": (ExposureCategory.GOVERNANCE, ExposureEffect.RECORD, False),
+    "disputes.case_ready_for_decision": (
+        ExposureCategory.GOVERNANCE,
+        ExposureEffect.REQUEST,
+        True,
+    ),
+    "disputes.conflict_declared": (ExposureCategory.GOVERNANCE, ExposureEffect.RECORD, False),
+    "disputes.decision_issued": (ExposureCategory.GOVERNANCE, ExposureEffect.DECIDE, True),
+    "sanctions.protective_measure_imposed": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.HOLD,
+        True,
+    ),
+    "sanctions.protective_measure_lifted": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.RELEASE,
+        True,
+    ),
+    "sanctions.protective_measure_revoked": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.REVOKE,
+        True,
+    ),
+    "sanctions.sanction_proposed": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.REQUEST,
+        True,
+    ),
+    "sanctions.sanction_finalized": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.FINALIZE,
+        True,
+    ),
+    "sanctions.sanction_revoked": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.REVOKE,
+        True,
+    ),
+    "appeals.appeal_submitted": (ExposureCategory.GOVERNANCE, ExposureEffect.REQUEST, False),
+    "appeals.appeal_decided": (ExposureCategory.GOVERNANCE, ExposureEffect.DECIDE, True),
+    "reputation.event_recorded": (ExposureCategory.REPUTATION, ExposureEffect.RECORD, True),
+    "reputation.event_activated": (ExposureCategory.REPUTATION, ExposureEffect.APPROVE, True),
+    "reputation.event_corrected": (ExposureCategory.REPUTATION, ExposureEffect.CORRECT, True),
+    "reputation.rehabilitation_recorded": (
+        ExposureCategory.REPUTATION,
+        ExposureEffect.RECORD,
+        True,
+    ),
+    "rehabilitation.plan_created": (ExposureCategory.SANCTION, ExposureEffect.CREATE, True),
+    "rehabilitation.step_completed": (ExposureCategory.SANCTION, ExposureEffect.RECORD, False),
+    "rehabilitation.plan_completed": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.FINALIZE,
+        True,
+    ),
+    "rehabilitation.plan_cancelled": (
+        ExposureCategory.SANCTION,
+        ExposureEffect.REVOKE,
+        True,
+    ),
+}
+
+
+def trust_command_assurance(
+    *,
+    principal: Principal,
+    actor: ActorClaim,
+    event_type: str,
+    subject_type: str,
+    subject_id: UUID,
+    command_record: IdempotencyRecord | None = None,
+    evidence_refs: Sequence[object] = (),
+    next_member_ids: Sequence[UUID] = (),
+) -> CommandAssurance:
+    mapped = TRUST_ASSURANCE_EVENTS.get(event_type)
+    if mapped is None or actor.organization_id is None:
+        raise trust_error("COMMAND_ASSURANCE_EVENT_UNMAPPED", 500)
+    category, effect, is_decision = mapped
+    cooperative = AccountabilityParty(
+        kind=AccountabilityPartyKind.COOPERATIVE,
+        reference=str(actor.organization_id),
+    )
+    evidence: list[object] = [
+        {"authenticated_session_id": str(principal.session_id)},
+        {
+            "event_subject": {
+                "event_type": event_type,
+                "subject_type": subject_type,
+                "subject_id": str(subject_id),
+            }
+        },
+    ]
+    basis_refs = [event_type, str(subject_id)]
+    if command_record is not None:
+        evidence.append({"idempotency_record_id": str(command_record.id)})
+        basis_refs.append(command_record.request_hash)
+    evidence.extend(evidence_refs)
+    actor_ref = actor_party(actor)
+    next_parties = [cooperative]
+    seen_members: set[UUID] = set()
+    for member_id in next_member_ids:
+        if member_id in seen_members:
+            continue
+        seen_members.add(member_id)
+        next_parties.append(member_party(member_id))
+    return CommandAssurance(
+        on_behalf_of=cooperative,
+        exposure=ExposureClaim(
+            category=category,
+            effect=effect,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            basis_refs=tuple(basis_refs),
+        ),
+        evidence_refs=tuple(evidence),
+        next_responsible=tuple(next_parties),
+        attesters=() if is_decision else (actor_ref,),
+        approvers=(actor_ref,) if is_decision else (),
+    )
 
 
 async def begin_trust_command(

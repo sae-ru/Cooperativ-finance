@@ -1,5 +1,6 @@
 """End-to-end crisis drill and persistence invariants."""
 
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -108,6 +109,22 @@ async def test_demo_crisis_drill_is_bounded_reconciled_idempotent_and_non_credit
                     select(CrisisReport).where(CrisisReport.mandate_id == mandate.id)
                 )
             ).scalar_one()
+            aggregate_ids = {
+                target.id,
+                snapshot.id,
+                mandate.id,
+                rule.id,
+                plan.id,
+                allocation.id,
+                form.id,
+            }
+            signed_events = list(
+                (
+                    await session.execute(
+                        select(SignedEvent).where(SignedEvent.aggregate_id.in_(aggregate_ids))
+                    )
+                ).scalars()
+            )
             crisis_events = set(
                 (
                     await session.execute(
@@ -154,6 +171,54 @@ async def test_demo_crisis_drill_is_bounded_reconciled_idempotent_and_non_credit
         assert [item.decision for item in reviews] == ["CONTINUE", "CLOSE"]
         assert report.report_payload["ration_issuance_count"] == 1
         assert report.report_payload["paper_form_count"] == 1
+        assurance_by_type = {
+            item.event_type: item.payload["_command_assurance"]
+            for item in signed_events
+            if "_command_assurance" in item.payload
+        }
+        expected_types = {
+            "crisis.reserve_target_proposed",
+            "crisis.reserve_target_approved",
+            "crisis.reserve_snapshot_recorded",
+            "crisis.mandate_proposed",
+            "crisis.mandate_activated",
+            "crisis.mandate_reviewed",
+            "crisis.rationing_rule_proposed",
+            "crisis.rationing_rule_approved",
+            "crisis.rationing_previewed",
+            "crisis.rationing_confirmed",
+            "crisis.ration_issued",
+            "crisis.paper_form_issued",
+            "crisis.paper_form_recorded",
+            "crisis.mandate_closed",
+        }
+        if assurance_by_type:
+            assert expected_types <= assurance_by_type.keys()
+            assert all(
+                assurance["format"] == "critical-command-assurance-v2"
+                and assurance["exposure"]["category"] == "CRISIS"
+                for assurance in assurance_by_type.values()
+            )
+            assert Decimal(
+                assurance_by_type["crisis.reserve_target_proposed"]["exposure"]["amount"]
+            ) == Decimal("100")
+            assert Decimal(
+                assurance_by_type["crisis.reserve_snapshot_recorded"]["exposure"]["amount"]
+            ) == Decimal("50")
+            ration_assurance = assurance_by_type["crisis.ration_issued"]
+            assert Decimal(ration_assurance["exposure"]["amount"]) == Decimal("5")
+            assert ration_assurance["exposure"]["unit"] == "KG"
+            assert str(allocation.member_id) in {
+                party["reference"] for party in ration_assurance["next_responsible"]
+            }
+            for event_type in (
+                "crisis.paper_form_issued",
+                "crisis.paper_form_recorded",
+            ):
+                assert str(form.assigned_to_member_id) in {
+                    party["reference"]
+                    for party in assurance_by_type[event_type]["next_responsible"]
+                }
         assert crisis_events
         assert crisis_events.isdisjoint(obligation_events)
         assert crisis_events.isdisjoint(share_events)

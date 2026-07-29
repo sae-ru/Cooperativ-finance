@@ -18,6 +18,7 @@ export function isOutdatedAssetError(value: unknown): boolean {
     "error loading dynamically imported module",
     "chunkloaderror",
     "loading chunk",
+    "unable to preload css",
   ].some((fragment) => normalized.includes(fragment));
 }
 

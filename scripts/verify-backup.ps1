@@ -13,6 +13,7 @@ $network = $container
 $dbVolume = "$container-db"
 $blobVolume = "$container-blobs"
 $password = ([Guid]::NewGuid().ToString("N") + [Guid]::NewGuid().ToString("N"))
+$secretDirectory = Join-Path ([IO.Path]::GetTempPath()) "coop-restore-secrets-$suffix"
 
 function Invoke-Docker {
     & docker @args
@@ -21,12 +22,32 @@ function Invoke-Docker {
     }
 }
 
-foreach ($name in @("COMPLETE", "SHA256SUMS", "manifest.env", "database.dump", "blobs.tar.gz")) {
+foreach ($name in @(
+    "COMPLETE",
+    "SHA256SUMS",
+    "manifest.env",
+    "database.dump",
+    "blobs.tar.gz",
+    "secret-storage-verification.txt",
+    "backup-secret-audit.json"
+    "restore-consistency.json"
+)) {
     if (-not (Test-Path -LiteralPath (Join-Path $backup $name))) {
         throw "Incomplete backup: missing $name"
     }
 }
 
+if (
+    (Get-Content -LiteralPath (Join-Path $backup "secret-storage-verification.txt") -Raw).Trim() -ne
+    "secret_storage=PASS"
+) {
+    throw "Backup has no valid secret storage evidence"
+}
+& python (Join-Path $PSScriptRoot "supply_secret_audit.py") backup --directory $backup | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "Backup secret audit failed" }
+$sourceConsistency = Get-Content -LiteralPath (Join-Path $backup "restore-consistency.json") -Raw |
+    ConvertFrom-Json
+if ($sourceConsistency.ok -ne $true) { throw "Source restore consistency proof is not valid" }
 Get-Content -LiteralPath (Join-Path $backup "SHA256SUMS") | ForEach-Object {
     $parts = $_ -split "  ", 2
     if ($parts.Count -ne 2) { throw "Malformed SHA256SUMS entry: $_" }
@@ -39,7 +60,9 @@ Get-Content -LiteralPath (Join-Path $backup "manifest.env") | ForEach-Object {
     $parts = $_ -split "=", 2
     if ($parts.Count -eq 2) { $manifest[$parts[0]] = $parts[1] }
 }
-if (
+if ($manifest.format -ne "cooperative-clearing-backup-v2") {
+    throw "Unsupported backup format: $($manifest.format)"
+}if (
     $manifest.backup_kind -eq "FULL" -and (
         $manifest.release_material -ne "included-verified" -or
         $manifest.recovery_material -ne "included-encrypted"
@@ -67,6 +90,7 @@ if ($manifest.release_material -eq "included-verified") {
         $env:COOP_RELEASE_PUBLIC_KEY
         "--expected-release"
         $manifest.release
+        "--load-images"
     )
     if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
         $verification += @(
@@ -79,6 +103,7 @@ if ($manifest.release_material -eq "included-verified") {
 }
 
 try {
+    New-Item -ItemType Directory -Path $secretDirectory | Out-Null
     Invoke-Docker run --rm -v "${backup}:/backup:ro" postgres:18-alpine sh -ec "pg_restore --list /backup/database.dump >/dev/null; tar -tzf /backup/blobs.tar.gz >/dev/null"
     Invoke-Docker network create $network | Out-Null
     Invoke-Docker volume create $dbVolume | Out-Null
@@ -112,6 +137,26 @@ try {
         "--exit-on-error", "--no-owner"
     ) -NoNewWindow -Wait -PassThru -RedirectStandardInput $dump
     if ($restore.ExitCode -ne 0) { throw "Database restore failed" }
+    Invoke-Docker exec $container psql -U coop_migrator -d restore_drill -v ON_ERROR_STOP=1 `
+        -c "ALTER ROLE coop_app LOGIN PASSWORD '$password'"
+
+    $secretStorageOutput = [IO.Path]::GetTempFileName()
+    try {
+        $secretStorageProcess = Start-Process -FilePath "docker" -ArgumentList @(
+            "exec", "-i", $container, "psql",
+            "-X", "-qAt", "-v", "ON_ERROR_STOP=1",
+            "-U", "coop_migrator", "-d", "restore_drill", "-f", "-"
+        ) -NoNewWindow -Wait -PassThru `
+            -RedirectStandardInput (Join-Path $root "infra/postgres/verify-secret-storage.sql") `
+            -RedirectStandardOutput $secretStorageOutput
+        if ($secretStorageProcess.ExitCode -ne 0 -or
+            (Get-Content -LiteralPath $secretStorageOutput -Raw).Trim() -ne "secret_storage=PASS") {
+            throw "Restored database secret storage verification failed"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $secretStorageOutput -Force -ErrorAction SilentlyContinue
+    }
 
     $schema = (& docker exec $container psql -U coop_migrator -d restore_drill -Atc "select version_num from alembic_version").Trim()
     if ($LASTEXITCODE -ne 0) { throw "Schema inspection failed" }
@@ -129,7 +174,45 @@ try {
         throw "Blob restore file count mismatch: archive=$archiveFiles restored=$restoredFiles"
     }
 
-    "restore_drill=PASS schema=$schema tables=$tableCount events=$eventCount blob_files=$restoredFiles"
+    $secretRoot = Join-Path $root "secrets"
+    foreach ($secret in @("node_signing_seed", "blob_encryption_key", "mfa_encryption_key")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $secretRoot $secret))) {
+            throw "Installed recovery secret is missing: secrets/$secret"
+        }
+        Copy-Item -LiteralPath (Join-Path $secretRoot $secret) `
+            -Destination (Join-Path $secretDirectory $secret)
+    }
+    $appPasswordFile = Join-Path $secretDirectory "postgres_app_password"
+    [IO.File]::WriteAllText(
+        $appPasswordFile,
+        $password + [Environment]::NewLine,
+        [Text.Encoding]::ASCII
+    )
+    $nodeCode = (& docker exec $container psql -U coop_migrator -d restore_drill -Atc "select node_code from node.node_profiles order by created_at limit 1").Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $nodeCode) { throw "Restored node profile is missing" }
+    $consistencyArguments = @(
+        "run", "--rm", "--user", "10001:10001", "--read-only", "--network", $network,
+        "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
+        "-e", "COOP_ENVIRONMENT=dev",
+        "-e", "COOP_NODE_CODE=$nodeCode",
+        "-e", "COOP_DATABASE_HOST=$container",
+        "-e", "COOP_DATABASE_NAME=restore_drill",
+        "-e", "COOP_DATABASE_USER=coop_app",
+        "-e", "COOP_DATABASE_PASSWORD_FILE=/run/secrets/postgres_app_password",
+        "-v", "${appPasswordFile}:/run/secrets/postgres_app_password:ro",
+        "-v", "$(Join-Path $secretDirectory 'node_signing_seed'):/run/secrets/node_signing_seed:ro",
+        "-v", "$(Join-Path $secretDirectory 'blob_encryption_key'):/run/secrets/blob_encryption_key:ro",
+        "-v", "$(Join-Path $secretDirectory 'mfa_encryption_key'):/run/secrets/mfa_encryption_key:ro",
+        "-v", "${blobVolume}:/var/lib/cooperative-clearing/blobs:ro",
+        "cooperative-clearing/backend:$($manifest.release)",
+        "coopctl", "verify-restore-consistency"
+    )
+    $consistency = @(& docker @consistencyArguments)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restored data and key consistency verification failed"
+    }
+
+    "restore_drill=PASS schema=$schema tables=$tableCount events=$eventCount blob_files=$restoredFiles consistency=$($consistency -join '')"
 }
 finally {
     $previousErrorAction = $ErrorActionPreference
@@ -137,5 +220,6 @@ finally {
     & docker rm -f $container 2>$null | Out-Null
     & docker network rm $network 2>$null | Out-Null
     & docker volume rm $dbVolume $blobVolume 2>$null | Out-Null
+    Remove-Item -LiteralPath $secretDirectory -Recurse -Force -ErrorAction SilentlyContinue
     $ErrorActionPreference = $previousErrorAction
 }

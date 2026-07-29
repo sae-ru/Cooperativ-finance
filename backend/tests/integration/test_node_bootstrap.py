@@ -22,9 +22,13 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     ServiceClientCredential,
     ServiceClientRequest,
 )
+from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob
 from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.modules.node.application.status import GetSystemStatus
 from cooperative_clearing.modules.node.infrastructure.repository import NodeRepository
+from cooperative_clearing.modules.operations.application.restore_consistency import (
+    verify_restore_consistency,
+)
 from cooperative_clearing.modules.risk.infrastructure.models import (
     ExposureCommitment,
     RiskPolicy,
@@ -209,6 +213,47 @@ async def test_node_initialization_and_demo_seed_are_idempotent() -> None:
     assert journal_report.last_sequence == journal_report.checked_events
     assert before == after
     assert before[1:] == (1, 3, 1, 1, 2, 1, 2, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.acceptance
+async def test_restore_consistency_verifies_blobs_and_rejects_tampering() -> None:
+    settings = Settings(service_name="restore-consistency-integration")
+    await seed_demo(settings)
+
+    report = await verify_restore_consistency(settings)
+    assert report.ok is True
+    assert report.journal_events > 0
+    assert report.ready_evidence_records > 0
+    assert report.verified_evidence_records == report.ready_evidence_records
+
+    database = Database.from_settings(settings)
+    try:
+        async with database.session() as session:
+            evidence = (
+                await session.execute(
+                    select(EvidenceBlob)
+                    .where(EvidenceBlob.status == "READY")
+                    .order_by(EvidenceBlob.id)
+                    .limit(1)
+                )
+            ).scalar_one()
+    finally:
+        await database.dispose()
+    assert evidence.storage_key is not None
+    path = settings.blob_root / evidence.storage_key
+    original = path.read_bytes()
+    path.write_bytes(original[:-1] + bytes([original[-1] ^ 1]))
+    try:
+        tampered = await verify_restore_consistency(settings)
+    finally:
+        path.write_bytes(original)
+
+    assert tampered.ok is False
+    assert tampered.verified_evidence_records < tampered.ready_evidence_records
+    assert "EVIDENCE_CONTENT_CORRUPT" in {
+        failure.code for failure in tampered.failures
+    }
 
 
 @pytest.mark.integration

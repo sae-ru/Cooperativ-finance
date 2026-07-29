@@ -1,24 +1,31 @@
 # Подписанный офлайн-релиз
 
-Статус: реализованный эксплуатационный контракт Slice 15. Production-релиз
+Статус: реализованный эксплуатационный контракт Slices 15, 39 и 40. Production-релиз
 допускается только после полного [production readiness review](production_readiness.md).
 
 ## Состав релиза
 
 Каталог релиза является замкнутым набором файлов:
 
-- `release-manifest.json` с release id, commit, revision БД и версиями протоколов;
+- `release-manifest.json` с release id, commit, revision БД, версиями
+  протоколов и платформенным контрактом;
 - `release-manifest.sig` с raw Ed25519-подписью точных байтов манифеста;
+- подписанный compatibility contract с target schema и точными source transitions;
 - `checksums.txt` с SHA-256 каждого файла, кроме самого списка;
 - `images/*.oci.tar` с backend, frontend, gateway и PostgreSQL;
 - `metadata/sbom/*.cdx.json` с CycloneDX 1.6 inventory;
 - `metadata/licenses/*.json` с независимой классификацией лицензий;
 - `metadata/license-policy.json` с версионированной политикой;
+- `metadata/secret-audit.json` с редактированным отчётом по source, node payload
+  и четырём образам;
 - `node/` с Compose, конфигурационным примером и эксплуатационными скриптами.
 
 Verifier отклоняет симлинки, обход каталога, отсутствующие и лишние файлы,
 несовпадающие размеры/hash, неверную подпись, release id, policy digest,
 неполный набор ролей образов, изменённый content ID и запрещённую лицензию.
+Он также отклоняет отсутствующую platform policy, смешанные архитектуры,
+необъявленный ARM64 и несовпадение Docker host. Затем он независимо повторяет
+secret scan поставляемого `node/` и каждого слоя четырёх image archives.
 Загрузка образов начинается только после полной проверки всех файлов.
 
 ## Ключи релиза
@@ -53,12 +60,19 @@ sh scripts/build-release-bundle.sh \
   1.0.0 \
   /release/cooperative-clearing-1.0.0 \
   /secure/release-private.pem \
-  cooperative-clearing/frontend-test:1.0.0
+  linux/amd64 \
+  cooperative-clearing/frontend-test:1.0.0 \
+  0.9.0@0037_actor_assurance
 ```
 
 Сборщик отказывается работать с dirty source tree. `--allow-dirty` разрешён
 только для локального приёмочного теста и фиксирует все dirty entries в
 подписанном манифесте.
+
+До подписи сборщик fail-closed проверяет Git inventory, строгий node payload и
+содержимое Docker layers. Найденное значение не выводится: диагностика содержит
+только rule/path. Изменение signed JSON на `PASSED` не помогает, потому что
+verifier выполняет собственный scan и сравнивает scope summaries.
 
 ## Независимая проверка
 
@@ -71,7 +85,8 @@ export COOP_RELEASE_LICENSE_POLICY_SHA256=<approved-sha256>
 sh scripts/verify-release-bundle.sh \
   /srv/cooperative-clearing/releases/1.0.0 \
   /etc/cooperative-clearing/release-public.pem \
-  1.0.0
+  1.0.0 \
+  linux/amd64
 ```
 
 Для проверки и импорта образов одной fail-closed операцией:
@@ -81,6 +96,7 @@ python3 scripts/release_bundle.py verify \
   --bundle /srv/cooperative-clearing/releases/1.0.0 \
   --public-key /etc/cooperative-clearing/release-public.pem \
   --expected-release 1.0.0 \
+  --expected-platform linux/amd64 \
   --expected-policy-sha256 <approved-sha256> \
   --load-images
 ```
@@ -88,6 +104,17 @@ python3 scripts/release_bundle.py verify \
 `review_required` не означает автоматический запрет, но production release
 нельзя утвердить, пока назначенный reviewer не сопоставил каждую такую запись
 с первичным текстом лицензии. Любой `blocked > 0` verifier отклоняет всегда.
+
+Bundle v2 квалифицирует только платформу, на которой выполнен полный release
+gate. Для AMD64-релиза ARM64 явно исключён, и наоборот. Старый
+pre-production bundle v1 не принимается как production v2.
+
+Compatibility contract имеет отдельный закрытый формат. Каждая допустимая
+операция update подписывает точную пару `source release@source schema`, target
+schema и проверяемый `alembic-downgrade`. Пакет без `--upgrade-from` является
+`clean-install-only`: его можно установить на пустой узел, но нельзя использовать
+для обновления существующего. Manifest иной версии или неподдерживаемая source
+пара отклоняются до загрузки образов.
 
 ## Чистая установка без сети
 
@@ -100,6 +127,7 @@ sh ./start.sh production \
   /srv/cooperative-clearing/releases/1.0.0 \
   /etc/cooperative-clearing/release-public.pem \
   1.0.0 \
+  linux/amd64 \
   <approved-license-policy-sha256>
 ```
 
@@ -116,10 +144,19 @@ Windows использует `start.bat production` и те же четыре а
 sh scripts/update-node.sh 1.0.1 /srv/cooperative-clearing/releases/1.0.1
 ```
 
-`update-node` по умолчанию читает сохранённые public key и policy hash, вызывает тот же verifier, загружает только проверенные образы,
-создаёт pre-update backup, применяет upgrade migration, проверяет health и
-журнал, затем переключает сохранённый recovery context на новый bundle. Ошибка до успешного gate запускает application rollback; несовместимая
-схема требует restore по recovery runbook.
+`update-node` по умолчанию читает сохранённые public key и policy hash, получает
+фактическую revision БД и требует точное совпадение с одним подписанным source
+transition. Он повторно проверяет текущий bundle, загружает только проверенные
+образы, создаёт pre-update backup, останавливает writers, применяет upgrade и
+требует точную target revision. Старый backend, в котором ещё нет нового
+consistency verifier, не является тупиком: backup запускает read-only verifier
+из уже проверенного target image против старой схемы.
+
+Ошибка до успешного gate запускает проверяемый rollback. `rollback-node`
+повторно проверяет оба bundle, фиксирует journal checkpoint, выполняет target
+migration downgrade до source revision, запускает старые signed images и требует
+неизменные `last_sequence` и `last_event_hash`. Destructive restore не запускается
+автоматически; он остаётся отдельной процедурой при отказе проверяемого rollback.
 
 ## Приёмочные признаки
 
@@ -128,7 +165,11 @@ sh scripts/update-node.sh 1.0.1 /srv/cooperative-clearing/releases/1.0.1
 - после `--load-images` content ID каждого reference равен манифесту;
 - чистый узел стартует с `--pull never --no-build`;
 - закрытый ключ отсутствует в bundle и удалён с release workstation;
-- все `review_required` лицензии имеют отдельное подписанное решение.
+- все `review_required` лицензии имеют отдельное подписанное решение;
+- wrong signature, unknown manifest version и unsupported source transition
+  отклонены до mutation узла;
+- rollback вернул previous release/schema и сохранил событие, принятое после
+  pre-update backup, с тем же journal hash.
 
 ## FULL backup и recovery release
 

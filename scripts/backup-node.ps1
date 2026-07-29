@@ -32,6 +32,9 @@ if (-not $release -and (Test-Path (Join-Path $root ".env"))) {
     if ($releaseLine) { $release = $releaseLine.Substring("COOP_RELEASE=".Length) }
 }
 if (-not $release) { $release = "0.1.0-dev" }
+$consistencyVerifierRelease = if ($env:COOP_BACKUP_VERIFIER_RELEASE) {
+    $env:COOP_BACKUP_VERIFIER_RELEASE
+} else { $release }
 if (-not $VerifiedReleaseBundle) {
     $VerifiedReleaseBundle = if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
         $env:COOP_VERIFIED_RELEASE_BUNDLE
@@ -61,9 +64,6 @@ try {
         (& docker inspect --format "{{.State.Running}}" $workerContainer) -ne "true") {
         throw "API and worker must be running before a coordinated backup"
     }
-    $journal = @(& docker @compose exec -T api coopctl verify-journal)
-    if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
-    [IO.File]::WriteAllLines((Join-Path $work "journal-verification.json"), [string[]] $journal, $utf8)
 
     if ($VerifiedReleaseBundle) {
         if (-not $releasePublicKey) {
@@ -102,6 +102,40 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Could not quiesce application writers" }
     $stopped = $true
 
+    $originalRelease = $env:COOP_RELEASE
+    try {
+        $env:COOP_RELEASE = $consistencyVerifierRelease
+        $consistency = @(& docker @compose run --rm --no-deps api coopctl verify-restore-consistency)
+        if ($LASTEXITCODE -ne 0) { throw "Restore consistency verification failed" }
+    }
+    finally {
+        if ($null -eq $originalRelease) { Remove-Item Env:COOP_RELEASE -ErrorAction SilentlyContinue }
+        else { $env:COOP_RELEASE = $originalRelease }
+    }
+    [IO.File]::WriteAllLines(
+        (Join-Path $work "restore-consistency.json"),
+        [string[]] $consistency,
+        $utf8
+    )
+    $journal = @(& docker @compose run --rm --no-deps api coopctl verify-journal)
+    if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
+    [IO.File]::WriteAllLines((Join-Path $work "journal-verification.json"), [string[]] $journal, $utf8)
+
+    $secretStorageOutput = Join-Path $work "secret-storage-verification.txt"
+    $secretStorageArguments = @($compose) + @(
+        "exec", "-T", "postgres", "psql",
+        "-X", "-qAt", "-v", "ON_ERROR_STOP=1",
+        "-U", "coop_migrator", "-d", "cooperative_clearing", "-f", "-"
+    )
+    $secretStorageProcess = Start-Process -FilePath "docker" `
+        -ArgumentList $secretStorageArguments -NoNewWindow -Wait -PassThru `
+        -RedirectStandardInput (Join-Path $root "infra/postgres/verify-secret-storage.sql") `
+        -RedirectStandardOutput $secretStorageOutput
+    if ($secretStorageProcess.ExitCode -ne 0 -or
+        (Get-Content -LiteralPath $secretStorageOutput -Raw).Trim() -ne "secret_storage=PASS") {
+        throw "Secret storage verification failed"
+    }
+
     $dump = Join-Path $work "database.dump"
     $dumpArguments = @($compose) + @(
         "exec", "-T", "postgres", "pg_dump",
@@ -133,26 +167,49 @@ try {
         Copy-Item -LiteralPath $recoveryBundle -Destination (Join-Path $work "recovery.bundle.enc")
         $recoveryMaterial = "included-encrypted"
     }
+    $backupSecretAudit = @(
+        & python (Join-Path $PSScriptRoot "supply_secret_audit.py") backup --directory $work
+    )
+    if ($LASTEXITCODE -ne 0) { throw "Backup secret audit failed" }
+    [IO.File]::WriteAllLines(
+        (Join-Path $work "backup-secret-audit.json"),
+        [string[]] $backupSecretAudit,
+        $utf8
+    )
     $kind = if (
         $recoveryMaterial -eq "included-encrypted" -and
         $releaseMaterial -eq "included-verified"
     ) { "FULL" } else { "DATA_ONLY" }
     $manifestLines = @(
-        "format=cooperative-clearing-backup-v1"
+        "format=cooperative-clearing-backup-v2"
         "backup_id=$backupId"
         "backup_kind=$kind"
         "created_at=$timestamp"
         "release=$release"
+        "consistency_verifier_release=$consistencyVerifierRelease"
         "schema=$(($schema -join ' ').Trim())"
         "database=database.dump"
         "blobs=blobs.tar.gz"
         "recovery_material=$recoveryMaterial"
         "release_material=$releaseMaterial"
         "release_manifest_sha256=$releaseManifestHash"
+        "secret_storage_verification=secret-storage-verification.txt"
+        "backup_secret_audit=backup-secret-audit.json"
+        "restore_consistency=restore-consistency.json"
     )
     [IO.File]::WriteAllLines((Join-Path $work "manifest.env"), [string[]] $manifestLines, $utf8)
 
-    $files = @("database.dump", "blobs.tar.gz", "journal-verification.json", "schema.txt", "compose.yaml", "manifest.env")
+    $files = @(
+        "database.dump",
+        "blobs.tar.gz",
+        "journal-verification.json",
+        "restore-consistency.json",
+        "schema.txt",
+        "compose.yaml",
+        "manifest.env",
+        "secret-storage-verification.txt",
+        "backup-secret-audit.json"
+    )
     if (Test-Path (Join-Path $work "runtime.env")) { $files += "runtime.env" }
     if ($recoveryMaterial -eq "included-encrypted") {
         $files += "recovery.bundle.enc"

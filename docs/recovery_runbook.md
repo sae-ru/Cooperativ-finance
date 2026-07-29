@@ -108,9 +108,10 @@ clean host, known-good release, определение времени компр
 bash ./scripts/backup-node.sh /var/lib/cooperative-clearing/backups
 ```
 
-Финальная строка stdout содержит абсолютный каталог завершённой копии. Каталог
-появляется только после успешных journal, checksum, `pg_restore --list` и
-`tar -tzf` checks. `manifest.env` различает:
+Финальная строка stdout содержит абсолютный каталог завершённой копии. Формат
+`cooperative-clearing-backup-v2` появляется только после успешных journal,
+checksum, `pg_restore --list`, `tar -tzf`, redacted backup scan и
+`secret_storage=PASS`. `manifest.env` различает:
 
 - `FULL`: приложены отдельно зашифрованный recovery material и независимо
   проверенный signed release bundle точной версии;
@@ -128,10 +129,16 @@ Restore drill без воздействия на рабочий узел:
 bash ./scripts/verify-backup.sh /var/lib/cooperative-clearing/backups/<backup-id>
 ```
 
-Скрипт создаёт одноразовые PostgreSQL container, network и volumes,
-восстанавливает dump и blobs, сверяет schema, таблицы, signed events и число
-файлов, после чего удаляет временные ресурсы. Для Windows operator workstation
-доступны `backup-node.ps1` и `verify-backup.ps1`.
+Скрипт повторно сканирует dump/blobs/runtime, создаёт одноразовые PostgreSQL
+container, network и volumes, восстанавливает dump и blobs, выполняет SQL
+secret-storage contract на восстановленной БД, сверяет schema, таблицы, signed
+events и число файлов, после чего удаляет временные ресурсы. Для Windows
+operator workstation доступны `backup-node.ps1` и `verify-backup.ps1`.
+
+Проверенное локальное учение Slice 40 восстановило backup v2 со schema
+`0037_actor_assurance`, 149 таблицами, 434 signed events и 47 blob-файлами.
+Tampered DB с plaintext `users.password_hash` была отклонена без вывода
+значения.
 
 Контролируемый restore является разрушительной операцией и требует двух явных
 подтверждений:
@@ -165,6 +172,18 @@ runtime `coop_app`, init/bootstrap, health и signed journal проверены.
 Локальное время полного restore составило 168,5 секунды. Оно не закрывает RTO
 на резервном оборудовании и учение с реальными recovery custodians. Подробности:
 [implemented_slice_16.md](implemented_slice_16.md).
+## Проверенное учение Slice 44
+
+Update/rollback теперь использует подписанный exact transition. Previous и
+target bundle проверяются независимо; downgrade выполняется migration image
+нового release до запуска старого application image. Journal sequence/hash
+фиксируются при остановленных writers и обязаны совпасть после старта.
+
+Изолированный переход `s44-old@0037 -> s44-new@0038 -> s44-old@0037` сохранил
+сделку и signed event 267, принятые после pre-update backup. Неверная подпись и
+корректно подписанный manifest неизвестной версии были отклонены до mutation.
+При отказе verified rollback оператор не запускает автоматический restore, а
+переходит к согласованному backup по этой инструкции.
 ## Восстановление доступа пользователя
 
 Эта процедура не заменяет восстановление узла и не требует внешней почты, SMS
@@ -190,3 +209,21 @@ runtime `coop_app`, init/bootstrap, health и signed journal проверены.
 временный пароль второму контролёру, выполнять SQL reset или отключать проверку
 step-up. При подозрении на компрометацию сначала изолируют узел/сессии и
 сохраняют evidence, затем проводят recovery.
+
+## Проверка согласованности Slice 43
+
+Успех backup/restore теперь требует не только checksum архива и совпадения числа
+файлов. `backup-node` в quiesced boundary создаёт `restore-consistency.json`,
+который входит в `SHA256SUMS`. `verify-backup` восстанавливает DB и blobs в
+одноразовые ресурсы и запускает `coopctl verify-restore-consistency` от UID
+`10001` с установленными recovery secrets.
+
+Команда полностью проверяет signed journal, соответствие активного Ed25519 key,
+расшифрование всех TOTP factors и каждого `READY` evidence blob с контролем
+AES-GCM, размера и plaintext SHA-256. В `restore-node` этот gate выполняется после
+migrations/init/bootstrap и до запуска API, worker, frontend и gateway. Secret
+values, TOTP seeds, содержимое и filesystem paths в JSON не выводятся.
+
+Encrypted recovery bundle расшифровывают и устанавливают независимые хранители;
+приложение не получает custody над recovery key, а доказывает совпадение уже
+установленного материала с восстановленными данными.

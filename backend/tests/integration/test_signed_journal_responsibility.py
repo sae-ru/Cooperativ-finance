@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from cooperative_clearing.cli import initialize_node
 from cooperative_clearing.modules.audit.infrastructure.models import AuditEntry
@@ -17,20 +18,29 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
     RoleAssignment,
     UserAccount,
 )
-from cooperative_clearing.modules.journal.application.outbox import dispatch_outbox_batch
+from cooperative_clearing.modules.journal.application.outbox import (
+    DispatchResult,
+    dispatch_outbox_batch,
+)
 from cooperative_clearing.modules.journal.application.service import (
+    OUTBOX_TOPIC,
     ActorClaim,
     SignedJournalService,
     verify_journal,
 )
 from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
     CommandAssurance,
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.journal.infrastructure.models import (
     ConsumerReceipt,
+    EventSignature,
     OutboxMessage,
     SignedEvent,
 )
@@ -189,6 +199,46 @@ async def create_people_and_roles(
             cooperative_id,
         ),
     )
+
+
+async def drain_pending_outbox(database: Database) -> None:
+    while True:
+        async with database.session() as session:
+            result = await dispatch_outbox_batch(
+                session,
+                instance_id=uuid4(),
+                batch_size=500,
+                lease_seconds=30,
+                max_attempts=1,
+            )
+            await session.commit()
+        if result.claimed == 0:
+            return
+
+
+async def append_probe_event(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    actor: Principal,
+    event_type: str,
+) -> UUID:
+    assert actor.member_id is not None
+    role = actor.roles[0]
+    appended = await SignedJournalService(settings).append(
+        session,
+        event_type=event_type,
+        aggregate_type="atomicity_probe",
+        aggregate_id=uuid4(),
+        aggregate_version=1,
+        actor=ActorClaim(
+            person_id=actor.member_id,
+            organization_id=role.cooperative_id,
+            role_assignment_id=role.assignment_id,
+        ),
+        payload={"probe": event_type},
+    )
+    return appended.event_id
 
 
 @pytest.mark.integration
@@ -520,6 +570,262 @@ async def test_concurrent_commands_preserve_node_sequence() -> None:
 
 
 @pytest.mark.integration
+async def test_database_rejects_event_without_signature_and_outbox() -> None:
+    settings = Settings(service_name="journal-atomicity-guard-integration")
+    await initialize_node(settings)
+    database = Database.from_settings(settings)
+    try:
+        _target_member_id, creator, _approver, _target = await create_people_and_roles(database)
+        async with database.session() as session:
+            before = (
+                int(await session.scalar(select(func.count()).select_from(SignedEvent)) or 0),
+                int(await session.scalar(select(func.count()).select_from(EventSignature)) or 0),
+                int(await session.scalar(select(func.count()).select_from(OutboxMessage)) or 0),
+            )
+            event_id = await append_probe_event(
+                session,
+                settings=settings,
+                actor=creator,
+                event_type="journal.atomicity_guard_probe",
+            )
+            delivery_rows = [
+                row for row in list(session.new) if isinstance(row, (EventSignature, OutboxMessage))
+            ]
+            assert {type(row) for row in delivery_rows} == {EventSignature, OutboxMessage}
+            for row in delivery_rows:
+                session.expunge(row)
+
+            with pytest.raises(DBAPIError) as failed_commit:
+                await session.commit()
+            error = str(failed_commit.value)
+            assert "EVENT_DELIVERY_ATOMICITY_VIOLATION" in error
+            assert str(event_id) not in error
+            await session.rollback()
+
+        async with database.session() as session:
+            after = (
+                int(await session.scalar(select(func.count()).select_from(SignedEvent)) or 0),
+                int(await session.scalar(select(func.count()).select_from(EventSignature)) or 0),
+                int(await session.scalar(select(func.count()).select_from(OutboxMessage)) or 0),
+            )
+        assert after == before
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.integration
+async def test_worker_crash_and_concurrent_restart_deliver_once() -> None:
+    settings = Settings(service_name="outbox-recovery-integration")
+    await initialize_node(settings)
+    database = Database.from_settings(settings)
+    try:
+        await drain_pending_outbox(database)
+        target_member_id, creator, _approver, target = await create_people_and_roles(database)
+        cooperative_id = creator.roles[0].cooperative_id
+        assert cooperative_id is not None
+        subject_id = uuid4()
+        expected_summary_hash = proposal_hash(
+            cooperative_id=cooperative_id,
+            member_id=target_member_id,
+            role_assignment_id=target.roles[0].assignment_id,
+            subject_type="worker_outage_asset",
+            subject_id=subject_id,
+            scope="Worker outage proof",
+            max_exposure=Decimal("4.0000"),
+            exposure_unit="UNIT",
+        )
+        async with database.session() as session:
+            proposed = await ResponsibilityService(settings).propose(
+                session,
+                principal=creator,
+                cooperative_id=cooperative_id,
+                member_id=target_member_id,
+                role_assignment_id=target.roles[0].assignment_id,
+                subject_type="worker_outage_asset",
+                subject_id=subject_id,
+                scope="Worker outage proof",
+                max_exposure=Decimal("4.0000"),
+                exposure_unit="UNIT",
+                valid_until=None,
+                expected_summary_hash=expected_summary_hash,
+                idempotency_key=str(uuid4()),
+                request_id=uuid4(),
+            )
+            await session.commit()
+
+        async with database.session() as session:
+            assignment = await session.get(ResponsibilityAssignment, proposed.object_id)
+            message = (
+                await session.execute(
+                    select(OutboxMessage).where(OutboxMessage.event_id == proposed.event_id)
+                )
+            ).scalar_one()
+            assert assignment is not None and assignment.status == "PENDING_APPROVAL"
+            assert message.status == "PENDING"
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ConsumerReceipt)
+                    .where(ConsumerReceipt.event_id == proposed.event_id)
+                )
+                == 0
+            )
+
+        async with database.session() as session:
+            interrupted = await dispatch_outbox_batch(
+                session,
+                instance_id=uuid4(),
+                batch_size=1,
+                lease_seconds=30,
+                max_attempts=5,
+            )
+            assert interrupted.claimed == 1 and interrupted.published == 1
+            await session.rollback()
+
+        async with database.session() as session:
+            message = (
+                await session.execute(
+                    select(OutboxMessage).where(OutboxMessage.event_id == proposed.event_id)
+                )
+            ).scalar_one()
+            assert message.status == "PENDING"
+            assert message.attempt_count == 0
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ConsumerReceipt)
+                    .where(ConsumerReceipt.event_id == proposed.event_id)
+                )
+                == 0
+            )
+
+        async def restart_worker() -> DispatchResult:
+            async with database.session() as session:
+                result = await dispatch_outbox_batch(
+                    session,
+                    instance_id=uuid4(),
+                    batch_size=1,
+                    lease_seconds=30,
+                    max_attempts=5,
+                )
+                await session.commit()
+                return result
+
+        results = await asyncio.gather(restart_worker(), restart_worker())
+        assert sum(result.claimed for result in results) == 1
+        assert sum(result.published for result in results) == 1
+
+        async with database.session() as session:
+            message = (
+                await session.execute(
+                    select(OutboxMessage).where(OutboxMessage.event_id == proposed.event_id)
+                )
+            ).scalar_one()
+            assert message.status == "PUBLISHED"
+            assert message.attempt_count == 1
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ConsumerReceipt)
+                    .where(ConsumerReceipt.event_id == proposed.event_id)
+                )
+                == 1
+            )
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.integration
+async def test_outbox_tamper_is_detected_quarantined_and_recoverable() -> None:
+    settings = Settings(service_name="outbox-tamper-integration")
+    await initialize_node(settings)
+    database = Database.from_settings(settings)
+    try:
+        await drain_pending_outbox(database)
+        _target_member_id, creator, _approver, _target = await create_people_and_roles(database)
+        async with database.session() as session:
+            event_id = await append_probe_event(
+                session,
+                settings=settings,
+                actor=creator,
+                event_type="journal.outbox_tamper_probe",
+            )
+            await session.commit()
+
+        async with database.session() as session:
+            message = (
+                await session.execute(
+                    select(OutboxMessage).where(OutboxMessage.event_id == event_id)
+                )
+            ).scalar_one()
+            original_payload = dict(message.payload)
+            message.payload = {**original_payload, "event_hash": "sha256:" + "0" * 64}
+            await session.commit()
+
+        async with database.session() as session:
+            node = (
+                await session.execute(
+                    select(NodeProfile).where(NodeProfile.node_code == settings.node_code)
+                )
+            ).scalar_one()
+            report = await verify_journal(session, node.id)
+            failure = next(item for item in report.failures if item.event_id == event_id)
+            assert failure.code == "OUTBOX_PAYLOAD_INVALID"
+            dispatched = await dispatch_outbox_batch(
+                session,
+                instance_id=uuid4(),
+                batch_size=1,
+                lease_seconds=30,
+                max_attempts=1,
+            )
+            await session.commit()
+            assert dispatched.quarantined == 1
+
+        async with database.session() as session:
+            message = (
+                await session.execute(
+                    select(OutboxMessage).where(OutboxMessage.event_id == event_id)
+                )
+            ).scalar_one()
+            assert message.status == "QUARANTINED"
+            assert message.last_error_code == "OUTBOX_EVENT_ENVELOPE_MISMATCH"
+            assert (
+                await session.scalar(
+                    select(func.count())
+                    .select_from(ConsumerReceipt)
+                    .where(ConsumerReceipt.event_id == event_id)
+                )
+                == 0
+            )
+            message.payload = original_payload
+            message.status = "PENDING"
+            message.attempt_count = 0
+            message.available_at = datetime.now(UTC)
+            message.last_error_code = None
+            await session.commit()
+
+        async with database.session() as session:
+            recovered = await dispatch_outbox_batch(
+                session,
+                instance_id=uuid4(),
+                batch_size=1,
+                lease_seconds=30,
+                max_attempts=5,
+            )
+            await session.commit()
+            assert recovered.published == 1
+        async with database.session() as session:
+            node = (
+                await session.execute(
+                    select(NodeProfile).where(NodeProfile.node_code == settings.node_code)
+                )
+            ).scalar_one()
+            assert (await verify_journal(session, node.id)).ok is True
+    finally:
+        await database.dispose()
+
+
+@pytest.mark.integration
 async def test_outbox_retries_then_quarantines_invalid_message() -> None:
     settings = Settings(service_name="outbox-quarantine-integration")
     await initialize_node(settings)
@@ -605,6 +911,12 @@ async def test_outbox_retries_then_quarantines_invalid_message() -> None:
                 .where(ConsumerReceipt.event_id == proposed.event_id)
             )
             assert receipt_count == 0
+            quarantined_message.topic = OUTBOX_TOPIC
+            quarantined_message.status = "PENDING"
+            quarantined_message.attempt_count = 0
+            quarantined_message.available_at = datetime.now(UTC)
+            quarantined_message.last_error_code = None
+            await session.commit()
     finally:
         await database.dispose()
 
@@ -615,9 +927,7 @@ async def test_signed_event_rejects_forged_actor_role_and_scope() -> None:
     await initialize_node(settings)
     database = Database.from_settings(settings)
     try:
-        target_member_id, creator, _approver, target = await create_people_and_roles(
-            database
-        )
+        target_member_id, creator, _approver, target = await create_people_and_roles(database)
         cooperative_id = creator.roles[0].cooperative_id
         assert cooperative_id is not None
         assert creator.member_id is not None
@@ -687,18 +997,18 @@ async def test_signed_event_rejects_forged_actor_role_and_scope() -> None:
     finally:
         await database.dispose()
 
+
 @pytest.mark.integration
 async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -> None:
     settings = Settings(service_name="journal-command-assurance-integration")
     await initialize_node(settings)
     database = Database.from_settings(settings)
     try:
-        _target_member_id, creator, _approver, _target = await create_people_and_roles(
-            database
-        )
+        target_member_id, creator, approver, _target = await create_people_and_roles(database)
         cooperative_id = creator.roles[0].cooperative_id
         assert cooperative_id is not None
         assert creator.member_id is not None
+        assert approver.member_id is not None
         actor = ActorClaim(
             person_id=creator.member_id,
             organization_id=cooperative_id,
@@ -740,12 +1050,62 @@ async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -
                     aggregate_version=1,
                     actor=actor,
                     payload={"amount": "5.00"},
-                    assurance=CommandAssurance(exposure=exposure, evidence_refs=()),
+                    assurance=CommandAssurance(
+                        on_behalf_of=actor_party(actor),
+                        exposure=exposure,
+                        evidence_refs=(),
+                        next_responsible=(member_party(target_member_id),),
+                    ),
                 )
             assert no_evidence.value.code == "CRITICAL_COMMAND_EVIDENCE_REQUIRED"
             await session.rollback()
 
         evidence = ({"event_id": str(uuid4()), "kind": "SHARE_CONTRIBUTION_SOURCE"},)
+        async with database.session() as session:
+            with pytest.raises(DomainError) as wrong_scope:
+                await journal.append(
+                    session,
+                    event_type="shares.contribution_recorded",
+                    aggregate_type="share_account",
+                    aggregate_id=subject_id,
+                    aggregate_version=1,
+                    actor=actor,
+                    payload={"amount": "5.00"},
+                    assurance=CommandAssurance(
+                        on_behalf_of=AccountabilityParty(
+                            kind=AccountabilityPartyKind.COOPERATIVE,
+                            reference=str(uuid4()),
+                            role_assignment_id=creator.roles[0].assignment_id,
+                        ),
+                        exposure=exposure,
+                        evidence_refs=evidence,
+                        next_responsible=(member_party(target_member_id),),
+                    ),
+                )
+            assert wrong_scope.value.code == "COMMAND_ASSURANCE_SCOPE_MISMATCH"
+            await session.rollback()
+
+        async with database.session() as session:
+            with pytest.raises(DomainError) as evidence_conflict:
+                await journal.append(
+                    session,
+                    event_type="shares.contribution_recorded",
+                    aggregate_type="share_account",
+                    aggregate_id=subject_id,
+                    aggregate_version=1,
+                    actor=actor,
+                    payload={"amount": "5.00"},
+                    evidence=list(evidence),
+                    assurance=CommandAssurance(
+                        on_behalf_of=actor_party(actor),
+                        exposure=exposure,
+                        evidence_refs=evidence,
+                        next_responsible=(member_party(target_member_id),),
+                    ),
+                )
+            assert evidence_conflict.value.code == "COMMAND_ASSURANCE_EVIDENCE_CONFLICT"
+            await session.rollback()
+
         async with database.session() as session:
             appended = await journal.append(
                 session,
@@ -755,7 +1115,24 @@ async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -
                 aggregate_version=1,
                 actor=actor,
                 payload={"amount": "5.00"},
-                assurance=CommandAssurance(exposure=exposure, evidence_refs=evidence),
+                assurance=CommandAssurance(
+                    on_behalf_of=actor_party(actor),
+                    exposure=exposure,
+                    evidence_refs=evidence,
+                    next_responsible=(member_party(target_member_id),),
+                    attesters=(
+                        member_party(
+                            approver.member_id,
+                            approver.roles[0].assignment_id,
+                        ),
+                    ),
+                    approvers=(
+                        member_party(
+                            creator.member_id,
+                            creator.roles[0].assignment_id,
+                        ),
+                    ),
+                ),
             )
             await session.commit()
 
@@ -764,10 +1141,15 @@ async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -
             assert event is not None
             assurance = event.payload["_command_assurance"]
             assert isinstance(assurance, dict)
-            assert assurance["format"] == "critical-command-assurance-v1"
-            assert assurance["actor"] == {
+            assert assurance["format"] == "critical-command-assurance-v2"
+            assert assurance["performed_by"] == {
                 "person_id": str(creator.member_id),
                 "user_id": str(creator.user_id),
+            }
+            assert assurance["on_behalf_of"] == {
+                "kind": "COOPERATIVE",
+                "reference": str(cooperative_id),
+                "role_assignment_id": str(creator.roles[0].assignment_id),
             }
             assert assurance["role"] == {
                 "assignment_id": str(creator.roles[0].assignment_id),
@@ -778,6 +1160,27 @@ async def test_critical_event_requires_signed_evidence_and_exposure_snapshot() -
                 "actor_organization_id": str(cooperative_id),
                 "role_cooperative_id": str(cooperative_id),
             }
+            assert assurance["attesters"] == [
+                {
+                    "kind": "MEMBER",
+                    "reference": str(approver.member_id),
+                    "role_assignment_id": str(approver.roles[0].assignment_id),
+                }
+            ]
+            assert assurance["approvers"] == [
+                {
+                    "kind": "MEMBER",
+                    "reference": str(creator.member_id),
+                    "role_assignment_id": str(creator.roles[0].assignment_id),
+                }
+            ]
+            assert assurance["next_responsible"] == [
+                {
+                    "kind": "MEMBER",
+                    "reference": str(target_member_id),
+                    "role_assignment_id": None,
+                }
+            ]
             assert assurance["exposure"] == {
                 "category": "SHARE",
                 "effect": "CREATE",

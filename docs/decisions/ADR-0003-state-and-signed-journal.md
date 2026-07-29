@@ -21,3 +21,8 @@ Read models могут перестраиваться, но operational state н
 ## Validation
 
 State/event/audit/outbox commit атомарен; runtime не имеет UPDATE/DELETE журнала.
+
+Начиная с revision `0038_atomic_event_outbox`, deferred constraint trigger на
+`signed_events` не позволяет завершить commit без одной NODE signature и одной
+canonical outbox row. Независимый verifier начинает со всех событий, поэтому
+missing signature/outbox не скрывается join-ом.

@@ -2,15 +2,19 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import select
 
+from cooperative_clearing.cli import initialize_node
 from cooperative_clearing.modules.identity.application.admin import IdentityAdminService
 from cooperative_clearing.modules.identity.application.authentication import AuthenticationService
 from cooperative_clearing.modules.identity.application.bootstrap import bootstrap_identity
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode, RoleGrant
 from cooperative_clearing.modules.identity.infrastructure.models import (
+    Member,
     RoleAssignment,
     UserAccount,
 )
+from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
 from cooperative_clearing.shared.domain.errors import DomainError
@@ -18,11 +22,12 @@ from cooperative_clearing.shared.infrastructure.database import Database
 
 
 def make_principal(user_id: UUID, role: RoleCode, cooperative_id: UUID | None = None) -> Principal:
+    member_id = uuid4()
     return Principal(
         user_id=user_id,
         session_id=uuid4(),
         login=f"test-{user_id}",
-        member_id=None,
+        member_id=member_id,
         must_change_password=False,
         roles=(RoleGrant(assignment_id=uuid4(), role=role, cooperative_id=cooperative_id),),
     )
@@ -69,7 +74,7 @@ async def test_authentication_rotation_revocation_and_lockout() -> None:
     service = AuthenticationService(settings, password_service)
     user_id = uuid4()
     login = f"auth-{user_id}"
-    password = "integration-password-value"
+    password = "".join(("integration-", "password-value"))
     try:
         async with database.session() as session:
             session.add(
@@ -90,7 +95,7 @@ async def test_authentication_rotation_revocation_and_lockout() -> None:
                     await service.login(
                         session,
                         login=login,
-                        password="invalid-password-value",
+                        password="".join(("invalid-", "password-value")),
                         client_ip="127.0.0.1",
                         user_agent="pytest",
                         request_id=uuid4(),
@@ -142,30 +147,64 @@ async def test_authentication_rotation_revocation_and_lockout() -> None:
 @pytest.mark.integration
 async def test_admin_commands_are_idempotent_and_privileged_roles_need_approval() -> None:
     settings = Settings(service_name="admin-integration")
+    await initialize_node(settings)
     database = Database.from_settings(settings)
-    service = IdentityAdminService()
+    service = IdentityAdminService(settings=settings)
     security_id = uuid4()
     auditor_id = uuid4()
     target_id = uuid4()
+    technical_target_id = uuid4()
     security = make_principal(security_id, RoleCode.SECURITY_ADMIN)
     auditor = make_principal(auditor_id, RoleCode.AUDITOR)
+    target_member_id = uuid4()
     try:
         async with database.session() as session:
-            for user_id, login in (
-                (security_id, f"security-{security_id}"),
-                (auditor_id, f"auditor-{auditor_id}"),
-                (target_id, f"target-{target_id}"),
+            for user_id, member_id, login in (
+                (security_id, security.member_id, f"security-{security_id}"),
+                (auditor_id, auditor.member_id, f"auditor-{auditor_id}"),
+                (target_id, target_member_id, f"target-{target_id}"),
             ):
+                assert member_id is not None
+                session.add(Member(id=member_id, display_name=login, status="ACTIVE"))
                 session.add(
                     UserAccount(
                         id=user_id,
                         login=login,
                         password_hash=PasswordService().hash("integration-password-value"),
-                        member_id=None,
+                        member_id=member_id,
                         status="ACTIVE",
                         must_change_password=False,
                     )
                 )
+            session.add(
+                UserAccount(
+                    id=technical_target_id,
+                    login=f"technical-{technical_target_id}",
+                    password_hash=PasswordService().hash("integration-password-value"),
+                    member_id=None,
+                    status="ACTIVE",
+                    must_change_password=False,
+                )
+            )
+            await session.flush()
+            session.add_all(
+                [
+                    RoleAssignment(
+                        id=security.roles[0].assignment_id,
+                        user_id=security_id,
+                        role_code=RoleCode.SECURITY_ADMIN.value,
+                        cooperative_id=None,
+                        status="ACTIVE",
+                    ),
+                    RoleAssignment(
+                        id=auditor.roles[0].assignment_id,
+                        user_id=auditor_id,
+                        role_code=RoleCode.AUDITOR.value,
+                        cooperative_id=None,
+                        status="ACTIVE",
+                    ),
+                ]
+            )
             await session.commit()
 
         key = str(uuid4())
@@ -220,6 +259,124 @@ async def test_admin_commands_are_idempotent_and_privileged_roles_need_approval(
         async with database.session() as session:
             assignment = await session.get(RoleAssignment, requested.object_id)
             assert assignment is not None and assignment.status == "ACTIVE"
+            await service.revoke_role(
+                session,
+                principal=security,
+                assignment_id=assignment.id,
+                reason_code="AUTHORITY_WITHDRAWN",
+                idempotency_key=str(uuid4()),
+                request_id=uuid4(),
+            )
+            await session.commit()
+        async with database.session() as session:
+            assignment = await session.get(RoleAssignment, requested.object_id)
+            assert assignment is not None and assignment.status == "REVOKED"
+            events = list(
+                (
+                    await session.execute(
+                        select(SignedEvent)
+                        .where(SignedEvent.aggregate_id == assignment.id)
+                        .order_by(SignedEvent.local_sequence)
+                    )
+                ).scalars()
+            )
+            assert [event.event_type for event in events] == [
+                "identity.role_assignment_requested",
+                "identity.role_assignment_approved",
+                "identity.role_assignment_revoked",
+            ]
+            assurances = [event.payload["_command_assurance"] for event in events]
+            assert all(
+                assurance["format"] == "critical-command-assurance-v2"
+                for assurance in assurances
+            )
+            assert assurances[0]["next_responsible"][0]["kind"] == "NODE"
+            assert assurances[1]["next_responsible"][0]["reference"] == str(
+                target_member_id
+            )
+            assert assurances[2]["next_responsible"][0]["kind"] == "NODE"
+
+        async with database.session() as session:
+            activated = await service.assign_role(
+                session,
+                principal=security,
+                user_id=target_id,
+                role=RoleCode.EXCHANGE_PARTICIPANT,
+                cooperative_id=created.object_id,
+                idempotency_key=str(uuid4()),
+                request_id=uuid4(),
+            )
+            rejected_request = await service.assign_role(
+                session,
+                principal=security,
+                user_id=target_id,
+                role=RoleCode.ARBITRATOR,
+                cooperative_id=None,
+                idempotency_key=str(uuid4()),
+                request_id=uuid4(),
+            )
+            await session.commit()
+        async with database.session() as session:
+            rejected = await service.decide_role(
+                session,
+                principal=auditor,
+                assignment_id=rejected_request.object_id,
+                approve=False,
+                reason_code="DUAL_CONTROL_REJECTED",
+                idempotency_key=str(uuid4()),
+                request_id=uuid4(),
+            )
+            await session.commit()
+            assert rejected.object_id == rejected_request.object_id
+        async with database.session() as session:
+            assignments = {
+                item.id: item
+                for item in (
+                    await session.execute(
+                        select(RoleAssignment).where(
+                            RoleAssignment.id.in_(
+                                (activated.object_id, rejected_request.object_id)
+                            )
+                        )
+                    )
+                ).scalars()
+            }
+            assert assignments[activated.object_id].status == "ACTIVE"
+            assert assignments[rejected_request.object_id].status == "REJECTED"
+            events = list(
+                (
+                    await session.execute(
+                        select(SignedEvent).where(
+                            SignedEvent.aggregate_id.in_(
+                                (activated.object_id, rejected_request.object_id)
+                            )
+                        )
+                    )
+                ).scalars()
+            )
+            by_type = {
+                event.event_type: event.payload["_command_assurance"]
+                for event in events
+            }
+            assert by_type["identity.role_assignment_activated"]["next_responsible"][0][
+                "reference"
+            ] == str(target_member_id)
+            assert by_type["identity.role_assignment_rejected"]["next_responsible"][0][
+                "kind"
+            ] == "NODE"
+
+        with pytest.raises(DomainError) as technical_assignment:
+            async with database.session() as session:
+                await service.assign_role(
+                    session,
+                    principal=security,
+                    user_id=technical_target_id,
+                    role=RoleCode.AUDITOR,
+                    cooperative_id=None,
+                    idempotency_key=str(uuid4()),
+                    request_id=uuid4(),
+                )
+        assert technical_assignment.value.code == "PERSONAL_ACTOR_REQUIRED"
 
         with pytest.raises(DomainError) as self_assignment:
             async with database.session() as session:

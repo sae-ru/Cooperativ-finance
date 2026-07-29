@@ -52,6 +52,16 @@ from cooperative_clearing.modules.journal.application.service import (
     ActorClaim,
     SignedJournalService,
 )
+from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    actor_party,
+    member_party,
+)
 from cooperative_clearing.modules.responsibility.infrastructure.models import (
     ResponsibilityAssignment,
 )
@@ -219,6 +229,7 @@ class CustodyContinuityService:
         now = datetime.now(UTC)
         case_id = uuid4()
         actor = self._actor(principal, continuity.cooperative_id, REQUEST_ROLES)
+        scope_party = self._cooperative_party(continuity.cooperative_id)
         request_event = await self.journal.append(
             session,
             event_type="responsibility.custody_continuity_started",
@@ -234,6 +245,21 @@ class CustodyContinuityService:
                 "warehouse_id": str(warehouse.id),
                 "lot_count": len(lots),
             },
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.CUSTODY,
+                    effect=ExposureEffect.REQUEST,
+                    subject_type="custody_continuity_case",
+                    subject_id=case_id,
+                    maximum_loss=source.max_exposure,
+                    unit=source.exposure_unit,
+                    basis_refs=evidence,
+                ),
+                evidence_refs=tuple({"reference": item} for item in evidence),
+                next_responsible=(scope_party,),
+                attesters=(actor_party(actor),),
+            ),
         )
         continuity_case = CustodyContinuityCase(
             id=case_id,
@@ -280,6 +306,23 @@ class CustodyContinuityService:
                     "warehouse_id": str(warehouse.id),
                     "previous_lot_version": lot.version,
                 },
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.HOLD,
+                        subject_type="inventory_lot",
+                        subject_id=lot.id,
+                        amount=_lot_quantity(lot),
+                        unit=f"asset-unit:{lot.unit_id}",
+                        basis_refs=(str(request_event.event_id),),
+                    ),
+                    evidence_refs=(
+                        {"requested_event_id": str(request_event.event_id)},
+                    ),
+                    next_responsible=(scope_party,),
+                    attesters=(actor_party(actor),),
+                ),
             )
             lot.continuity_hold_case_id = case_id
             lot.updated_at = now
@@ -544,6 +587,19 @@ class CustodyContinuityService:
             raise _error("INDEPENDENT_CUSTODY_APPROVER_REQUIRED", 403)
 
         actor = self._actor(principal, continuity_case.cooperative_id, REVIEW_ROLES)
+        scope_party = self._cooperative_party(continuity_case.cooperative_id)
+        target_party = member_party(
+            continuity_case.target_member_id,
+            continuity_case.target_role_assignment_id,
+        )
+        decision_evidence: tuple[object, ...] = (
+            {"requested_event_id": str(continuity_case.requested_event_id)},
+            *(
+                {"attestation_event_id": str(item.event_id)}
+                for item in items
+                if item.event_id is not None
+            ),
+        )
         now = datetime.now(UTC)
         if approve:
             blockers = await self._state_blockers(
@@ -585,6 +641,24 @@ class CustodyContinuityService:
                         continuity_case.temporary_valid_until.isoformat()
                     ),
                 },
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.APPROVE,
+                        subject_type="custody_continuity_case",
+                        subject_id=continuity_case.id,
+                        maximum_loss=source.max_exposure,
+                        unit=source.exposure_unit,
+                        basis_refs=(
+                            str(continuity_case.requested_event_id),
+                            *tuple(continuity_case.evidence_refs),
+                        ),
+                    ),
+                    evidence_refs=decision_evidence,
+                    next_responsible=(target_party,),
+                    approvers=(actor_party(actor),),
+                ),
             )
             session.add(
                 ResponsibilityAssignment(
@@ -625,6 +699,22 @@ class CustodyContinuityService:
                 aggregate_version=continuity_case.version + 1,
                 actor=actor,
                 payload=payload,
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.REJECT,
+                        subject_type="custody_continuity_case",
+                        subject_id=continuity_case.id,
+                        basis_refs=(
+                            str(continuity_case.requested_event_id),
+                            *tuple(continuity_case.evidence_refs),
+                        ),
+                    ),
+                    evidence_refs=decision_evidence,
+                    next_responsible=(scope_party,),
+                    approvers=(actor_party(actor),),
+                ),
             )
             await self._release_holds(session, continuity_case, items, actor, reason)
             continuity_case.status = CustodyContinuityStatus.REJECTED.value
@@ -734,6 +824,16 @@ class CustodyContinuityService:
             frozenset({RoleCode.WAREHOUSE_CUSTODIAN}),
             exact_assignment_id=target_role.id,
         )
+        scope_party = self._cooperative_party(continuity_case.cooperative_id)
+        target_party = member_party(target_member.id, target_role.id)
+        case_evidence: tuple[object, ...] = (
+            {"requested_event_id": str(continuity_case.requested_event_id)},
+            *(
+                ({"approved_event_id": str(continuity_case.decided_event_id)},)
+                if continuity_case.decided_event_id is not None
+                else ()
+            ),
+        )
         now = datetime.now(UTC)
         evidence: list[EvidenceBlob] = []
         if accept:
@@ -776,6 +876,30 @@ class CustodyContinuityService:
                     "lot_count": len(items),
                     "evidence": self._evidence_payload(evidence),
                 },
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.EXECUTE,
+                        subject_type="custody_continuity_case",
+                        subject_id=continuity_case.id,
+                        maximum_loss=target_assignment.max_exposure,
+                        unit=target_assignment.exposure_unit,
+                        basis_refs=(
+                            str(continuity_case.requested_event_id),
+                            str(continuity_case.decided_event_id),
+                        ),
+                    ),
+                    evidence_refs=(
+                        *case_evidence,
+                        *(
+                            {"evidence_id": str(item.id), "sha256": item.expected_sha256}
+                            for item in evidence
+                        ),
+                    ),
+                    next_responsible=(target_party,),
+                    attesters=(actor_party(actor),),
+                ),
             )
             source = await session.get(
                 ResponsibilityAssignment,
@@ -801,6 +925,27 @@ class CustodyContinuityService:
                         "warehouse_id": str(continuity_case.warehouse_id),
                         "quantity": decimal_text(_lot_quantity(lot)),
                     },
+                    assurance=CommandAssurance(
+                        on_behalf_of=scope_party,
+                        exposure=ExposureClaim(
+                            category=ExposureCategory.CUSTODY,
+                            effect=ExposureEffect.TRANSFER,
+                            subject_type="inventory_lot",
+                            subject_id=lot.id,
+                            amount=_lot_quantity(lot),
+                            unit=f"asset-unit:{lot.unit_id}",
+                            basis_refs=(
+                                str(event.event_id),
+                                str(continuity_case.requested_event_id),
+                            ),
+                        ),
+                        evidence_refs=(
+                            {"acceptance_event_id": str(event.event_id)},
+                            *case_evidence,
+                        ),
+                        next_responsible=(target_party,),
+                        attesters=(actor_party(actor),),
+                    ),
                 )
                 session.add(
                     CustodyTransfer(
@@ -853,6 +998,25 @@ class CustodyContinuityService:
                 aggregate_version=continuity_case.version + 1,
                 actor=actor,
                 payload=payload,
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.REJECT,
+                        subject_type="custody_continuity_case",
+                        subject_id=continuity_case.id,
+                        basis_refs=(
+                            str(continuity_case.requested_event_id),
+                            reason,
+                        ),
+                    ),
+                    evidence_refs=(
+                        *case_evidence,
+                        {"reason_code": reason},
+                    ),
+                    next_responsible=(scope_party,),
+                    attesters=(actor_party(actor),),
+                ),
             )
             target_assignment.status = "REJECTED"
             target_assignment.version += 1
@@ -1000,6 +1164,7 @@ class CustodyContinuityService:
         actor = self._actor_for_any_permanent_role(
             principal, continuity_case.cooperative_id
         )
+        scope_party = self._cooperative_party(continuity_case.cooperative_id)
         event = await self.journal.append(
             session,
             event_type="responsibility.custody_continuity_blocked",
@@ -1011,6 +1176,25 @@ class CustodyContinuityService:
                 "custody_continuity_case_id": str(continuity_case.id),
                 "blocked_reasons": sorted(set(blockers)),
             },
+            assurance=CommandAssurance(
+                on_behalf_of=scope_party,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.CUSTODY,
+                    effect=ExposureEffect.HOLD,
+                    subject_type="custody_continuity_case",
+                    subject_id=continuity_case.id,
+                    basis_refs=(
+                        str(continuity_case.requested_event_id),
+                        *tuple(sorted(set(blockers))),
+                    ),
+                ),
+                evidence_refs=(
+                    {"requested_event_id": str(continuity_case.requested_event_id)},
+                    {"blocked_reasons": sorted(set(blockers))},
+                ),
+                next_responsible=(scope_party,),
+                attesters=(actor_party(actor),),
+            ),
         )
         continuity_case.status = CustodyContinuityStatus.BLOCKED.value
         continuity_case.blocked_reasons = sorted(set(blockers))
@@ -1043,6 +1227,7 @@ class CustodyContinuityService:
     ) -> None:
         lots = await self._locked_lots(session, items)
         now = datetime.now(UTC)
+        scope_party = self._cooperative_party(continuity_case.cooperative_id)
         for lot in lots.values():
             if lot.continuity_hold_case_id != continuity_case.id:
                 continue
@@ -1057,6 +1242,27 @@ class CustodyContinuityService:
                     "custody_continuity_case_id": str(continuity_case.id),
                     "reason_code": reason,
                 },
+                assurance=CommandAssurance(
+                    on_behalf_of=scope_party,
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=ExposureEffect.RELEASE,
+                        subject_type="inventory_lot",
+                        subject_id=lot.id,
+                        amount=_lot_quantity(lot),
+                        unit=f"asset-unit:{lot.unit_id}",
+                        basis_refs=(
+                            str(continuity_case.requested_event_id),
+                            reason,
+                        ),
+                    ),
+                    evidence_refs=(
+                        {"requested_event_id": str(continuity_case.requested_event_id)},
+                        {"reason_code": reason},
+                    ),
+                    next_responsible=(scope_party,),
+                    approvers=(actor_party(actor),),
+                ),
             )
             lot.continuity_hold_case_id = None
             lot.updated_at = now
@@ -1135,6 +1341,13 @@ class CustodyContinuityService:
             ).scalars()
         )
         return {item.id: item for item in rows}
+
+    @staticmethod
+    def _cooperative_party(cooperative_id: UUID) -> AccountabilityParty:
+        return AccountabilityParty(
+            kind=AccountabilityPartyKind.COOPERATIVE,
+            reference=str(cooperative_id),
+        )
 
     @staticmethod
     def _require_role(

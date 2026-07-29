@@ -4,9 +4,11 @@
 
 ## Целевая топология локального узла
 
-Один физический или виртуальный Linux host на x86-64; ARM64 допускается после
-полного теста релиза. Резервное устройство способно принять тот же offline
-bundle и backup.
+Один физический или виртуальный Linux host. Каждый signed bundle v2
+квалифицирует ровно одну платформу: `linux/amd64` либо `linux/arm64`, а вторую
+явно исключает. ARM64 допускается только после полного release gate на ARM64;
+обычная AMD64-сборка не считается доказательством. Резервное устройство должно
+совпадать с платформой bundle и принять тот же offline bundle и backup.
 
 ## Сервисы Compose
 
@@ -128,7 +130,7 @@ verify/
 docs/
 ```
 
-Manifest содержит version, git commit, build id, supported architectures,
+Manifest содержит version, git commit, build id, qualified/excluded platforms,
 image digests, DB schema range, protocol range и hashes всех файлов.
 
 ## Установка
@@ -216,21 +218,27 @@ incidents, key rotations и назначения federation-ролей; огра
 active/due mandates, allocations/forms, reserve snapshot age, дела и апелляции.
 ## Реализованные операции Slice 11
 
-Перед backup API и worker должны быть запущены. Скрипт проверяет signed journal,
-останавливает по container id только эти writers, создаёт DB/blob backup, manifest
-и checksums, затем возвращает те же containers в работу:
+Перед backup API и worker должны быть запущены. Скрипт проверяет signed journal
+и secret storage, останавливает по container id только эти writers, создаёт
+backup v2 для DB/blobs, redacted secret-audit, manifest и checksums, затем
+возвращает те же containers в работу:
 
 ```bash
 bash ./scripts/backup-node.sh /var/lib/cooperative-clearing/backups
 bash ./scripts/verify-backup.sh /var/lib/cooperative-clearing/backups/<backup-id>
 ```
 
-В PowerShell используются `backup-node.ps1` и `verify-backup.ps1`. Restore
-требует точного backup id и подтверждения установленного recovery material.
-Update проверяет offline manifest signature/checksums, создаёт pre-update backup,
-применяет только upgrade migrations и запускает health/journal gates. Rollback
-не выполняет Alembic downgrade: при несовместимой схеме используется
-координированный restore.
+В PowerShell используются `backup-node.ps1` и `verify-backup.ps1`. Verifier
+раскрывает blob archive, повторно сканирует backup и запускает SQL-контракт
+после восстановления. Restore требует точного backup id и подтверждения
+установленного recovery material.
+Update проверяет offline manifest signature/checksums и точную подписанную пару
+source release/schema, создаёт pre-update backup, останавливает writers,
+применяет upgrade и требует exact target revision. Rollback повторно проверяет
+оба bundle, выполняет разрешённый contract-ом Alembic downgrade target image,
+возвращает previous signed images и сравнивает journal sequence/hash. При любой
+непроверяемой или небезопасной миграции пакет не должен объявлять source
+transition; тогда используется координированный restore.
 
 `verify-stack` по умолчанию проверяет health, system status и worker heartbeat.
 Проверка одноразового bootstrap-пароля включается только явным
@@ -330,7 +338,8 @@ Topology создаёт три API и три PostgreSQL на закрытой Do
 ## Подписанный офлайн-релиз Slice 15
 
 Release bundle содержит четыре runtime-образа, установочный `node/` payload,
-SBOM, license inventory, pinned policy, checksum inventory и Ed25519 manifest.
+SBOM, license inventory, pinned policy, signed secret-audit, checksum inventory
+и Ed25519 manifest. Verifier независимо повторяет payload/image secret scan.
 Закрытый release key хранится вне source tree и узла; открытый ключ и fingerprint
 поступают отдельным доверенным каналом.
 
@@ -340,6 +349,7 @@ python3 scripts/release_bundle.py verify \
   --bundle <bundle> \
   --public-key <public-key> \
   --expected-release <release> \
+  --expected-platform linux/amd64 \
   --expected-policy-sha256 <approved-sha256> \
   --load-images
 ```
@@ -352,11 +362,14 @@ python3 scripts/release_bundle.py verify \
 
 `update-node` требует FULL pre-update backup, где одновременно присутствуют
 encrypted recovery material и verified release текущей версии. Bounded
-readiness переживает нормальный restart writers. Ошибка до успешного gate
-возвращает previous application release; schema downgrade запрещён.
+readiness переживает нормальный restart writers. Начиная со Slice 44 update
+также требует точный подписанный source release/schema transition. Ошибка до
+успешного gate выполняет проверенный downgrade и возвращает previous signed
+application release без изменения принятого journal checkpoint.
 
-Если old application несовместимо с expanded schema, выполняется destructive
-restore записанного backup. Restore сначала проверяет и загружает exact signed
+Если переход не объявляет безопасный downgrade или его проверка не проходит,
+пакет не устанавливается; оператор выполняет destructive restore записанного
+backup. Restore сначала проверяет и загружает exact signed
 release, затем возвращает DB ACL/data и blobs, выполняет init/bootstrap и
 заканчивается health/journal gates. Evidence:
 [implemented_slice_16.md](implemented_slice_16.md).
@@ -398,3 +411,33 @@ python scripts/diagnostic_bundle.py \
 удаляют по локальной secret-handling policy. Расшифрованный каталог считается
 операционным материалом ограниченного доступа, даже несмотря на исключение PII
 по контракту. Подробности: [implemented_slice_29.md](implemented_slice_29.md).
+
+## Schema head 0039
+
+Текущий application schema head:
+`0039_participant_address_events`. Readiness отклоняет `0038` как устаревшую
+схему. Перед перезапуском API/worker migration должна завершить address event FK,
+CHECK, index и trigger; `alembic check` после обновления не должен обнаруживать
+новых операций.
+
+## Автономная проверка наблюдаемости
+
+Перед пилотом и после изменения Docker/network policy выполните из корня узла:
+
+```bash
+bash ./scripts/test-local-observability.sh
+```
+
+или в Windows PowerShell:
+
+```powershell
+.\scripts\test-local-observability.ps1
+```
+
+Сценарий использует отдельный Compose project и порт, проверяет local
+health/readiness, защищённые snapshot/metrics, bounded logs, четыре internal
+сети и блокировку внешнего egress, затем удаляет тестовые volumes. Основной узел
+на `127.0.0.1:8080` не останавливается. Каталог
+`evidence/local-observability-<UTC>` должен содержать `PASSED` report и
+проверяемый `SHA256SUMS`. Подробный контракт и ограничения:
+[implemented_slice_46.md](implemented_slice_46.md).

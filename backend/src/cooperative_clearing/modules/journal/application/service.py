@@ -14,6 +14,8 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
 )
 from cooperative_clearing.modules.journal.domain.assurance import (
     CRITICAL_EVENT_TYPES,
+    AccountabilityParty,
+    AccountabilityPartyKind,
     CommandAssurance,
     ExposureClaim,
 )
@@ -158,6 +160,7 @@ class SignedJournalService:
         occurred_at: datetime | None = None,
         schema_version: int = 1,
         offline_epoch_id: UUID | None = None,
+        event_id: UUID | None = None,
     ) -> AppendedEvent:
         if not event_type or not aggregate_type or aggregate_version < 1 or schema_version < 1:
             raise DomainError(
@@ -166,7 +169,24 @@ class SignedJournalService:
                 status_code=422,
             )
         assignment, user = await self._validate_actor_claim(session, actor)
+        if assurance is not None and evidence is not None:
+            raise _actor_error("COMMAND_ASSURANCE_EVIDENCE_CONFLICT")
         evidence_items = list(assurance.evidence_refs) if assurance is not None else evidence or []
+        profile = (
+            await session.execute(
+                select(NodeProfile).where(NodeProfile.node_code == self.settings.node_code)
+            )
+        ).scalar_one_or_none()
+        if profile is None:
+            raise _service_error("NODE_PROFILE_NOT_INITIALIZED")
+        if assurance is not None:
+            await self._validate_assurance_parties(
+                session,
+                assurance=assurance,
+                actor=actor,
+                node_id=profile.id,
+                node_code=profile.node_code,
+            )
         event_payload = self._assured_payload(
             event_type=event_type,
             payload=payload,
@@ -178,13 +198,6 @@ class SignedJournalService:
             user_id=user.id,
             role_cooperative_id=assignment.cooperative_id,
         )
-        profile = (
-            await session.execute(
-                select(NodeProfile).where(NodeProfile.node_code == self.settings.node_code)
-            )
-        ).scalar_one_or_none()
-        if profile is None:
-            raise _service_error("NODE_PROFILE_NOT_INITIALIZED")
         chain = (
             await session.execute(
                 select(NodeChainState).where(NodeChainState.node_id == profile.id).with_for_update()
@@ -206,7 +219,7 @@ class SignedJournalService:
         if not hmac.compare_digest(key.fingerprint, self.signer.fingerprint):
             raise _service_error("NODE_SIGNING_KEY_MISMATCH")
 
-        event_id = uuid4()
+        event_id = event_id or uuid4()
         timestamp = (occurred_at or datetime.now(UTC)).astimezone(UTC)
         payload_digest = payload_hash(event_payload)
         envelope = build_envelope(
@@ -306,6 +319,62 @@ class SignedJournalService:
         return assignment, user
 
     @staticmethod
+    async def _validate_assurance_parties(
+        session: AsyncSession,
+        *,
+        assurance: CommandAssurance,
+        actor: ActorClaim,
+        node_id: UUID,
+        node_code: str,
+    ) -> None:
+        represented = assurance.on_behalf_of
+        if represented.kind == AccountabilityPartyKind.COOPERATIVE:
+            if actor.organization_id is None or represented.reference != str(actor.organization_id):
+                raise _actor_error("COMMAND_ASSURANCE_SCOPE_MISMATCH")
+        elif represented.kind == AccountabilityPartyKind.MEMBER:
+            if represented.reference != str(actor.person_id):
+                raise _actor_error("COMMAND_ASSURANCE_SCOPE_MISMATCH")
+        elif represented.kind == AccountabilityPartyKind.NODE and represented.reference not in {
+            str(node_id),
+            node_code,
+        }:
+            raise _actor_error("COMMAND_ASSURANCE_SCOPE_MISMATCH")
+
+        for group in (assurance.attesters, assurance.approvers):
+            role_ids = [
+                party.role_assignment_id for party in group if party.role_assignment_id is not None
+            ]
+            if len(role_ids) != len(set(role_ids)):
+                raise _actor_error("COMMAND_ASSURANCE_PARTY_DUPLICATED")
+        parties = (
+            assurance.on_behalf_of,
+            *assurance.attesters,
+            *assurance.approvers,
+            *assurance.next_responsible,
+        )
+        for party in parties:
+            if not party.reference.strip() or len(party.reference) > 200:
+                raise _actor_error("COMMAND_ASSURANCE_PARTY_INVALID")
+            if party.role_assignment_id is None:
+                continue
+            assignment = await session.get(RoleAssignment, party.role_assignment_id)
+            if assignment is None or assignment.status != "ACTIVE":
+                raise _actor_error("COMMAND_ASSURANCE_ROLE_INACTIVE")
+            user = await session.get(UserAccount, assignment.user_id)
+            if user is None or user.status != "ACTIVE" or user.member_id is None:
+                raise _actor_error("COMMAND_ASSURANCE_USER_INACTIVE")
+            if party.kind == AccountabilityPartyKind.MEMBER and party.reference != str(
+                user.member_id
+            ):
+                raise _actor_error("COMMAND_ASSURANCE_PARTY_MISMATCH")
+            if (
+                party.kind == AccountabilityPartyKind.COOPERATIVE
+                and assignment.cooperative_id is not None
+                and str(assignment.cooperative_id) != party.reference
+            ):
+                raise _actor_error("COMMAND_ASSURANCE_PARTY_MISMATCH")
+
+    @staticmethod
     def _assured_payload(
         *,
         event_type: str,
@@ -329,11 +398,12 @@ class SignedJournalService:
         return {
             **payload,
             "_command_assurance": {
-                "format": "critical-command-assurance-v1",
-                "actor": {
+                "format": "critical-command-assurance-v2",
+                "performed_by": {
                     "person_id": str(actor.person_id),
                     "user_id": str(user_id),
                 },
+                "on_behalf_of": _party_payload(assurance.on_behalf_of),
                 "role": {
                     "assignment_id": str(actor.role_assignment_id),
                     "code": role_code,
@@ -341,20 +411,19 @@ class SignedJournalService:
                 },
                 "scope": {
                     "actor_organization_id": (
-                        str(actor.organization_id)
-                        if actor.organization_id is not None
-                        else None
+                        str(actor.organization_id) if actor.organization_id is not None else None
                     ),
                     "role_cooperative_id": (
-                        str(role_cooperative_id)
-                        if role_cooperative_id is not None
-                        else None
+                        str(role_cooperative_id) if role_cooperative_id is not None else None
                     ),
                 },
                 "evidence": {
                     "count": len(evidence),
                     "digest": sha256_ref(canonicalize(evidence)),
                 },
+                "attesters": [_party_payload(party) for party in assurance.attesters],
+                "approvers": [_party_payload(party) for party in assurance.approvers],
+                "next_responsible": [_party_payload(party) for party in assurance.next_responsible],
                 "exposure": _exposure_payload(assurance.exposure),
             },
         }
@@ -434,30 +503,65 @@ def envelope_from_event(event: SignedEvent) -> dict[str, object]:
 
 
 async def verify_journal(session: AsyncSession, node_id: UUID) -> IntegrityReport:
-    rows = list(
+    events = list(
         (
             await session.execute(
-                select(SignedEvent, EventSignature, NodeKeyRecord)
-                .join(EventSignature, EventSignature.event_id == SignedEvent.event_id)
+                select(SignedEvent)
+                .where(SignedEvent.node_id == node_id)
+                .order_by(SignedEvent.local_sequence)
+            )
+        ).scalars()
+    )
+    signature_rows = list(
+        (
+            await session.execute(
+                select(EventSignature, NodeKeyRecord)
                 .join(NodeKeyRecord, NodeKeyRecord.id == EventSignature.key_id)
+                .join(SignedEvent, SignedEvent.event_id == EventSignature.event_id)
                 .where(
                     SignedEvent.node_id == node_id,
                     EventSignature.signature_scope == "NODE",
                 )
-                .order_by(SignedEvent.local_sequence)
             )
         ).all()
     )
+    outbox_rows = list(
+        (
+            await session.execute(
+                select(OutboxMessage)
+                .join(SignedEvent, SignedEvent.event_id == OutboxMessage.event_id)
+                .where(SignedEvent.node_id == node_id)
+            )
+        ).scalars()
+    )
+    signatures_by_event: dict[UUID, list[tuple[EventSignature, NodeKeyRecord]]] = {}
+    for signature, key in signature_rows:
+        signatures_by_event.setdefault(signature.event_id, []).append((signature, key))
+    outbox_by_event: dict[UUID, list[OutboxMessage]] = {}
+    for message in outbox_rows:
+        outbox_by_event.setdefault(message.event_id, []).append(message)
+
     failures: list[IntegrityFailure] = []
     expected_sequence = 1
     previous_hash: str | None = None
-    for event, signature, key in rows:
+    for event in events:
         code: str | None = None
         canonical = canonicalize(envelope_from_event(event))
+        event_signatures = signatures_by_event.get(event.event_id, [])
+        event_outbox = outbox_by_event.get(event.event_id, [])
+        outbox_error = (
+            _outbox_integrity_error(event_outbox[0], event) if len(event_outbox) == 1 else None
+        )
         if event.local_sequence != expected_sequence:
             code = "SEQUENCE_GAP"
         elif event.previous_event_hash != previous_hash:
             code = "PREVIOUS_HASH_MISMATCH"
+        elif len(event_signatures) != 1:
+            code = "NODE_SIGNATURE_COUNT_INVALID"
+        elif len(event_outbox) != 1:
+            code = "OUTBOX_COUNT_INVALID"
+        elif outbox_error is not None:
+            code = outbox_error
         elif event.canonicalization_profile != CANONICALIZATION_PROFILE:
             code = "CANONICAL_PROFILE_UNSUPPORTED"
         elif event.payload_hash != payload_hash(event.payload):
@@ -466,17 +570,27 @@ async def verify_journal(session: AsyncSession, node_id: UUID) -> IntegrityRepor
             code = "CANONICAL_BYTES_MISMATCH"
         elif event.event_hash != sha256_ref(canonical):
             code = "EVENT_HASH_MISMATCH"
-        elif signature.algorithm != SIGNATURE_ALGORITHM:
+        elif event_signatures[0][0].algorithm != SIGNATURE_ALGORITHM:
             code = "SIGNATURE_ALGORITHM_UNSUPPORTED"
-        elif key.algorithm != SIGNATURE_ALGORITHM:
+        elif event_signatures[0][1].algorithm != SIGNATURE_ALGORITHM:
             code = "KEY_ALGORITHM_UNSUPPORTED"
-        elif event.occurred_at < key.valid_from:
+        elif event.occurred_at < event_signatures[0][1].valid_from:
             code = "KEY_NOT_YET_VALID"
-        elif key.valid_until is not None and event.occurred_at >= key.valid_until:
+        elif (
+            event_signatures[0][1].valid_until is not None
+            and event.occurred_at >= event_signatures[0][1].valid_until
+        ):
             code = "KEY_EXPIRED"
-        elif key.revoked_at is not None and event.occurred_at >= key.revoked_at:
+        elif (
+            event_signatures[0][1].revoked_at is not None
+            and event.occurred_at >= event_signatures[0][1].revoked_at
+        ):
             code = "KEY_REVOKED_AT_EVENT_TIME"
-        elif not verify_signature(key.public_key, signature.signature, canonical):
+        elif not verify_signature(
+            event_signatures[0][1].public_key,
+            event_signatures[0][0].signature,
+            canonical,
+        ):
             code = "SIGNATURE_INVALID"
         if code is not None:
             failures.append(IntegrityFailure(event.local_sequence, event.event_id, code))
@@ -493,11 +607,26 @@ async def verify_journal(session: AsyncSession, node_id: UUID) -> IntegrityRepor
     return IntegrityReport(
         ok=not failures,
         node_id=node_id,
-        checked_events=len(rows),
+        checked_events=len(events),
         last_sequence=max(0, expected_sequence - 1),
         last_event_hash=previous_hash,
         failures=tuple(failures),
     )
+
+
+def _outbox_integrity_error(message: OutboxMessage, event: SignedEvent) -> str | None:
+    if message.topic != OUTBOX_TOPIC:
+        return "OUTBOX_TOPIC_INVALID"
+    expected_payload = {
+        "event_id": str(event.event_id),
+        "event_type": event.event_type,
+        "event_hash": event.event_hash,
+        "node_id": str(event.node_id),
+        "local_sequence": event.local_sequence,
+    }
+    if any(message.payload.get(key) != value for key, value in expected_payload.items()):
+        return "OUTBOX_PAYLOAD_INVALID"
+    return None
 
 
 def _service_error(code: str) -> DomainError:
@@ -526,7 +655,8 @@ def _exposure_payload(claim: ExposureClaim) -> dict[str, object]:
         raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
     if claim.maximum_loss is not None and claim.maximum_loss < 0:
         raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
-    if (claim.amount is None) != (unit is None):
+    has_quantified_exposure = claim.amount is not None or claim.maximum_loss is not None
+    if has_quantified_exposure != (unit is not None):
         raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
     if claim.amount is None and not basis_refs:
         raise _actor_error("CRITICAL_COMMAND_EXPOSURE_INVALID")
@@ -541,4 +671,14 @@ def _exposure_payload(claim: ExposureClaim) -> dict[str, object]:
             format(claim.maximum_loss, "f") if claim.maximum_loss is not None else None
         ),
         "basis_refs": list(basis_refs),
+    }
+
+
+def _party_payload(party: AccountabilityParty) -> dict[str, object]:
+    return {
+        "kind": party.kind.value,
+        "reference": party.reference,
+        "role_assignment_id": (
+            str(party.role_assignment_id) if party.role_assignment_id is not None else None
+        ),
     }

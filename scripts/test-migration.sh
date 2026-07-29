@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 root_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-previous_revision="${COOP_MIGRATION_FROM:-0034_custody_continuity}"
-expected_head="${COOP_MIGRATION_HEAD:-0037_actor_assurance}"
+previous_revision="${COOP_MIGRATION_FROM:-0038_atomic_event_outbox}"
+expected_head="${COOP_MIGRATION_HEAD:-0039_participant_address_events}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 project="${COOP_MIGRATION_PROJECT:-coop-migration-${timestamp,,}}"
 report="${COOP_MIGRATION_REPORT:-$root_dir/evidence/migration-$timestamp.json}"
@@ -127,6 +127,39 @@ executed_amount_columns="$(psql_value "
     AND table_name = 'exposure_commitments'
     AND column_name = 'executed_amount'
     AND is_nullable = 'NO'")"
+atomicity_trigger="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_signed_event_delivery_atomicity'
+    AND tgenabled = 'O'")"
+outbox_event_constraint="$(psql_value "
+  SELECT count(*)
+  FROM pg_constraint
+  WHERE conname = 'uq_outbox_event'
+    AND conrelid = 'journal.outbox_messages'::regclass")"
+node_signature_index="$(psql_value "
+  SELECT count(*)
+  FROM pg_indexes
+  WHERE schemaname = 'journal'
+    AND tablename = 'event_signatures'
+    AND indexname = 'uq_event_signatures_node_event'")"
+address_event_trigger="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_participant_address_event_link'
+    AND tgenabled = 'O'")"
+address_event_constraint="$(psql_value "
+  SELECT count(*)
+  FROM pg_constraint
+  WHERE conrelid = 'identity.participant_addresses'::regclass
+    AND contype = 'c'
+    AND pg_get_constraintdef(oid) LIKE '%event_tracking_required%'")"
+address_event_index="$(psql_value "
+  SELECT count(*)
+  FROM pg_indexes
+  WHERE schemaname = 'identity'
+    AND tablename = 'participant_addresses'
+    AND indexname = 'ix_participant_addresses_last_event_id'")"
 
 if [ "$identity_before" != "$identity_after" ] ||
    [ "$profile_before" != "$profile_after" ]; then
@@ -135,8 +168,13 @@ if [ "$identity_before" != "$identity_after" ] ||
 fi
 if [ "$critical_tables" != "1" ] ||
    [ "$executed_amount_columns" != "1" ] ||
-   [ "$tables_after" -le "$tables_before" ]; then
-  echo "Head migration did not install the expected compensation schema" >&2
+   [ "$atomicity_trigger" != "1" ] ||
+   [ "$outbox_event_constraint" != "1" ] ||
+   [ "$node_signature_index" != "1" ] ||
+   [ "$address_event_trigger" != "1" ] ||
+   [ "$address_event_constraint" != "1" ] ||
+   [ "$address_event_index" != "1" ]; then
+  echo "Head migration did not install the expected event assurance schema" >&2
   exit 1
 fi
 
@@ -156,14 +194,37 @@ if [ "$identity_after" != "$identity_idempotent" ]; then
   exit 1
 fi
 
+accepted_events_before="$(psql_value "SELECT count(*) FROM journal.signed_events")"
+run_application coopctl seed-demo
+accepted_events_after="$(psql_value "SELECT count(*) FROM journal.signed_events")"
+accepted_hash_after="$(psql_value "SELECT event_hash FROM journal.signed_events ORDER BY local_sequence DESC LIMIT 1")"
+if [ "$accepted_events_after" -le "$accepted_events_before" ] || [ -z "$accepted_hash_after" ]; then
+  echo "Post-backup acceptance probe did not append a signed business event" >&2
+  exit 1
+fi
+
 run_migration downgrade "$previous_revision"
 actual_downgrade="$(psql_value "SELECT version_num FROM alembic_version")"
 profile_downgrade="$(psql_value "
   SELECT concat_ws(':', id, node_code, environment)
   FROM node.node_profiles
   ORDER BY node_code")"
+atomicity_downgrade="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_signed_event_delivery_atomicity'")"
+address_event_downgrade="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_participant_address_event_link'")"
+accepted_events_downgrade="$(psql_value "SELECT count(*) FROM journal.signed_events")"
+accepted_hash_downgrade="$(psql_value "SELECT event_hash FROM journal.signed_events ORDER BY local_sequence DESC LIMIT 1")"
 if [ "$actual_downgrade" != "$previous_revision" ] ||
-   [ "$profile_downgrade" != "$profile_before" ]; then
+   [ "$profile_downgrade" != "$profile_before" ] ||
+   [ "$atomicity_downgrade" != "1" ] ||
+   [ "$address_event_downgrade" != "0" ] ||
+   [ "$accepted_events_downgrade" != "$accepted_events_after" ] ||
+   [ "$accepted_hash_downgrade" != "$accepted_hash_after" ]; then
   echo "Recovery downgrade did not preserve previous-release data" >&2
   exit 1
 fi
@@ -174,8 +235,20 @@ profile_reupgrade="$(psql_value "
   SELECT concat_ws(':', id, node_code, environment)
   FROM node.node_profiles
   ORDER BY node_code")"
+atomicity_reupgrade="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_signed_event_delivery_atomicity'
+    AND tgenabled = 'O'")"
+address_event_reupgrade="$(psql_value "
+  SELECT count(*)
+  FROM pg_trigger
+  WHERE tgname = 'trg_participant_address_event_link'
+    AND tgenabled = 'O'")"
 if [ "$actual_reupgrade" != "$expected_head" ] ||
-   [ "$profile_reupgrade" != "$profile_before" ]; then
+   [ "$profile_reupgrade" != "$profile_before" ] ||
+   [ "$atomicity_reupgrade" != "1" ] ||
+   [ "$address_event_reupgrade" != "1" ]; then
   echo "Re-upgrade did not reproduce the expected state" >&2
   exit 1
 fi
@@ -194,7 +267,21 @@ cat > "$report" <<EOF
   "tables_before": $tables_before,
   "tables_after": $tables_after,
   "critical_head_tables": $critical_tables,
-  "executed_amount_columns": $executed_amount_columns
+  "executed_amount_columns": $executed_amount_columns,
+  "atomicity_trigger": $atomicity_trigger,
+  "outbox_event_constraint": $outbox_event_constraint,
+  "node_signature_index": $node_signature_index,
+  "address_event_trigger": $address_event_trigger,
+  "address_event_constraint": $address_event_constraint,
+  "address_event_index": $address_event_index,
+  "post_backup_events_before": $accepted_events_before,
+  "post_backup_events_after": $accepted_events_after,
+  "post_backup_events_downgrade": $accepted_events_downgrade,
+  "post_backup_last_hash": "$accepted_hash_downgrade",
+  "atomicity_downgrade": $atomicity_downgrade,
+  "address_event_downgrade": $address_event_downgrade,
+  "atomicity_reupgrade": $atomicity_reupgrade,
+  "address_event_reupgrade": $address_event_reupgrade
 }
 EOF
 printf '%s\n' "$report"

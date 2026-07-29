@@ -594,6 +594,34 @@
 .sell-workspace .results-heading { margin-bottom: 14px; }
 .sell-workspace .results-heading p { max-width: 620px; margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 
+.browser-draft-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border-left: 3px solid var(--forest);
+}
+.browser-draft-notice.offline { border-left-color: var(--amber); background: var(--amber-soft); }
+.browser-draft-notice svg { flex: 0 0 auto; }
+.browser-draft-notice div { display: grid; gap: 2px; }
+.browser-draft-notice span { color: var(--muted); font-size: 10px; line-height: 1.45; }
+.browser-draft-list { margin-bottom: 12px; border-block: 1px solid var(--line); }
+.browser-draft-heading,
+.browser-draft-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 2px; }
+.browser-draft-heading { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.browser-draft-heading span { min-width: 24px; text-align: center; }
+.browser-draft-row { border-top: 1px solid var(--line); }
+.browser-draft-row.active { background: var(--green-soft); }
+.browser-draft-row > div:first-child { display: grid; min-width: 0; gap: 2px; }
+.browser-draft-row > div:first-child strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.browser-draft-row > div:first-child span { color: var(--muted); font-size: 9px; }
+.browser-draft-row > div:last-child { display: flex; align-items: center; gap: 5px; }
+.browser-draft-row button { display: inline-flex; min-height: 32px; align-items: center; gap: 6px; padding: 0 9px; color: var(--forest); background: transparent; border: 1px solid var(--line); border-radius: 4px; font-size: 10px; font-weight: 700; }
+.browser-draft-row .icon-action { width: 32px; justify-content: center; padding: 0; }
+
 .seller-permission,
 .sell-success {
   display: flex;
@@ -621,8 +649,13 @@
 .sell-description-field,
 .sell-origin-field { grid-column: span 2; }
 .sell-form > .span-two { grid-column: 1 / -1; }
-.sell-submit { grid-column: span 2; min-height: 42px; }
+.sell-actions { display: grid; grid-template-columns: minmax(160px, .35fr) minmax(220px, 1fr); grid-column: span 2; gap: 8px; }
+.sell-actions button { min-height: 42px; }
+.sell-actions .secondary-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--forest); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 11px; font-weight: 750; }
+.sell-submit { min-height: 42px; }
 .sell-success { margin: 14px 0 0; color: var(--green); background: var(--green-soft); border-color: var(--green); }
+.sell-success.local > div { display: grid; gap: 2px; }
+.sell-success.local span { color: var(--ink); }
 .sell-success > div { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .sell-success button { color: var(--green); background: transparent; border: 0; text-decoration: underline; }
 
@@ -640,8 +673,10 @@
   .sell-product-field,
   .sell-description-field,
   .sell-origin-field,
-  .sell-submit,
+  .sell-actions,
   .sell-form > .span-two { grid-column: auto; }
+  .sell-actions { grid-template-columns: 1fr; }
+  .browser-draft-row { align-items: flex-start; }
 }
 .offer-kind-switch { display: inline-flex; gap: 3px; margin-bottom: 12px; padding: 3px; background: #e8eeeb; border: 1px solid var(--line); border-radius: 6px; }
 .offer-kind-switch button { display: inline-flex; min-height: 35px; align-items: center; gap: 7px; padding: 0 12px; color: var(--muted); font-size: 10px; font-weight: 750; background: transparent; border: 1px solid transparent; border-radius: 4px; }

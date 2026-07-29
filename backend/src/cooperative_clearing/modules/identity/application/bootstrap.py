@@ -384,10 +384,13 @@ async def seed_demo_identity(session: AsyncSession, settings: Settings) -> None:
             is_default_pickup=is_default_pickup,
             is_default_delivery=is_default_delivery,
             status="ACTIVE",
+            event_tracking_required=False,
+            last_event_id=None,
         )
         await session.execute(
             address_statement.on_conflict_do_update(
                 index_elements=[ParticipantAddress.id],
+                where=ParticipantAddress.event_tracking_required.is_(False),
                 set_={
                     "label": address_statement.excluded.label,
                     "purpose": address_statement.excluded.purpose,

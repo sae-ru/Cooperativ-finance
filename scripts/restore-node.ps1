@@ -121,10 +121,12 @@ if ($LASTEXITCODE -ne 0) { throw "Migration failed" }
 if ($LASTEXITCODE -ne 0) { throw "Node initialization check failed" }
 & docker @compose run --rm bootstrap-identity
 if ($LASTEXITCODE -ne 0) { throw "Identity bootstrap check failed" }
-& docker @compose up -d api worker frontend gateway
-if ($LASTEXITCODE -ne 0) { throw "Runtime startup failed" }
+& docker @compose run --rm --no-deps api coopctl verify-restore-consistency
+if ($LASTEXITCODE -ne 0) { throw "Restored data and key consistency verification failed" }
 & docker @compose run --rm --no-deps api coopctl verify-journal
 if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
+& docker @compose up -d api worker frontend gateway
+if ($LASTEXITCODE -ne 0) { throw "Runtime startup failed" }
 $httpPort = if ($env:COOP_HTTP_PORT) { $env:COOP_HTTP_PORT } else { $null }
 if (-not $httpPort) {
     $portLine = Get-Content $envFile |

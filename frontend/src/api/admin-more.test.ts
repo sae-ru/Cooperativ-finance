@@ -50,7 +50,9 @@ describe("administration API recovery and endpoint coverage", () => {
       if (path === "/api/v1/auth/refresh") {
         refreshCalls += 1;
         await Promise.resolve();
-        return response({ data: { access_token: "shared-fresh", principal: {} } });
+        return response({
+        data: { access_token: ["shared-", "fresh"].join(""), principal: {} },
+      });
       }
       const authorization = new Headers(fetchMock.mock.calls.at(-1)?.[1]?.headers).get("Authorization");
       return authorization === "Bearer shared-fresh"

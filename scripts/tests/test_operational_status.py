@@ -72,7 +72,7 @@ class OperationalStatusTests(unittest.TestCase):
         backup = self.root / "backups" / "node-20260727T120000Z"
         backup.mkdir(parents=True)
         (backup / "manifest.env").write_text(
-            "format=cooperative-clearing-backup-v1\n"
+            "format=cooperative-clearing-backup-v2\n"
             "backup_id=node-20260727T120000Z\n"
             "backup_kind=FULL\n"
             "release=1.2.3\n",
@@ -84,6 +84,21 @@ class OperationalStatusTests(unittest.TestCase):
             encoding="ascii",
         )
 
+        (backup / "secret-storage-verification.txt").write_text(
+            "secret_storage=PASS\n",
+            encoding="ascii",
+        )
+        (backup / "backup-secret-audit.json").write_text(
+            json.dumps(
+                {
+                    "format": "cooperative-clearing-secret-audit-v1",
+                    "status": "PASSED",
+                    "finding_count": 0,
+                    "scopes": [],
+                }
+            ),
+            encoding="utf-8",
+        )
         output = operational_status.record_backup(self.root, backup)
         payload = json.loads(output.read_text(encoding="utf-8"))
 

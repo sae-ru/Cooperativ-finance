@@ -9,6 +9,7 @@ import type { Principal } from "./api/admin";
 import * as discovery from "./api/discovery";
 import * as inventory from "./api/inventory";
 import * as participant from "./api/participant";
+import * as browserDrafts from "./shared/browser-drafts";
 
 vi.mock("./api/discovery", async () => {
   const actual = await vi.importActual<typeof import("./api/discovery")>("./api/discovery");
@@ -28,6 +29,16 @@ vi.mock("./api/participant", async () => {
       typeof value === "function" ? vi.fn() : value,
     ]),
   );
+});
+vi.mock("./shared/browser-drafts", async () => {
+  const actual = await vi.importActual<typeof import("./shared/browser-drafts")>("./shared/browser-drafts");
+  return {
+    ...actual,
+    deleteBrowserOfferDraft: vi.fn(),
+    isBrowserDraftStorageAvailable: vi.fn(),
+    listBrowserOfferDrafts: vi.fn(),
+    saveBrowserOfferDraft: vi.fn(),
+  };
 });
 
 
@@ -125,6 +136,13 @@ describe("DiscoveryView", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
     vi.clearAllMocks();
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    vi.mocked(browserDrafts.isBrowserDraftStorageAvailable).mockReturnValue(true);
+    vi.mocked(browserDrafts.listBrowserOfferDrafts).mockResolvedValue([]);
+    vi.mocked(browserDrafts.deleteBrowserOfferDraft).mockResolvedValue();
+    vi.mocked(browserDrafts.saveBrowserOfferDraft).mockImplementation(async (input) =>
+      browserDrafts.buildBrowserOfferDraft(input),
+    );
     vi.mocked(inventory.uploadEvidence).mockResolvedValue("evidence-image-1");
     vi.mocked(participant.getParticipantAddresses).mockResolvedValue([]);
     vi.mocked(discovery.getPurchaseIntents).mockResolvedValue([]);
@@ -383,6 +401,82 @@ describe("DiscoveryView", () => {
       }),
       "service-member-1",
     );
+  });
+  it("saves an offline offer only on the device without calling command APIs", async () => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    const user = userEvent.setup();
+    renderView({
+      ...principal,
+      member_id: "seller-member-1",
+      roles: [{ assignment_id: "role-1", role: "EXCHANGE_PARTICIPANT", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Offer" }));
+    expect(screen.getByText("No connection to the local node")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: /Exact (pickup|service) address/ }), "12 Farm Road, Barn 2");
+    await user.type(screen.getByRole("textbox", { name: "Contact phone" }), "+1 555 010 2000");
+    await user.click(screen.getByRole("button", { name: "Save on this device" }));
+
+    await waitFor(() => expect(browserDrafts.saveBrowserOfferDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner_user_id: "user-1",
+        cooperative_id: "30000000-0000-0000-0000-000000000001",
+        payload: expect.objectContaining({ description: "Milk", image_evidence_id: null }),
+      }),
+    ));
+    expect(discovery.publishOffer).not.toHaveBeenCalled();
+    expect(inventory.uploadEvidence).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(browserDrafts.saveBrowserOfferDraft).mock.calls[0]?.[0])).not.toContain("event_id");
+    expect(screen.getByText("Nothing has been published or added to the share account.")).toBeInTheDocument();
+  });
+  it("never auto-publishes after reconnect and removes a reviewed draft after explicit success", async () => {
+    const saved = browserDrafts.buildBrowserOfferDraft({
+      owner_user_id: "user-1",
+      cooperative_id: "30000000-0000-0000-0000-000000000001",
+      payload: {
+        kind: "SERVICE",
+        product_code: "SERVICE.COMPUTER.REPAIR",
+        description: "Computer repair",
+        quantity_available: "2.00",
+        unit_code: "HOUR",
+        minimum_batch: "1.00",
+        origin_region: "EAST-DISTRICT",
+        pickup_address_text: "12 Farm Road, Barn 2",
+        pickup_contact_name: "Technician",
+        pickup_contact_phone: "+1 555 010 2000",
+        pickup_instructions: "Call at the gate",
+        unit_price: "4.00",
+        available_until: "2026-08-05",
+        image_evidence_id: null,
+      },
+      attachment: null,
+    });
+    vi.mocked(browserDrafts.listBrowserOfferDrafts).mockResolvedValue([saved]);
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    const user = userEvent.setup();
+    renderView({
+      ...principal,
+      member_id: "service-member-1",
+      roles: [{ assignment_id: "role-1", role: "EXCHANGE_PARTICIPANT", cooperative_id: "30000000-0000-0000-0000-000000000001" }],
+    });
+
+    await user.click(screen.getByRole("tab", { name: "Offer" }));
+    await user.click(await screen.findByRole("button", { name: "Review" }));
+    expect(screen.getByRole("textbox", { name: "Service name" })).toHaveValue("Computer repair");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    window.dispatchEvent(new Event("online"));
+    expect(discovery.publishOffer).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "Publish offer" }));
+
+    await waitFor(() => expect(discovery.publishOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ product_code: "SERVICE.COMPUTER.REPAIR" }),
+      "service-member-1",
+    ));
+    await waitFor(() => expect(browserDrafts.deleteBrowserOfferDraft).toHaveBeenCalledWith(
+      saved.draft_id,
+      "user-1",
+      "30000000-0000-0000-0000-000000000001",
+    ));
   });
   it("switches the participant offer form to a plain service workflow", async () => {
     const user = userEvent.setup();

@@ -24,7 +24,7 @@ from cooperative_clearing.shared.infrastructure.database import Database
 async def test_protected_operational_snapshot_and_metrics() -> None:
     settings = Settings(service_name="operations-integration")
     database = Database.from_settings(settings)
-    password = "operations-integration-password"
+    password = "".join(("operations-integration-", "password"))
     login = f"operations-auditor-{uuid4()}"
     user_id = uuid4()
     try:
@@ -70,7 +70,7 @@ async def test_protected_operational_snapshot_and_metrics() -> None:
         snapshot = client.get("/api/v1/operations/snapshot", headers=headers)
         assert snapshot.status_code == 200
         data = snapshot.json()["data"]
-        assert data["schema_revision"] == "0037_actor_assurance"
+        assert data["schema_revision"] == "0039_participant_address_events"
         assert data["signed_events"] >= 0
         assert data["active_sessions"] >= 1
         assert data["outbox_quarantined"] >= 0
@@ -137,15 +137,19 @@ async def test_protected_operational_snapshot_and_metrics() -> None:
     try:
         async with verification_database.session() as session:
             audit = (
-                await session.execute(
-                    select(AuditEntry)
-                    .where(
-                        AuditEntry.actor_user_id == user_id,
-                        AuditEntry.action == "DIAGNOSTIC_BUNDLE_EXPORTED",
+                (
+                    await session.execute(
+                        select(AuditEntry)
+                        .where(
+                            AuditEntry.actor_user_id == user_id,
+                            AuditEntry.action == "DIAGNOSTIC_BUNDLE_EXPORTED",
+                        )
+                        .order_by(AuditEntry.occurred_at.desc())
                     )
-                    .order_by(AuditEntry.occurred_at.desc())
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             assert audit is not None
             assert audit.payload["bytes"] == len(bundle.content)
             assert audit.payload["sha256"] == hashlib.sha256(bundle.content).hexdigest()

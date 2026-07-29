@@ -14,6 +14,7 @@ from cooperative_clearing.modules.crisis.application.common import (
     audit_crisis_action,
     begin_crisis_command,
     complete_crisis_command,
+    crisis_command_assurance,
     crisis_role_actor,
     evidence_payload,
     link_evidence,
@@ -133,6 +134,16 @@ class CrisisService:
             aggregate_version=1,
             actor=actor,
             payload={**terms_payload, "target_id": str(target_id), "terms_hash": terms_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.reserve_target_proposed",
+                subject_type="reserve_target",
+                subject_id=target_id,
+                command_record=record,
+                amount=target,
+                unit=unit,
+            ),
         )
         session.add(
             ReserveTarget(
@@ -231,6 +242,17 @@ class CrisisService:
                     "previous_terms_hash": active_target.terms_hash,
                     "replacement_terms_hash": target.terms_hash,
                 },
+                assurance=crisis_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="crisis.reserve_target_retired",
+                    subject_type="reserve_target",
+                    subject_id=active_target.id,
+                    command_record=record,
+                    attester_member_ids=(active_target.proposed_by_member_id,),
+                    amount=active_target.target_quantity,
+                    unit=active_target.unit_code,
+                ),
             )
             active_target.status = "RETIRED"
             active_target.version += 1
@@ -252,6 +274,18 @@ class CrisisService:
             aggregate_version=target.version + 1,
             actor=actor,
             payload=payload,
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.reserve_target_approved",
+                subject_type="reserve_target",
+                subject_id=target.id,
+                command_record=record,
+                next_member_ids=(target.proposed_by_member_id,),
+                attester_member_ids=(target.proposed_by_member_id,),
+                amount=target.target_quantity,
+                unit=target.unit_code,
+            ),
         )
         target.status = "ACTIVE"
         target.approved_by_user_id = principal.user_id
@@ -353,6 +387,17 @@ class CrisisService:
             aggregate_version=1,
             actor=actor,
             payload={**signed_payload, "snapshot_hash": snapshot_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.reserve_snapshot_recorded",
+                subject_type="reserve_snapshot",
+                subject_id=snapshot_id,
+                command_record=record,
+                evidence_refs=evidence_payload(evidence),
+                amount=assessment.verified if assessment.verified > 0 else None,
+                unit=target.unit_code if assessment.verified > 0 else None,
+            ),
         )
         session.add(
             ReserveSnapshot(
@@ -483,6 +528,15 @@ class CrisisService:
             aggregate_version=1,
             actor=actor,
             payload={**terms_payload, "mandate_id": str(mandate_id), "terms_hash": terms_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.mandate_proposed",
+                subject_type="crisis_mandate",
+                subject_id=mandate_id,
+                command_record=record,
+                evidence_refs=evidence_payload(evidence),
+            ),
         )
         session.add(
             CrisisMandate(
@@ -579,6 +633,16 @@ class CrisisService:
                 "expires_at": mandate.expires_at.isoformat(),
                 "safe_state": mandate.safe_state,
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.mandate_activated",
+                subject_type="crisis_mandate",
+                subject_id=mandate.id,
+                command_record=record,
+                next_member_ids=(mandate.proposed_by_member_id,),
+                attester_member_ids=(mandate.proposed_by_member_id,),
+            ),
         )
         mandate.status = "ACTIVE"
         mandate.activated_by_user_id = principal.user_id
@@ -684,6 +748,16 @@ class CrisisService:
                 "previous_review_at": mandate.review_at.isoformat(),
                 "previous_expires_at": mandate.expires_at.isoformat(),
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.mandate_reviewed",
+                subject_type="crisis_mandate",
+                subject_id=mandate.id,
+                command_record=record,
+                next_member_ids=(mandate.proposed_by_member_id, mandate.activated_by_member_id),
+                attester_member_ids=(mandate.proposed_by_member_id, mandate.activated_by_member_id),
+            ),
         )
         session.add(
             CrisisReview(
@@ -779,6 +853,16 @@ class CrisisService:
             aggregate_version=1,
             actor=actor,
             payload={**terms_payload, "rule_id": str(rule_id), "terms_hash": terms_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.rationing_rule_proposed",
+                subject_type="rationing_rule",
+                subject_id=rule_id,
+                command_record=record,
+                amount=maximum,
+                unit=target.unit_code,
+            ),
         )
         session.add(
             RationingRule(
@@ -883,6 +967,15 @@ class CrisisService:
                     "previous_terms_hash": active_rule.terms_hash,
                     "replacement_terms_hash": rule.terms_hash,
                 },
+                assurance=crisis_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="crisis.rationing_rule_retired",
+                    subject_type="rationing_rule",
+                    subject_id=active_rule.id,
+                    command_record=record,
+                    attester_member_ids=(active_rule.proposed_by_member_id,),
+                ),
             )
             active_rule.status = "RETIRED"
             active_rule.version += 1
@@ -904,6 +997,16 @@ class CrisisService:
             aggregate_version=rule.version + 1,
             actor=actor,
             payload=payload,
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.rationing_rule_approved",
+                subject_type="rationing_rule",
+                subject_id=rule.id,
+                command_record=record,
+                next_member_ids=(rule.proposed_by_member_id,),
+                attester_member_ids=(rule.proposed_by_member_id,),
+            ),
         )
         rule.status = "ACTIVE"
         rule.approved_by_user_id = principal.user_id
@@ -971,9 +1074,8 @@ class CrisisService:
         if active_count != len(set(member_ids)):
             raise crisis_error("ACTIVE_ELIGIBLE_MEMBERS_REQUIRED", 422)
         snapshot = await self._latest_snapshot(session, rule.target_id)
-        self._require_fresh_snapshot(
-            snapshot, await self._target(session, rule.target_id, lock=False)
-        )
+        target = await self._target(session, rule.target_id, lock=False)
+        self._require_fresh_snapshot(snapshot, target)
         reserved = await self._reserved_total(session, rule.target_id)
         available = snapshot.available_quantity - reserved
         if available < 0:
@@ -1018,6 +1120,16 @@ class CrisisService:
                 "total_allocated": str(sum((item.quantity for item in shares), Decimal(0))),
                 "expires_at": expires_at.isoformat(),
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.rationing_previewed",
+                subject_type="rationing_plan",
+                subject_id=plan_id,
+                command_record=record,
+                amount=sum((item.quantity for item in shares), Decimal(0)),
+                unit=target.unit_code,
+            ),
         )
         session.add(
             RationingPlan(
@@ -1104,9 +1216,8 @@ class CrisisService:
             raise crisis_error("INDEPENDENT_APPROVER_REQUIRED")
         await self._lock_cooperative(session, mandate.cooperative_id)
         snapshot = await self._latest_snapshot(session, rule.target_id)
-        self._require_fresh_snapshot(
-            snapshot, await self._target(session, rule.target_id, lock=False)
-        )
+        target = await self._target(session, rule.target_id, lock=False)
+        self._require_fresh_snapshot(snapshot, target)
         available = snapshot.available_quantity - await self._reserved_total(
             session, rule.target_id
         )
@@ -1125,6 +1236,18 @@ class CrisisService:
                 "total_allocated": str(plan.total_allocated),
                 "creates_debt": False,
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.rationing_confirmed",
+                subject_type="rationing_plan",
+                subject_id=plan.id,
+                command_record=record,
+                next_member_ids=(plan.proposed_by_member_id,),
+                attester_member_ids=(plan.proposed_by_member_id,),
+                amount=plan.total_allocated,
+                unit=target.unit_code,
+            ),
         )
         plan.status = "CONFIRMED"
         plan.confirmed_by_user_id = principal.user_id
@@ -1164,6 +1287,7 @@ class CrisisService:
         plan = await self._plan(session, plan_id, lock=True)
         rule = await self._rule(session, plan.rule_id, lock=False)
         mandate = await self._mandate(session, rule.mandate_id, lock=False)
+        target = await self._target(session, rule.target_id, lock=False)
         payload = {
             "plan_id": str(plan.id),
             "expected_version": expected_version,
@@ -1203,6 +1327,17 @@ class CrisisService:
             aggregate_version=plan.version + 1,
             actor=actor,
             payload={**payload, "allocations_hash": plan.allocations_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.rationing_cancelled",
+                subject_type="rationing_plan",
+                subject_id=plan.id,
+                command_record=record,
+                attester_member_ids=(plan.proposed_by_member_id,),
+                amount=plan.total_allocated,
+                unit=target.unit_code,
+            ),
         )
         await session.execute(
             update(RationingAllocation)
@@ -1241,6 +1376,7 @@ class CrisisService:
         plan = await self._plan(session, allocation.plan_id, lock=False)
         rule = await self._rule(session, plan.rule_id, lock=False)
         mandate = await self._mandate(session, rule.mandate_id, lock=False)
+        target = await self._target(session, rule.target_id, lock=False)
         self._require_effective_mandate(mandate, CrisisCapability.ENABLE_RATIONING)
         command = {
             "allocation_id": str(allocation.id),
@@ -1276,6 +1412,19 @@ class CrisisService:
                 "evidence": evidence_payload(evidence),
                 "creates_debt": False,
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.ration_issued",
+                subject_type="rationing_allocation",
+                subject_id=allocation.id,
+                command_record=record,
+                evidence_refs=evidence_payload(evidence),
+                next_member_ids=(allocation.member_id,),
+                attester_member_ids=(plan.confirmed_by_member_id,),
+                amount=allocation.quantity,
+                unit=target.unit_code,
+            ),
         )
         session.add(
             RationIssuance(
@@ -1360,6 +1509,15 @@ class CrisisService:
             aggregate_version=1,
             actor=actor,
             payload={**command, "form_id": str(form_id), "checksum": checksum},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.paper_form_issued",
+                subject_type="crisis_paper_form",
+                subject_id=form_id,
+                command_record=record,
+                next_member_ids=(assigned_to_member_id,),
+            ),
         )
         session.add(
             CrisisPaperForm(
@@ -1437,6 +1595,16 @@ class CrisisService:
                 "payload_hash": form_payload_hash,
                 "issued_event_id": str(form.issued_event_id),
             },
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.paper_form_recorded",
+                subject_type="crisis_paper_form",
+                subject_id=form.id,
+                command_record=record,
+                next_member_ids=(form.assigned_to_member_id,),
+                attester_member_ids=(form.issued_by_member_id,),
+            ),
         )
         form.status = "RECORDED"
         form.payload = payload
@@ -1560,6 +1728,16 @@ class CrisisService:
             aggregate_version=mandate.version + 1,
             actor=actor,
             payload={**report_payload, "report_hash": report_hash},
+            assurance=crisis_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="crisis.mandate_expired" if expired else "crisis.mandate_closed",
+                subject_type="crisis_mandate",
+                subject_id=mandate.id,
+                command_record=record,
+                next_member_ids=(mandate.proposed_by_member_id, mandate.activated_by_member_id),
+                attester_member_ids=(mandate.proposed_by_member_id, mandate.activated_by_member_id),
+            ),
         )
         review_id = uuid4()
         session.add(

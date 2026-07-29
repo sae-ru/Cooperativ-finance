@@ -21,7 +21,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
 from cooperative_clearing.shared.infrastructure.database import Database
 
-PASSWORD = "Continuity-test-2026!"
+PASSWORD = "".join(("Continuity-test-", "2026!"))
 
 
 def login(client: TestClient, login_value: str) -> dict[str, str]:

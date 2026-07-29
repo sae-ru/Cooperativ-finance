@@ -162,3 +162,15 @@ read-only mount `.operations`. Probe старше 180 секунд не счит
 `.ccdiag` с `Cache-Control: no-store`. Успешная выдача обязательно создаёт
 append-only audit с actor, request ID, размером и SHA-256 ciphertext. Формат,
 проверка и ограничения описаны в [Slice 29](implemented_slice_29.md).
+
+## Изолированный контракт Slice 46
+
+`scripts/test-local-observability.sh` и `.ps1` проверяют весь локальный контур в
+Compose-топологии без внешнего маршрута. Все четыре сети имеют `Internal=true`;
+read-only probe внутри `edge` получает health, защищённые snapshot/readiness и
+Prometheus metrics, а gateway не достигает TEST-NET адреса.
+
+Отчёт содержит только агрегаты, schema, hashes и статусы. Пароль, access token,
+сырое тело metrics и runtime log в него не входят. Сам bounded log остаётся
+локальным evidence и по-прежнему исключён из diagnostic bundle. Подробности:
+[implemented_slice_46.md](implemented_slice_46.md).

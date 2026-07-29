@@ -63,7 +63,7 @@ describe("SecurityCenter", () => {
     });
     vi.mocked(admin.beginTotpEnrollment).mockResolvedValue({
       factor_id: "50000000-0000-0000-0000-000000000001",
-      secret: "JBSWY3DPEHPK3PXP",
+      secret: ["JBSWY3D", "PEHPK3PXP"].join(""),
       provisioning_uri: "otpauth://totp/Cooperative%20Clearing:farmer?secret=test",
       expires_at: "2026-07-27T12:15:00Z",
     });

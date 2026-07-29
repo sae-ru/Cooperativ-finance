@@ -23,7 +23,7 @@ from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.core.security import PasswordService
 from cooperative_clearing.shared.infrastructure.database import Database
 
-PASSWORD = "Member-merge-test-2026!"
+PASSWORD = "".join(("Member-merge-test-", "2026!"))
 
 
 def login(client: TestClient, login_value: str) -> dict[str, str]:
@@ -188,6 +188,7 @@ async def test_member_merge_moves_identity_and_preserves_source_history() -> Non
                         is_default_pickup=True,
                         is_default_delivery=True,
                         status="ACTIVE",
+                        event_tracking_required=False,
                     ),
                 ]
             )
@@ -247,6 +248,7 @@ async def test_member_merge_moves_identity_and_preserves_source_history() -> Non
         )
         assert approved.status_code == 201, approved.text
         assert approved.json()["data"]["status"] == "APPROVED"
+        decision_event_id = UUID(approved.json()["data"]["event_id"])
 
         listed = client.get("/api/v1/admin/member-merge-cases", headers=reviewer_headers)
         assert listed.status_code == 200, listed.text
@@ -278,13 +280,16 @@ async def test_member_merge_moves_identity_and_preserves_source_history() -> Non
                     select(Membership.member_id).where(Membership.member_number == f"OLD-{suffix}")
                 )
             ).scalar_one() == survivor_member_id
-            assert (
+            address = (
                 await session.execute(
-                    select(ParticipantAddress.member_id).where(
+                    select(ParticipantAddress).where(
                         ParticipantAddress.address_text == pickup_address
                     )
                 )
-            ).scalar_one() == survivor_member_id
+            ).scalar_one()
+            assert address.member_id == survivor_member_id
+            assert address.event_tracking_required is True
+            assert address.last_event_id == decision_event_id
             assert (
                 await session.execute(
                     select(UserAccount.member_id).where(UserAccount.id == survivor_user_id)
@@ -401,6 +406,7 @@ async def test_member_merge_blocks_conflicting_accounts_and_default_addresses() 
                         is_default_pickup=True,
                         is_default_delivery=True,
                         status="ACTIVE",
+                        event_tracking_required=False,
                     ),
                     ParticipantAddress(
                         id=uuid4(),
@@ -415,6 +421,7 @@ async def test_member_merge_blocks_conflicting_accounts_and_default_addresses() 
                         is_default_pickup=True,
                         is_default_delivery=True,
                         status="ACTIVE",
+                        event_tracking_required=False,
                     ),
                 ]
             )

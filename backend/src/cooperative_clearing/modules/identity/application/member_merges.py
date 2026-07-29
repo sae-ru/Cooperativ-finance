@@ -337,6 +337,7 @@ class MemberMergeService:
             raise _error("MEMBER_MERGE_CASE_NOT_PENDING", 409)
 
         now = datetime.now(UTC)
+        decision_event_id = uuid4()
         event_type = "identity.duplicate_merge_rejected"
         if merge_case.expires_at <= now:
             merge_case.status = MemberMergeCaseStatus.EXPIRED.value
@@ -384,7 +385,13 @@ class MemberMergeService:
                 reason = "BLOCKERS_DETECTED_AT_REVIEW"
                 event_type = "identity.duplicate_merge_blocked"
             else:
-                await self._apply_merge(session, source, survivor, now)
+                await self._apply_merge(
+                    session,
+                    source,
+                    survivor,
+                    now,
+                    decision_event_id,
+                )
                 merge_case.status = MemberMergeCaseStatus.APPROVED.value
                 merge_case.blocker_summary = {"codes": [], "references": {}}
                 event_type = "identity.duplicate_merge_decided"
@@ -409,6 +416,7 @@ class MemberMergeService:
                 "mapping": {str(merge_case.source_member_id): str(merge_case.survivor_member_id)},
                 "blocker_summary": merge_case.blocker_summary,
             },
+            event_id=decision_event_id,
         )
         await AuditRepository(session).record(
             action=f"MEMBER_MERGE_{merge_case.status}",
@@ -502,6 +510,7 @@ class MemberMergeService:
         source: Member,
         survivor: Member,
         now: datetime,
+        decision_event_id: UUID,
     ) -> None:
         await session.execute(
             update(MemberIdentifier)
@@ -524,6 +533,7 @@ class MemberMergeService:
                 member_id=survivor.id,
                 updated_at=now,
                 version=ParticipantAddress.version + 1,
+                last_event_id=decision_event_id,
             )
         )
         await session.execute(

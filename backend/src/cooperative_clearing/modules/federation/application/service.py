@@ -17,6 +17,7 @@ from cooperative_clearing.modules.federation.application.common import (
     begin_federation_command,
     complete_federation_command,
     federation_actor,
+    federation_command_assurance,
 )
 from cooperative_clearing.modules.federation.domain.types import (
     NodeCapability,
@@ -269,7 +270,19 @@ class FederationService:
             aggregate_version=1,
             actor=actor,
             payload=payload,
-            evidence=[{"evidence_id": str(item)} for item in evidence_ids],
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_application_created",
+                subject_type="external_node",
+                subject_id=node_id,
+                target_node_id=node_id,
+                command_record=record,
+                evidence_refs=tuple({"evidence_id": str(item)} for item in evidence_ids),
+                next_member_ids=tuple(item.member_id for item in responsible_parties),
+            ),
         )
         if owner is None:
             session.add(
@@ -411,6 +424,20 @@ class FederationService:
                 "maximum_exposure": str(item.max_exposure),
                 "exposure_unit": item.exposure_unit,
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_responsibility_accepted",
+                subject_type="node_responsibility",
+                subject_id=item.id,
+                target_node_id=item.node_id,
+                command_record=record,
+                next_member_ids=(item.member_id,),
+                maximum_loss=item.max_exposure,
+                unit=item.exposure_unit,
+            ),
         )
         item.status = "ACTIVE"
         item.accepted_by_user_id = principal.user_id
@@ -483,6 +510,17 @@ class FederationService:
                 "responsibility_ids": sorted(str(item.id) for item in parties),
                 "certificate_fingerprint": certificate.fingerprint,
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_application_submitted",
+                subject_type="node_application",
+                subject_id=application.id,
+                target_node_id=node.id,
+                command_record=record,
+            ),
         )
         now = datetime.now(UTC)
         application.status = node.status = "APPLICATION_SUBMITTED"
@@ -540,6 +578,19 @@ class FederationService:
             aggregate_version=application.version + 1,
             actor=actor,
             payload={**payload, "node_id": str(node.id)},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_identity_verified",
+                subject_type="node_application",
+                subject_id=application.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=({"verification_summary": payload["verification_summary"]},),
+                attester_user_ids=(application.created_by_user_id,),
+            ),
         )
         now = datetime.now(UTC)
         application.status = node.status = "IDENTITY_VERIFIED"
@@ -636,6 +687,23 @@ class FederationService:
                 "nonce_hash": sha256_ref(nonce.encode()),
                 "expires_at": utc_timestamp(expires_at),
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_challenge_issued",
+                subject_type="node_challenge",
+                subject_id=challenge_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {
+                        "certificate_fingerprint": certificate.fingerprint,
+                        "nonce_hash": sha256_ref(nonce.encode()),
+                    },
+                ),
+            ),
         )
         session.add(
             NodeChallenge(
@@ -736,6 +804,25 @@ class FederationService:
                 "response_hash": payload["response_hash"],
                 "signature_verified": True,
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_challenge_passed",
+                subject_type="node_challenge",
+                subject_id=challenge.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {
+                        "certificate_fingerprint": certificate.fingerprint,
+                        "response_hash": payload["response_hash"],
+                        "signature_verified": True,
+                    },
+                ),
+                attester_user_ids=(challenge.issued_by_user_id,),
+            ),
         )
         challenge.status = "PASSED"
         challenge.response_signature = signature
@@ -813,6 +900,27 @@ class FederationService:
             aggregate_version=application.version + 1,
             actor=actor,
             payload={**payload, "node_id": str(node.id)},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_audit_approved"
+                if approve
+                else "federation.node_application_rejected",
+                subject_type="node_application",
+                subject_id=application.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {"challenge_id": str(challenge.id), "rationale": payload["rationale"]},
+                ),
+                attester_user_ids=(
+                    application.created_by_user_id,
+                    application.identity_verified_by_user_id,
+                    challenge.issued_by_user_id,
+                ),
+            ),
         )
         now = datetime.now(UTC)
         application.audit_decided_by_user_id = principal.user_id

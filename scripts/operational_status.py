@@ -25,7 +25,8 @@ from runtime_environment import parse_env_file
 
 HOST_PROBE_FORMAT = "cooperative-clearing-host-probe-v1"
 BACKUP_STATUS_FORMAT = "cooperative-clearing-backup-status-v1"
-BACKUP_FORMAT = "cooperative-clearing-backup-v1"
+BACKUP_FORMAT = "cooperative-clearing-backup-v2"
+SECRET_AUDIT_FORMAT = "cooperative-clearing-secret-audit-v1"
 SAFE_IDENTIFIER = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,127}$")
 ALLOWED_CLOCK = {"SYNCED", "CONFIGURED", "UNSYNCED", "UNKNOWN"}
 ALLOWED_UPS = {"ONLINE", "ON_BATTERY", "LOW_BATTERY", "NOT_CONFIGURED", "UNKNOWN"}
@@ -359,7 +360,18 @@ def record_backup(root: Path, backup_dir: Path) -> Path:
     manifest_path = backup_dir / "manifest.env"
     complete_path = backup_dir / "COMPLETE"
     checksums_path = backup_dir / "SHA256SUMS"
-    if not manifest_path.is_file() or not complete_path.is_file() or not checksums_path.is_file():
+    secret_storage_path = backup_dir / "secret-storage-verification.txt"
+    secret_audit_path = backup_dir / "backup-secret-audit.json"
+    if not all(
+        path.is_file()
+        for path in (
+            manifest_path,
+            complete_path,
+            checksums_path,
+            secret_storage_path,
+            secret_audit_path,
+        )
+    ):
         raise StatusError("backup is incomplete")
     values = _manifest(manifest_path)
     if values.get("format") != BACKUP_FORMAT:
@@ -371,6 +383,19 @@ def record_backup(root: Path, backup_dir: Path) -> Path:
         raise StatusError("invalid backup identifier")
     if backup_kind not in {"FULL", "DATA_ONLY"}:
         raise StatusError("invalid backup kind")
+    if secret_storage_path.read_text(encoding="utf-8").strip() != "secret_storage=PASS":
+        raise StatusError("backup secret storage evidence is invalid")
+    try:
+        secret_audit = json.loads(secret_audit_path.read_text(encoding="utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise StatusError("backup secret audit is invalid") from exc
+    if (
+        not isinstance(secret_audit, dict)
+        or secret_audit.get("format") != SECRET_AUDIT_FORMAT
+        or secret_audit.get("status") != "PASSED"
+        or secret_audit.get("finding_count") != 0
+    ):
+        raise StatusError("backup secret audit is not clean")
     completed_at = _backup_timestamp(complete_path.read_text(encoding="ascii").strip())
     destination = root / ".operations" / "backup-status.json"
     _write_atomic(

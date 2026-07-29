@@ -13,6 +13,11 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+try:
+    from supply_secret_audit import is_plaintext_secret_setting
+except ModuleNotFoundError:
+    from scripts.supply_secret_audit import is_plaintext_secret_setting
+
 ALLOWED_ENVIRONMENTS = frozenset(
     {"dev", "test", "staging-node", "pilot", "production"}
 )
@@ -131,6 +136,14 @@ def _contains_known_demo_credentials(root: Path) -> list[str]:
     return found
 
 
+def _plaintext_runtime_secret_names(values: Mapping[str, str]) -> list[str]:
+    prefixes = ("COOP_", "POSTGRES_", "BOOTSTRAP_", "NODE_", "BLOB_", "MFA_")
+    return sorted(
+        name
+        for name, value in values.items()
+        if name.startswith(prefixes) and is_plaintext_secret_setting(name, value)
+    )
+
 def _write_env_file(path: Path, updates: Mapping[str, str], template: Path) -> None:
     if path.is_file():
         original_lines = path.read_text(encoding="utf-8-sig").splitlines()
@@ -203,6 +216,12 @@ def configure_mode(
             "use a clean installation and restore only approved production data"
         )
     if mode == "production":
+        plaintext_secrets = _plaintext_runtime_secret_names(existing)
+        if plaintext_secrets:
+            raise EnvironmentContractError(
+                "Production .env contains plaintext secret settings: "
+                + ", ".join(plaintext_secrets)
+            )
         demo_secrets = _contains_known_demo_credentials(root)
         if demo_secrets:
             raise EnvironmentContractError(

@@ -10,6 +10,19 @@
 - payload содержит только данные факта и ссылки, не произвольный снимок БД;
 - персональные данные минимизируются.
 
+## Critical command assurance
+
+Канонический code registry содержит 115 event types: economic finality,
+account recovery, break-glass, emergency custody, lifecycle ролей,
+trust/disputes/sanctions/appeals/reputation/rehabilitation, crisis и node
+authority/key lifecycle. Для них обязателен подписанный `_command_assurance` v2
+с actor, represented party, role/scope, evidence digest, exposure, attesters,
+approvers и следующими ответственными. Отсутствие контракта останавливает
+хозяйственную транзакцию. Полный список и границы:
+[Slice 34](implemented_slice_34.md), [Slice 35](implemented_slice_35.md),
+[Slice 36](implemented_slice_36.md), [Slice 37](implemented_slice_37.md) и
+[Slice 38](implemented_slice_38.md).
+
 ## Identity
 
 | Событие | Минимальный payload |
@@ -18,6 +31,11 @@
 | `identity.membership_activated` | membership, period |
 | `identity.role_assigned` | member, role, scope, period, assigners |
 | `identity.role_revoked` | assignment, reason, decision |
+| `identity.role_assignment_requested` | target user/member, privileged role, scope, requester |
+| `identity.role_assignment_activated` | target user/member, ordinary role, scope, activator |
+| `identity.role_assignment_approved` | assignment, target member, requester, independent approver, reason |
+| `identity.role_assignment_rejected` | assignment, target member, requester, independent approver, reason |
+| `identity.role_assignment_revoked` | assignment, target member, scope, revoker, reason |
 | `identity.session_revoked` | user, session, reason |
 | `identity.access_recovered` | user, approvers, procedure |
 | `identity.member_verified` | member, verifier, evidence, decision |
@@ -273,7 +291,9 @@ assessment не двигает пай. Slice 30 разрешает только 
 | `federation.sync_package_exported/simulated/applied` | перенос и применение пакета |
 | `federation.sync_conflict_opened/resolved` | конфликт без удаления истории |
 | `federation.node_incident_opened/resolved` | quarantine lifecycle |
-| `federation.node_key_rotation_requested/rotated` | dual-control ротация ключа |
+| `federation.node_key_rotation_requested/rotated/rejected` | dual-control ротация ключа |
+| `federation.node_suspended/quarantined/revoked` | ограничение или прекращение доверия |
+| `federation.node_rehabilitated_limited` | ограниченное восстановление после решения |
 | `federation.paper_form_issued` | выдача нумерованного оригинала |
 | `federation.paper_operation_recorded` | независимый ввод операции |
 | `federation.paper_form_voided` | контролируемое аннулирование оригинала |
@@ -368,3 +388,16 @@ request id; эти записи не подменяют подписанное �
 - `responsibility.custody_continuity_blocked` фиксирует fail-closed причины изменения состояния.
 
 Все события подписываются node key, входят в hash-chain и outbox; audit связывает их с персональным пользователем и request id.
+
+## События приватной адресной книги Slice 45
+
+| Event type | Назначение |
+|---|---|
+| `identity.participant_address_created` | участник лично создал адресную точку и принял ответственность за её актуальность |
+| `identity.participant_address_updated` | участник изменил версию адресной точки, включая явную смену default |
+| `identity.participant_address_archived` | участник вывел адресную точку из дальнейшего использования |
+
+Все три события входят в critical registry и содержат custody assurance. Полный
+адрес, контакт, телефон, инструкции и метка не входят в canonical envelope.
+Payload хранит только безопасный operational summary и идентификаторы затронутых
+default-записей.

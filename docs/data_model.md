@@ -653,3 +653,16 @@ Revision `0033_member_continuity` создаёт `identity.member_continuity_cas
 Revision `0034_custody_continuity` создает `assets.custody_continuity_cases`, `assets.custody_continuity_items` и nullable FK `assets.inventory_lots.continuity_hold_case_id`. Case связывает подтвержденный `MemberContinuityCase`, исходное и временное назначения, склад, участников каждого решения, срок, доказательства, blockers и версии. Item фиксирует снимок версии и количества партии, фактический пересчет и доказательство.
 
 Partial unique index запрещает параллельные незавершенные дела на одно исходное назначение. Hold является частью самой партии и блокирует обычные мутации. История не удаляется, а downgrade fail-closed запрещен после появления дел.
+
+#### Дополнение Slice 45
+
+`identity.participant_addresses` дополнена полями
+`event_tracking_required` и `last_event_id`. Для новых и изменённых tracked rows
+`last_event_id` обязателен и ссылается deferred FK на
+`journal.signed_events.event_id`. Trigger требует новый event UUID при изменении
+деловых полей и запрещает выключить уже включённый tracking. Existing rows после
+миграции считаются legacy-untracked до первой пользовательской команды.
+
+Полные контактные данные остаются только в приватной таблице. Signed event
+содержит member/cooperative, purpose, region, status/version, default flags и
+affected IDs, но не address text, contact name, phone, instructions или label.

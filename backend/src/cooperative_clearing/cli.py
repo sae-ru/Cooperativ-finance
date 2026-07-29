@@ -53,6 +53,10 @@ from cooperative_clearing.modules.journal.application.service import (
     verify_journal,
 )
 from cooperative_clearing.modules.node.infrastructure.repository import NodeRepository
+from cooperative_clearing.modules.operations.application.restore_consistency import (
+    restore_consistency_payload,
+    verify_restore_consistency,
+)
 from cooperative_clearing.modules.operations.application.status import (
     GetOperationalSnapshot,
     snapshot_payload,
@@ -344,6 +348,7 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("worker")
     commands.add_parser("worker-health")
     commands.add_parser("verify-journal")
+    commands.add_parser("verify-restore-consistency")
     commands.add_parser("diagnostics")
     export = commands.add_parser("export-openapi")
     export.add_argument("--output", type=Path, required=True)
@@ -370,9 +375,19 @@ def main() -> None:
     elif args.command == "worker-health":
         raise SystemExit(0 if asyncio.run(worker_is_healthy(settings)) else 1)
     elif args.command == "verify-journal":
-        report = asyncio.run(verify_local_journal(settings))
-        _print_journal_report(report)
-        raise SystemExit(0 if report.ok else 1)
+        journal_report = asyncio.run(verify_local_journal(settings))
+        _print_journal_report(journal_report)
+        raise SystemExit(0 if journal_report.ok else 1)
+    elif args.command == "verify-restore-consistency":
+        consistency_report = asyncio.run(verify_restore_consistency(settings))
+        print(
+            json.dumps(
+                restore_consistency_payload(consistency_report),
+                ensure_ascii=True,
+                separators=(",", ":"),
+            )
+        )
+        raise SystemExit(0 if consistency_report.ok else 1)
     elif args.command == "diagnostics":
         print(
             json.dumps(

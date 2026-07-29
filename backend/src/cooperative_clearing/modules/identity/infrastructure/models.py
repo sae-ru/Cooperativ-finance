@@ -329,6 +329,19 @@ class ParticipantAddress(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    event_tracking_required: Mapped[bool] = mapped_column(
+        nullable=False, server_default=text("true")
+    )
+    last_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "journal.signed_events.event_id",
+            ondelete="RESTRICT",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        index=True,
+    )
 
 
 class MemberMergeCase(Base):

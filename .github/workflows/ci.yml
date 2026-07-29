@@ -82,6 +82,18 @@ jobs:
           curl --fail --silent http://127.0.0.1:8080/health/live >/dev/null
           curl --fail --silent http://127.0.0.1:8080/api/v1/system/status \
             | python -c 'import json,sys; value=json.load(sys.stdin)["data"]; assert value["status"] == "OPERATIONAL"; assert value["node"]["demo_data_loaded"] is True; assert value["worker"]["status"] == "RUNNING"'
+          docker compose exec -T api coopctl verify-journal \
+            | python -c 'import json,sys; value=json.load(sys.stdin); assert value["ok"] is True; assert not value["failures"]'
+      - name: Verify secret storage and restore an audited backup
+        run: |
+          secret_status="$(
+            docker compose exec -T postgres psql -X -qAt -v ON_ERROR_STOP=1 \
+              -U coop_migrator -d cooperative_clearing -f - \
+              < infra/postgres/verify-secret-storage.sql
+          )"
+          test "$secret_status" = "secret_storage=PASS"
+          backup_dir="$(bash ./scripts/backup-node.sh "$RUNNER_TEMP/backups")"
+          bash ./scripts/verify-backup.sh "$backup_dir"
       - name: Stop smoke stack
         if: always()
         run: docker compose down --volumes --remove-orphans
@@ -94,6 +106,24 @@ jobs:
       - name: Run three-node clearing acceptance
         run: sh ./scripts/test-federation.sh
 
+  local-observability:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create ephemeral node configuration
+        run: sh ./scripts/bootstrap-node.sh
+      - name: Verify local observability with all Docker networks isolated
+        run: sh ./scripts/test-local-observability.sh
+      - name: Upload local observability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-observability-evidence
+          path: evidence/local-observability-*
+          if-no-files-found: ignore
+          retention-days: 14
+
   supply-chain:
     needs: [backend, frontend, critical-quality]
     runs-on: ubuntu-latest
@@ -104,7 +134,7 @@ jobs:
       - name: Validate operator scripts
         shell: pwsh
         run: |
-          python -m py_compile scripts/release_bundle.py scripts/openapi_compat.py scripts/tests/test_release_bundle.py scripts/tests/test_openapi_compat.py
+          python -m py_compile scripts/release_bundle.py scripts/supply_secret_audit.py scripts/runtime_environment.py scripts/operational_status.py scripts/local_observability_probe.py scripts/openapi_compat.py scripts/tests/test_release_bundle.py scripts/tests/test_supply_secret_audit.py scripts/tests/test_runtime_environment.py scripts/tests/test_operational_status.py scripts/tests/test_local_observability_probe.py scripts/tests/test_openapi_compat.py
           Get-ChildItem scripts -Filter *.sh | ForEach-Object {
             bash -n $_.FullName
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -142,13 +172,18 @@ jobs:
             --release ci-contract \
             --output "$RUNNER_TEMP/release-bundle" \
             --private-key "$RUNNER_TEMP/release-private.pem" \
+            --qualified-platform linux/amd64 \
+            --upgrade-from ci-previous@0037_actor_assurance \
             --frontend-audit-image cooperative-clearing/frontend-test:ci-contract
           policy_sha="$(sha256sum "$RUNNER_TEMP/release-bundle/metadata/license-policy.json" | cut -d' ' -f1)"
           python scripts/release_bundle.py verify \
             --bundle "$RUNNER_TEMP/release-bundle" \
             --public-key "$RUNNER_TEMP/release-public.pem" \
             --expected-release ci-contract \
+            --installed-release ci-previous \
+            --installed-schema 0037_actor_assurance \
             --expected-policy-sha256 "$policy_sha" \
+            --expected-platform linux/amd64 \
             --load-images
           mkdir -p artifacts
           mv "$RUNNER_TEMP/release-bundle" artifacts/release-bundle

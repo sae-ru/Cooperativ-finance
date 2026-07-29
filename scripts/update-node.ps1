@@ -27,6 +27,14 @@ $currentVerifiedBundle = if ($env:COOP_VERIFIED_RELEASE_BUNDLE) {
     $env:COOP_VERIFIED_RELEASE_BUNDLE
 } else { Get-RuntimeSetting "COOP_VERIFIED_RELEASE_BUNDLE" }
 $compose = @("compose", "--project-directory", $root, "-f", (Join-Path $root "compose.yaml"))
+function Get-DatabaseSchema {
+    $output = @(& docker @compose run --rm --no-deps api alembic current)
+    if ($LASTEXITCODE -ne 0) { throw "Database schema resolution failed" }
+    $matches = @($output | Where-Object { $_ -match "^([0-9A-Za-z][0-9A-Za-z_-]{0,127})(?: \(head\))?$" })
+    if ($matches.Count -ne 1) { throw "Cannot determine one current database schema revision" }
+    [void] ($matches[0] -match "^([0-9A-Za-z][0-9A-Za-z_-]{0,127})(?: \(head\))?$")
+    return $Matches[1]
+}
 $envFile = Join-Path $root ".env"
 $current = if ($env:COOP_RELEASE) { $env:COOP_RELEASE } else { "0.1.0-dev" }
 if (Test-Path $envFile) {
@@ -55,6 +63,9 @@ if ($environment -eq "production" -and $Build) {
 if ($environment -eq "production" -and (-not $releasePublicKey -or -not $policySha256)) {
     throw "Production update requires the persisted release public key and license-policy SHA-256"
 }
+if ($environment -eq "production" -and -not $currentVerifiedBundle) {
+    throw "Production update requires the verified current release bundle for rollback"
+}
 $httpPort = if ($env:COOP_HTTP_PORT) { $env:COOP_HTTP_PORT } else { $null }
 if (-not $httpPort -and (Test-Path $envFile)) {
     $portLine = Get-Content $envFile |
@@ -64,11 +75,28 @@ if (-not $httpPort -and (Test-Path $envFile)) {
 }
 if (-not $httpPort) { $httpPort = "8080" }
 
+$currentSchema = Get-DatabaseSchema
+$targetSchema = $currentSchema
+$bundle = ""
 if ($OfflineBundle) {
     $bundle = (Resolve-Path -LiteralPath $OfflineBundle).Path
     if (-not $releasePublicKey) {
         throw "COOP_RELEASE_PUBLIC_KEY must name the independently provisioned public key"
     }
+    if (-not $currentVerifiedBundle) {
+        throw "Signed update requires the verified current release bundle for rollback"
+    }
+    $currentVerifiedBundle = (Resolve-Path -LiteralPath $currentVerifiedBundle).Path
+    $previousVerification = @(
+        (Join-Path $PSScriptRoot "release_bundle.py")
+        "verify"
+        "--bundle"
+        $currentVerifiedBundle
+        "--public-key"
+        $releasePublicKey
+        "--expected-release"
+        $current
+    )
     $verification = @(
         (Join-Path $PSScriptRoot "release_bundle.py")
         "verify"
@@ -78,17 +106,28 @@ if ($OfflineBundle) {
         $releasePublicKey
         "--expected-release"
         $TargetRelease
+        "--installed-release"
+        $current
+        "--installed-schema"
+        $currentSchema
         "--load-images"
     )
     if ($policySha256) {
-        $verification += @(
-            "--expected-policy-sha256",
-            $policySha256
-        )
+        $previousVerification += @("--expected-policy-sha256", $policySha256)
+        $verification += @("--expected-policy-sha256", $policySha256)
     }
-    & python @verification
+    & python @previousVerification | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Current release bundle verification failed" }
+    $verificationOutput = @(& python @verification)
     if ($LASTEXITCODE -ne 0) { throw "Offline bundle verification failed" }
+    $verificationResult = $verificationOutput[-1] | ConvertFrom-Json
+    $targetSchema = [string] $verificationResult.database_schema_revision
+    if ($targetSchema -notmatch "^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$") {
+        throw "Verified release returned an invalid target schema revision"
+    }
+    $verificationOutput | Write-Output
 }
+$env:COOP_BACKUP_VERIFIER_RELEASE = $TargetRelease
 $backupArgs = @{}
 if ($env:COOP_BACKUP_ROOT) { $backupArgs.BackupRoot = $env:COOP_BACKUP_ROOT }
 if ($env:COOP_ENCRYPTED_RECOVERY_BUNDLE) {
@@ -111,6 +150,10 @@ New-Item -ItemType Directory -Path $operations -Force | Out-Null
 $stateLines = @(
     "previous_release=$current"
     "target_release=$TargetRelease"
+    "previous_schema=$currentSchema"
+    "target_schema=$targetSchema"
+    "previous_bundle=$currentVerifiedBundle"
+    "target_bundle=$bundle"
     "preupdate_backup=$backup"
     "updated_at=$([DateTime]::UtcNow.ToString('o'))"
 )
@@ -145,9 +188,19 @@ else {
     }
 }
 
+& docker @compose stop api worker frontend gateway
+if ($LASTEXITCODE -ne 0) {
+    & (Join-Path $PSScriptRoot "rollback-node.ps1") -Release $current
+    throw "Runtime writer stop failed"
+}
+
 try {
     & docker @compose run --rm migrate
     if ($LASTEXITCODE -ne 0) { throw "Migration failed" }
+    $migratedSchema = Get-DatabaseSchema
+    if ($migratedSchema -ne $targetSchema) {
+        throw "Migration reached schema $migratedSchema, expected $targetSchema"
+    }
     if ($failpoint -eq "after-migration") {
         throw "Injected update failure after migration"
     }
@@ -159,6 +212,8 @@ try {
     & (Join-Path $PSScriptRoot "verify-stack.ps1") -BaseUrl "http://127.0.0.1:$httpPort"
     & docker @compose run --rm --no-deps api coopctl verify-journal
     if ($LASTEXITCODE -ne 0) { throw "Journal verification failed" }
+    & docker @compose run --rm --no-deps api coopctl verify-restore-consistency
+    if ($LASTEXITCODE -ne 0) { throw "Restored-state consistency verification failed" }
     if ($environment -eq "production") {
         $contextUpdate = @(
             (Join-Path $PSScriptRoot "runtime_environment.py")

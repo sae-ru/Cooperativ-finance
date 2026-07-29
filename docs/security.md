@@ -83,8 +83,20 @@ filesystem permissions.
 
 `mfa_encryption_key` генерируется отдельно, монтируется только backend-сервисам и входит в зашифрованный recovery material; потеря этого ключа делает активные TOTP seeds непригодными и требует контролируемого восстановления учётных записей.
 
-Secret scanning запускается локально и в CI. Найденный опубликованный secret
-считается скомпрометированным, а не просто удаляется из последнего commit.
+`scripts/supply_secret_audit.py` запускается локально, в release builder,
+независимом verifier, backup/restore и CI. Он сканирует Git inventory, node
+payload, распакованные Docker layers, dump/blob backup и runtime env. Отчёт
+содержит только rule/path/offset, но не значение. Production `.env` допускает
+секреточувствительный параметр только как `*_FILE` со ссылкой на каталог
+secrets.
+
+`infra/postgres/verify-secret-storage.sql` отдельно проверяет Argon2id password
+hashes, 64-hex token/credential digests, MFA nonce/ciphertext, перечень
+secret-sensitive columns и отсутствие plaintext patterns. Тот же SQL
+обязательно выполняется после restore.
+
+Найденный опубликованный secret считается скомпрометированным, а не просто
+удаляется из последнего commit.
 
 ## Application security
 
@@ -148,3 +160,12 @@ failure, backup/restore и break-glass. Пароли, tokens, private keys и п
 - dependency и secret scans без critical findings;
 - backup restore drill;
 - независимый review криптографии и liability path до пилота.
+
+## Приватность адресных событий
+
+Адресная книга хранит operational PII в `identity.participant_addresses`.
+Immutable journal намеренно исключает address text, contact name, phone,
+instructions и label. Событие доказывает actor, role, membership, command basis,
+версию и назначение адресной точки без копирования полного контакта в
+append-only историю. Audit также хранит только безопасный summary и signed event
+UUID.

@@ -112,8 +112,9 @@ docker run --rm -v "${project}_blob-data:/target" -v "$backup_dir:/backup:ro" po
 "${compose[@]}" run --rm migrate
 "${compose[@]}" run --rm init-node
 "${compose[@]}" run --rm bootstrap-identity
-"${compose[@]}" up -d api worker frontend gateway
+"${compose[@]}" run --rm --no-deps api coopctl verify-restore-consistency
 "${compose[@]}" run --rm --no-deps api coopctl verify-journal
+"${compose[@]}" up -d api worker frontend gateway
 bash "$root_dir/scripts/verify-stack.sh" "http://127.0.0.1:${COOP_HTTP_PORT:-8080}"
 
 echo "restore_completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

@@ -110,6 +110,12 @@ class EventSignature(Base):
     __table_args__ = (
         CheckConstraint("signature_scope IN ('NODE','OPERATOR')", name="scope_allowed"),
         UniqueConstraint("event_id", "key_id", "signature_scope", name="uq_event_signature"),
+        Index(
+            "uq_event_signatures_node_event",
+            "event_id",
+            unique=True,
+            postgresql_where=text("signature_scope = 'NODE'"),
+        ),
         {"schema": "journal"},
     )
 
@@ -140,6 +146,7 @@ class OutboxMessage(Base):
             name="status_allowed",
         ),
         CheckConstraint("attempt_count >= 0", name="attempt_count_nonnegative"),
+        UniqueConstraint("event_id", name="uq_outbox_event"),
         UniqueConstraint("event_id", "topic", name="uq_outbox_event_topic"),
         Index("ix_outbox_ready", "status", "available_at", "id"),
         {"schema": "journal"},

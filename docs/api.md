@@ -455,3 +455,12 @@ POST /api/v1/risk/compensations/{transfer_id}/void
 Settlement выполняет только владелец целевого member account личной acceptance;
 void до acceptance требует другого независимого оператора, причины и evidence.
 Сырые machine codes переводятся интерфейсом в понятные RU/EN сообщения.
+
+### Гарантия event_id адресной книги
+
+Команды `POST /api/v1/participant/addresses`,
+`PUT /api/v1/participant/addresses/{address_id}` и
+`POST /api/v1/participant/addresses/{address_id}/archive` возвращают
+`data.event_id` реального `journal.signed_events.event_id`. Это не audit UUID.
+Повтор с тем же idempotency key возвращает тот же event UUID и
+`replayed=true`.

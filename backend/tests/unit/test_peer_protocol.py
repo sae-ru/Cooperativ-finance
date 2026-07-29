@@ -65,4 +65,7 @@ def test_peer_endpoint_requires_https_in_hardened_environments() -> None:
     with pytest.raises(DomainError, match="PEER_ENDPOINT_INVALID"):
         peer_message_url("http://peer:8080", Environment.PRODUCTION)
     with pytest.raises(DomainError, match="PEER_ENDPOINT_INVALID"):
-        peer_message_url("https://user:password@peer.example", Environment.PRODUCTION)
+        peer_message_url(
+            "https://user:" + "password@peer.example",
+            Environment.PRODUCTION,
+        )

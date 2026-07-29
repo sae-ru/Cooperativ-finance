@@ -321,3 +321,163 @@ acceptance criteria и tests. Если строка карты меняется,
 | Нет двойного execution | transfer/cycle/accounts locks и expected version | active-case, proof и receipt uniqueness | один settlement/finalize, один conflict |
 | Повтор после ответа | command registry по actor/type/key/payload | unique command key | replay либо fail-closed conflict |
 | Один доказательный след | event append в той же транзакции | unique event refs и chain sequence | journal verification |
+
+## Slice 34 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Физический исполнитель | validated member/user/role snapshot в `performed_by` | forged actor и inactive role integration |
+| Действие от имени стороны | typed member/cooperative/node `on_behalf_of` совпадает со scope | forged cooperative rejection |
+| Доказательства | непустой canonical evidence list и SHA-256 digest | missing/conflicting evidence rejection |
+| Ограниченная экспозиция | category/effect/subject/exact decimal/unit/max loss/basis refs | invalid exposure tests и доменные E2E |
+| Approvers и attesters | role-bound local parties и signed remote node references | clearing, compensation, solidarity, fulfillment, federation flows |
+| Следующий ответственный | member/cooperative/node list, включая все affected nodes | payload snapshot assertions |
+| Нельзя забыть assurance | AST связывает 24 registry types со всеми append call sites | `test_command_assurance_registry.py` |
+| История не переписывается | новый v2, старые v1/missing events остаются legacy evidence | journal hash/signature verification |
+| Понятная ошибка | RU/EN safe message вместо internal code/request id | frontend unit test |
+| Все critical commands | ещё не заявлено: authority/security/custody scope открыт | production-readiness checkbox остаётся пустым |
+## Slice 35 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Recovery имеет личного requester и независимого decider | `IDENTITY/REQUEST|EXECUTE|REJECT`, actor-bound attester/approver | identity security E2E и signed payload assertions |
+| Recovery возвращается целевому человеку | executed event указывает target member в `next_responsible` | target member assertion |
+| Break-glass ограничен человеком, ролью, scope и временем | `AUTHORITY/REQUEST|CREATE|REJECT|REVOKE`, duration/evidence basis | activate/revoke E2E и запрет делегирования |
+| Технический user не получает безымянную власть | authority target обязан иметь member | `_user_party` fail-closed guard |
+| Старый хранитель остаётся до acceptance | lot custodian меняется только вместе с accepted transfer event | custody E2E before/after assertions |
+| Каждая партия имеет hold и transfer exposure | `CUSTODY/HOLD|TRANSFER|RELEASE`, exact quantity/unit | signed lot payload assertions |
+| Лимит физической ответственности видим | source/target assignment maximum loss и unit входят в assurance | `500.0000 SHARE` assertion |
+| Отказ не оставляет шаг без владельца | reject/decline/block/release возвращают cooperative next party | AST registry и service call sites |
+| Нельзя забыть новый assurance | registry расширен до 40 literal event types | `test_command_assurance_registry.py` |
+| Все critical commands | ещё не заявлено: role admin, sanctions/crisis и node authority открыты | production-readiness checkbox остаётся пустым |
+
+## Slice 36 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Полномочие получает человек | target user обязан ссылаться на active member | memberless target получает fail-closed отказ |
+| Исполнитель действует постоянной ролью | actor user/member/assignment/scope повторно проверяются journal | service/API integration |
+| Обычная роль имеет явного владельца | immediate activation передаёт `next_responsible` target member | activated event assertion |
+| Привилегированная роль имеет dual control | requester attester и другой approver подписаны вместе | approve/reject integration |
+| Отказ и отзыв не оставляют authority без владельца | следующий шаг возвращается cooperative/node scope | rejected/revoked assertions |
+| Audit не заменяет доказательство | signed event и state mutation находятся в одной транзакции | journal payload и signature chain |
+| Нельзя забыть assurance | registry расширен до 45 literal event types | `test_command_assurance_registry.py` |
+| Все critical commands | ещё не заявлено: sanctions/crisis и node authority открыты | production-readiness checkbox остаётся пустым |
+
+## Slice 37 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Санкция имеет процессуальную цепочку | requester/decider/subject, evidence, effect и next owner входят в assurance | trust appeal E2E |
+| Апелляция не стирает историю | revoke/correction создают новые signed events | immutable decision/reputation tests |
+| Crisis authority ограничена | proposer/activator/controller, mandate scope и safe close подписаны | crisis drill |
+| Количество кризисного ресурса точно | Decimal amount и unit для target, snapshot, plan и issuance | signed payload assertions |
+| Нулевой остаток не становится ложной экспозицией | zero остаётся фактом payload без positive exposure | service guard |
+| Нельзя дважды зарезервировать запас | snapshot lock и повторная проверка available | crisis concurrency |
+| Нельзя забыть assurance | registry расширен до 87 literal event types | `test_command_assurance_registry.py` |
+| Все critical commands | ещё не заявлено: node authority открыт | production-readiness checkbox остаётся пустым |
+
+## Slice 38 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Внешний узел не является безымянной стороной | local node действует от своего имени, external node и все active named parties получают next responsibility | federation onboarding E2E |
+| Доверие и риск ограничены | contract, bilateral limit, bond и exposure содержат точный maximum loss/amount и unit | signed payload assertions |
+| Компрометация ключа не скрывает решение | request, old/new proof, incident и независимый approve/reject входят в assurance | key lifecycle E2E |
+| Quarantine/revoke не стирают историю | status и limited rehabilitation создают новые signed events | emergency lifecycle E2E |
+| Offline authority привязана к узлу | внешний node обязателен при close, лимиты и reconciliation подписаны | offline epoch assertions |
+| Нельзя забыть assurance | registry расширен до 115 literal event types | `test_command_assurance_registry.py` |
+| Все critical commands текущего registry | software gate закрыт; legal/operations/pilot gates отдельны | production-readiness checkbox и Slice 38 evidence |
+
+## Slice 39 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 122 не допускает неиспытанный ARM64 | signed v2 contract квалифицирует ровно одну platform и явно исключает вторую | AMD64/ARM64 positive fixtures и missing-exclusion rejection |
+| Образы не смешивают архитектуры | builder и verifier требуют один OS/arch для четырёх runtime roles | mixed-image negative tests |
+| Носитель соответствует серверу | `--expected-platform` и Docker host check до `docker load` | expected/host mismatch tests |
+| Импорт не подменяет platform | после load повторно проверяются content ID и OS/arch | verifier load contract |
+| Offline документация воспроизводима | Linux/PowerShell wrappers принимают qualified/expected platform | parser и shell syntax gates |
+## Slice 40 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 126: source не содержит закрытых ключей и открытых credentials | Git inventory и strict redacted scan | 735-file live scan и token/PEM/literal fixtures |
+| Node payload не проносит secret literal | strict scan всех поставляемых файлов | real payload scan и literal fixture |
+| Images не содержат key/secret material | разбор Docker-save outer tar и каждого layer | четыре real images и infected-layer tamper |
+| Подписанный отчёт нельзя подделать | verifier повторно сканирует payload/images и сравнивает scope summary | signed false-PASSED rejection |
+| `.env` не хранит plaintext secret | production принимает только безопасный `*_FILE` reference | runtime positive/negative tests |
+| БД хранит password/token/MFA безопасно | read-only SQL: Argon2id, SHA-256 digests, AEAD nonce/ciphertext, content scan | live PASS и tampered DB rejection |
+| Backup не скрывает plaintext | backup v2 сканирует dump, раскрывает blobs и хранит SQL evidence | real backup/restore drill |
+| Значение не попадает в диагностику | findings ограничены rule/path/offset или schema/table/column | explicit no-value-leak assertions |
+
+## Slice 41 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 127: event/signature/outbox commit вместе | deferred PostgreSQL constraint trigger и unique event indexes | incomplete commit получает `23514`, counts не меняются |
+| Доменное состояние откатывается вместе | один application session/commit для responsibility state, audit, event и outbox | injected audit failure и DB guard rollback assertions |
+| Worker не является critical dependency | durable `PENDING`, lease и `FOR UPDATE OF outbox_messages SKIP LOCKED` | operation committed при остановленном worker |
+| Crash не оставляет половину projection | receipt и `PUBLISHED` в одной worker transaction | rollback после dispatch возвращает attempt/status/receipt |
+| Два workers не повторяют эффект | row lock плюс unique `(event_id, consumer_name)` | concurrent restart: один claim, одна receipt |
+| Повреждение не публикуется | full envelope validation и quarantine | tampered hash, verifier failure, zero receipt, recovery |
+| История проверяется независимо | verifier начинает со всех events и проверяет signature/outbox cardinality | live `434/434/434`, failures `[]` |
+| Миграция безопасна для истории | preflight до установки trigger | populated `2921` event downgrade/re-upgrade cycle |
+
+## Slice 42 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 128: browser draft не получает `event_id` | versioned local schema с `draft_id`, recursive authoritative-field denylist | pure schema и nested tamper tests |
+| Draft не меняет хозяйственное состояние | save использует только IndexedDB, API остается `NetworkOnly` | upload/publish mocks не вызваны, live events `434 -> 434` |
+| Статус понятен пользователю | `authoritative=false`, `review_required=true`, явный RU/EN local status | component assertions и live browser UI |
+| Нет автоматического replay | reconnect только включает отдельную кнопку публикации | zero publish до explicit click |
+| Черновик изолирован между логинами | owner `user_id` index и повторная owner validation | owner mismatch rejection |
+| Поврежденный IndexedDB не становится командой | format/owner/expiry/authority validation при каждом чтении | contaminated record rejected |
+| Черновик переживает перезагрузку | native IndexedDB и Blob attachment | Docker browser save/reload/review |
+| Успешная публикация завершает local lifecycle | delete только в mutation `onSuccess` | explicit publish/delete component test |
+
+## Slice 43 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 129: восстановленные DB и journal согласованы | полный `verify_journal` внутри restore consistency gate | isolated restore: 434 events, failures `[]` |
+| Установлен тот ключ подписи, которому доверяет БД | Ed25519 fingerprint и public key сравниваются с единственным active record | live key match и wrong-seed unit test |
+| MFA material не потерян | каждый зашифрованный TOTP seed фактически расшифровывается | live `3/3`, wrong-key rejection |
+| Все связанные вложения пригодны | canonical key, AES-GCM tag, plaintext size и SHA-256 проверяются для каждого READY record | live `55/55`, one-byte tamper rejection |
+| Нет скрытых/лишних evidence blobs | disk `.ccb` set сравнивается с DB-derived set | orphan fixture и live orphan `0` |
+| Повреждённый restore не открывается пользователям | gate идёт после bootstrap и до запуска API/worker/frontend/gateway | restore script order и nonzero exit |
+## Slice 44 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 130: неверная подпись не устанавливается | Ed25519 verification предшествует image load, backup и migration | tampered signature, unchanged `s44-old@0037` |
+| Неизвестная версия не устанавливается | manifest version и compatibility format имеют закрытый allowlist | корректно подписанный version `3` отклонён |
+| Неподдерживаемый переход не устанавливается | exact signed source release/schema allowlist | unit transition mismatch и CI verifier flags |
+| Rollback возвращает прежнее приложение | previous bundle повторно проверяется и его image IDs загружаются заново | реальные образы commit `48701b0`, health release `s44-old` |
+| Rollback возвращает прежнюю schema | downgrade исполняется target migration image до выбора old app | `0038_atomic_event_outbox -> 0037_actor_assurance` |
+| События после backup не теряются | writers quiesced; journal checkpoint сравнивается до/после | сделка и signed event 267 сохранились с тем же hash |
+| Старый app не блокирует новый backup gate | target backend используется только как verified read-only consistency verifier | bootstrap defect reproduction и успешный повтор |
+
+## Slice 45 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| API `event_id` является событием | ответ хранит UUID `journal.signed_events`, а audit содержит `signed_event_id` | create/replay/update/archive integration assertions |
+| Адрес нельзя изменить без происхождения | `last_event_id`, tracking CHECK, deferred FK и mutation trigger | прямой UPDATE получает SQLSTATE `23514` |
+| Смена default не оставляет скрытую mutation | затронутые строки блокируются и получают тот же заранее выделенный event UUID | один transaction и signed payload affected IDs |
+| Падение вторичного audit не оставляет state/event | state, event, signature, outbox, audit и idempotency в одной транзакции | injected audit failure и нулевые остаточные записи |
+| Ответственность персональна | member on-behalf-of/attester, permanent role, active membership и next responsible | critical assurance payload assertions |
+| PII не становится вечным journal payload | address/contact/phone/instructions/label остаются в private table | negative immutable payload assertions |
+| Rollback схемы не теряет события | downgrade удаляет только адресную ссылку, signed journal остаётся append-only | `0038 -> 0039 -> 0038 -> 0039` count/hash drill |
+
+## Slice 46 trace
+
+| Требование | Реализация | Проверка |
+|---|---|---|
+| Acceptance 131: health доступен без Интернета | локальный gateway и operator probe в internal `edge` | live/ready `LIVE/READY` при blocked TEST-NET egress |
+| Метрики доступны только оператору | штатный login, смена bootstrap-пароля, role-protected operations API | snapshot/readiness и четыре обязательные Prometheus family |
+| Журналы доступны локально | bounded `docker compose logs` для api/worker/gateway | непустые bytes/lines/SHA-256 и required service markers |
+| Внешняя телеметрия не обязательна | все четыре сети internal, exporter отсутствует | network inspect и `telemetry_export=DISABLED` |
+| Секреты не становятся evidence | probe не печатает password/token/raw metrics и сканирует runtime log | unit leak tests для исходного и сменённого пароля |
+| Доказательство переносимо | report/network/log плюс LF `SHA256SUMS` | PowerShell и Bash Docker drills, `sha256sum -c` |

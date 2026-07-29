@@ -380,3 +380,212 @@ debit/credit, неизменный protected amount и повторный отк
 четыре класса exactly-once из production-readiness.
 
 Checkpoint на заново созданной test-БД: Ruff и `252 passed, 1 deselected`.
+
+## Проверки Slice 34
+
+Journal integration намеренно отправляет критическую команду без assurance,
+без evidence, с forged cooperative scope и с двумя конфликтующими источниками
+evidence. Каждый вариант обязан завершиться доменным отказом до commit.
+Положительный сценарий сравнивает полный v2 snapshot и затем независимо
+проверяет hash chain и Ed25519 signature.
+
+AST unit gate разбирает все production Python sources, извлекает literal event
+types из обычных и conditional expressions и требует `assurance=` для каждого
+элемента `CRITICAL_EVENT_TYPES`. Он также требует, чтобы все 24 registry types
+были найдены хотя бы в одном реальном call site.
+
+Domain regression повторно проходит rights, fulfillment/provenance, local
+clearing, share exposure, compensation, solidarity, federation lifecycle и
+inter-node prepare/commit/apply/reconcile. Frontend проверяет безопасный RU/EN
+текст отказа без internal code и request id.
+
+Контрольный прогон Slice 34 на чистой test-БД: Ruff без замечаний, strict mypy
+по `220` production source files, `255 passed, 1 deselected` backend,
+`197 passed` frontend, typecheck, production build и отдельный three-node
+Docker federation acceptance `1 passed`.
+## Проверки Slice 35
+
+Identity security E2E проходит TOTP, account recovery, независимое решение,
+отзыв сессий/factors, break-glass activation, запрет делегирования временной
+власти и revoke. Дополнительные assertions читают `_command_assurance` и
+проверяют category, node/cooperative scope и target member.
+
+Custody E2E подтверждает, что old custodian сохраняется до личного acceptance,
+а затем source assignment освобождается, target assignment активируется и lot
+атомарно получает нового custodian. Signed payload assertions проверяют
+`CUSTODY`, `HOLD`, maximum loss `500.0000 SHARE`, candidate member и permanent
+role assignment.
+
+AST gate теперь требует assurance для 40 событий. Оба E2E включены в
+`test-critical-quality.sh`. Контрольный прогон на чистой test-БД:
+Ruff, strict mypy и `255 passed, 1 deselected`.
+
+## Проверки Slice 36
+
+Role administration integration проходит privileged request, независимое
+approval, immediate activation обычной scoped-роли, independent rejection и
+revoke. Signed payload assertions проверяют target member, requester/approver,
+node/cooperative scope и каждого `next_responsible`.
+
+API flow использует персонального security administrator и target user,
+связанный с active member, затем читает подписанный request event. AST gate
+теперь требует assurance для 45 событий. Оба сценария включены в
+`test-critical-quality.sh`. Контрольный прогон: Ruff, strict mypy по `220`
+production source files, `255 passed, 1 deselected` на чистой схеме, `29 passed`
+в independent critical-quality round и `1 passed` в three-node acceptance.
+Живой узел вернул `READY`, journal verification подтвердил `434/434` событий.
+
+## Проверки Slice 37
+
+Trust appeal E2E читает signed events для dispute, protective measure,
+sanction, appeal, reputation correction и rehabilitation. Crisis drill читает
+assurance для reserve target/snapshot, mandate, rationing, resource issuance и
+paper forms; отдельный concurrency test проверяет единичное резервирование.
+
+AST gate теперь требует assurance для 87 событий. Оба доменных сценария входят
+в `test-critical-quality.sh`. Контрольный прогон: Ruff, strict mypy по `220`
+production source files, `255 passed, 1 deselected`, targeted `7 passed`,
+independent critical-quality `33 passed`, migration cycle green и journal
+verification `452/452`, three-node acceptance `1 passed`, live Docker node
+`READY` и его журнал `434/434`. Evidence:
+`evidence/quality-20260728T164149Z`.
+
+## Проверки Slice 38
+
+Federation onboarding E2E читает assurance для заявки, пяти принятых
+персональных ролей, identity/challenge/audit, trust contract, bilateral limit,
+bond, activation, offline epoch и внешней exposure. Emergency lifecycle в
+одной откатываемой транзакции проходит incident, плановую и compromise-ротацию
+ключей, независимые approve/reject, suspend, quarantine, revoke и limited
+rehabilitation.
+
+AST gate требует assurance для 112 событий. Federation flow входит в
+`test-critical-quality.sh`. Контрольный прогон: Ruff, strict mypy по `220`
+production source files, полный backend `256 passed, 1 deselected`,
+independent critical-quality `35 passed`, migration cycle green и journal
+verification `452/452`, three-node acceptance `1 passed`, live Docker node
+`READY` и его журнал `434/434`. Evidence:
+`evidence/quality-20260728T170948Z`.
+
+## Проверки Slice 39
+
+Release bundle tests создают корректные signed AMD64 и ARM64 fixtures и
+повторно подписывают намеренно испорченные манифесты, чтобы проверить именно
+семантический verifier после успешной криптографической проверки. Missing
+platform contract, mixed image architecture, отсутствующее явное исключение,
+expected-platform mismatch и несовместимый Docker host отклоняются fail-closed.
+
+Полный script gate: `49 passed`; Python compile, все Bash scripts и все
+PowerShell scripts проходят синтаксическую проверку. CI supply-chain job
+создаёт v2 bundle с `--qualified-platform linux/amd64` и независимо проверяет
+его с `--expected-platform linux/amd64`.
+
+Live release-contract gate: signed bundle `slice39-platform-contract`,
+`linux/amd64`, `4` images, `45` node payload files, `blocked=0`; verifier с
+`--load-images` успешно импортировал и повторно проверил все образы. Evidence:
+`evidence/platform-release-20260728T175332Z`.
+## Проверки Slice 40
+
+Secret fixtures покрывают полный PEM block, token signatures, credential URL,
+secret filename, strict literal, plaintext `.env`, infected Docker layer,
+compiled vendor binary boundary и распакованный blob backup. Release tests
+доказывают, что подписанный ложный `PASSED` не скрывает находку.
+
+Strict Git inventory scan прошёл 735 файлов без находок. Реальный signed
+`linux/amd64` bundle содержит 4 images, 48 node payload files и 6 clean scopes;
+независимый verifier повторно раскрыл payload/images и выполнил `docker load`.
+Живая и восстановленная БД прошли `secret_storage=PASS`; tampered DB отклонена
+без вывода значения. Backup v2 восстановил schema `0037_actor_assurance`, 149
+tables, 434 signed events и 47 blobs.
+
+Полный script gate: `64 passed`; backend: `256 passed, 1 deselected`; затронутые
+frontend fixtures: `5 passed`; Ruff, Python compile, все Bash scripts и 12
+PowerShell scripts прошли. Evidence:
+`evidence/secret-safety-20260728T185835Z`.
+
+## Slice 41: atomic event/outbox gate
+
+PostgreSQL integration tests выполняют deferred commit без signature/outbox,
+injected rollback после создания consumer receipt, конкурентный restart двух
+workers и повреждение canonical outbox payload. Проверяются exact counts,
+status, attempt count, quarantine code, отсутствие receipt и последующее
+восстановление. Migration проходит populated `0038 -> 0037 -> 0038`, а live
+verifier начинает со всех events и требует полную event/signature/outbox
+кардинальность.
+
+## Slice 42: browser draft authority gate
+
+Pure frontend tests запрещают event identity во всем дереве draft payload и
+отклоняют tampered IndexedDB record. Component tests переводят браузер в
+offline, сохраняют товар без upload/publish API, восстанавливают online и
+требуют отдельный review и publish click. Delete локальной записи разрешен
+только после успешной server mutation.
+
+Browser gate на полном Docker-стенде записывает signed event count до save,
+после save и после reload/review. Все три значения обязаны совпадать. Затем
+тестовый local draft удаляется, readiness и console errors проверяются снова.
+
+## Slice 43: restore consistency gate
+
+Unit tests проверяют правильный blob, one-byte ciphertext tamper, orphan `.ccb`,
+несовпадающие Ed25519 seed/public record и MFA key. PostgreSQL integration test
+создаёт demo evidence, запускает полный journal/key/blob verifier, портит реальный
+blob и требует `EVIDENCE_CONTENT_CORRUPT`, возвращая файл в `finally`.
+
+Живой `coopctl verify-restore-consistency`: journal `434`, signing keys `1`,
+evidence `55/55`, unique blobs `45`, MFA `3/3`, orphan `0`, failures `0`.
+Independent restore drill: schema `0038_atomic_event_outbox`, 149 таблиц, 434
+events и 47 файлов архива; восстановленный consistency report `ok=true`.
+Синтетический FULL повторил drill с independently verified exact release из
+четырёх образов и encrypted recovery fixture; одноразовый signing private key
+после проверки удалён.
+Финальный backend gate: `261 passed, 2 deselected`, coverage `83.35%`; restore
+acceptance отдельно прошёл `1 passed` на чистой Docker-топологии.
+## Slice 44: signed update and rollback gate
+
+Release unit tests требуют manifest version `2`, compatibility format v1 и
+точную пару `source release@schema`. Wrong signature, correctly signed unknown
+version, unsupported source schema, duplicate transition и unsafe rollback mode
+должны завершаться до `docker load`.
+
+Migration gate создаёт данные на `0037`, поднимается на `0038`, принимает новые
+signed business events, возвращается на `0037` и сравнивает count/last hash до
+повторного upgrade. Script contract tests удерживают одинаковые Linux/Windows
+проверки, оба signed bundle, target verifier для старого app и journal checkpoint.
+
+Изолированный acceptance использует реальные старые образы commit `48701b0` и
+новые образы. После pre-update backup через API создаётся сделка; rollback обязан
+вернуть old app/schema и сохранить deal, event sequence и hash. Test key,
+DATA_ONLY backup и локальный host не заменяют production ceremony/FULL drill.
+
+## Slice 45: participant address event assurance
+
+`test_participant_address_book.py` проверяет полный create/replay/update/archive
+flow и связывает каждый возвращённый event UUID с `SignedEvent`, NODE signature и
+outbox. Worker в тесте не нужен для commit. В immutable payload запрещены полный
+адрес и телефон.
+
+Injected failure в `AuditRepository.record` обязан откатить address, journal,
+signature, outbox и idempotency. Отдельный ORM mutation без смены
+`last_event_id` обязан завершиться IntegrityError от PostgreSQL trigger.
+`test_command_assurance_registry.py` распознаёт типизированный address wrapper и
+требует assurance для всех трёх event types.
+
+Migration gate проходит `0038 -> 0039 -> 0038 -> 0039`, проверяет trigger,
+constraint и index, а после downgrade сравнивает точные event count и last hash.
+`alembic check` должен возвращать `No new upgrade operations detected`.
+
+## Slice 46: local observability without Internet
+
+Pure Python tests проверяют loopback/internal-origin allowlist, обязательные
+metric families, полную internal network evidence, границу размера logs и
+запрет утечки исходного либо сменённого пароля. Bootstrap credential меняется
+через штатный `/api/v1/auth/change-password`; оба access token остаются только в
+памяти процесса.
+
+Linux и PowerShell acceptance wrappers поднимают чистый Compose project, требуют
+`Internal=true` для `edge/app/web/data`, доказывают blocked egress к TEST-NET,
+собирают bounded local logs и запускают read-only probe внутри `edge`. Итоговые
+`report.json`, `network-isolation.json`, `runtime.log` и LF `SHA256SUMS`
+проверяются независимо. Target-host UPS/clock/storage и ручной operator drill
+этим тестом не подменяются.

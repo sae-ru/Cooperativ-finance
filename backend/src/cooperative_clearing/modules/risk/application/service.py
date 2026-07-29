@@ -25,6 +25,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.risk.application.antifraud_enforcement import (
@@ -470,6 +472,9 @@ class RiskService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(account.member_id),),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.CREATE,
@@ -1003,6 +1008,15 @@ class RiskService:
                 "exposure_preview": self._preview_payload(preview),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(commitment.owner_member_id),),
+                attesters=(
+                    member_party(
+                        commitment.proposed_by_member_id,
+                        commitment.proposed_role_assignment_id,
+                    ),
+                ),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.RESERVE,
@@ -1098,6 +1112,9 @@ class RiskService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(commitment.owner_member_id),),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.RELEASE,

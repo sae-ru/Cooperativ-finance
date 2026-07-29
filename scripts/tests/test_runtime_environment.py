@@ -149,6 +149,42 @@ class RuntimeEnvironmentTests(unittest.TestCase):
         ):
             runtime_environment.configure_mode(self.root, mode="production")
 
+    def test_plaintext_runtime_secret_blocks_production_without_value_leak(self) -> None:
+        secret = "-".join(("never-print-this-production", "secret"))
+        (self.root / ".env").write_text(
+            "COOP_ENVIRONMENT=dev\n"
+            "COOP_DEMO_DATA_ENABLED=false\n"
+            f"POSTGRES_PASSWORD={secret}\n",
+            encoding="utf-8",
+        )
+
+        with self.assertRaises(
+            runtime_environment.EnvironmentContractError
+        ) as raised:
+            runtime_environment.configure_mode(
+                self.root,
+                mode="production",
+                **self.production_artifacts,
+            )
+
+        self.assertIn("POSTGRES_PASSWORD", str(raised.exception))
+        self.assertNotIn(secret, str(raised.exception))
+
+    def test_secret_file_reference_is_allowed_for_production(self) -> None:
+        (self.root / ".env").write_text(
+            "COOP_ENVIRONMENT=dev\n"
+            "COOP_DEMO_DATA_ENABLED=false\n"
+            "POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password\n",
+            encoding="utf-8",
+        )
+
+        result = runtime_environment.configure_mode(
+            self.root,
+            mode="production",
+            **self.production_artifacts,
+        )
+
+        self.assertEqual(result.environment, "production")
     def test_hardened_node_cannot_be_downgraded_to_demo(self) -> None:
         (self.root / ".env").write_text(
             "COOP_ENVIRONMENT=pilot\nCOOP_DEMO_DATA_ENABLED=false\n",
@@ -241,12 +277,57 @@ class DeploymentScriptContractTests(unittest.TestCase):
             self.assertNotIn("'prod'", text)
 
 
+    def test_backup_v2_requires_secret_audit_and_restored_database_gate(self) -> None:
+        scripts = {
+            relative: (self.root / relative).read_text(encoding="utf-8")
+            for relative in (
+                "scripts/backup-node.ps1",
+                "scripts/backup-node.sh",
+                "scripts/verify-backup.ps1",
+                "scripts/verify-backup.sh",
+            )
+        }
+        for text in scripts.values():
+            self.assertIn("cooperative-clearing-backup-v2", text)
+            self.assertIn("supply_secret_audit.py", text)
+            self.assertIn("verify-secret-storage.sql", text)
+            self.assertIn("secret-storage-verification.txt", text)
+            self.assertIn("backup-secret-audit.json", text)
     def test_successful_update_rotates_persisted_release_context(self) -> None:
         for relative in ("scripts/update-node.ps1", "scripts/update-node.sh"):
             text = (self.root / relative).read_text(encoding="utf-8")
             self.assertIn("--verified-release-bundle", text)
             self.assertIn("--release-public-key", text)
             self.assertIn("--license-policy-sha256", text)
+
+    def test_update_and_rollback_enforce_signed_schema_transition(self) -> None:
+        updates = [
+            (self.root / relative).read_text(encoding="utf-8")
+            for relative in ("scripts/update-node.ps1", "scripts/update-node.sh")
+        ]
+        rollbacks = [
+            (self.root / relative).read_text(encoding="utf-8")
+            for relative in ("scripts/rollback-node.ps1", "scripts/rollback-node.sh")
+        ]
+        backups = [
+            (self.root / relative).read_text(encoding="utf-8")
+            for relative in ("scripts/backup-node.ps1", "scripts/backup-node.sh")
+        ]
+        for text in updates:
+            self.assertIn("--installed-release", text)
+            self.assertIn("--installed-schema", text)
+            self.assertIn("COOP_BACKUP_VERIFIER_RELEASE", text)
+            self.assertIn("previous_schema", text.lower())
+            self.assertIn("target_schema", text.lower())
+        for text in rollbacks:
+            self.assertIn("alembic downgrade", text)
+            self.assertIn("previous_bundle", text.lower())
+            self.assertIn("target_bundle", text.lower())
+            self.assertIn("last_event_hash", text)
+            self.assertIn("verify-restore-consistency", text)
+        for text in backups:
+            self.assertIn("consistency_verifier_release", text.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

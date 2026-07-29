@@ -4,7 +4,9 @@ param(
     [string] $BundleDirectory,
     [Parameter(Mandatory)]
     [string] $PublicKey,
-    [string] $ExpectedRelease
+    [string] $ExpectedRelease,
+    [ValidateSet("linux/amd64", "linux/arm64")]
+    [string] $ExpectedPlatform
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +19,7 @@ $arguments = @(
     $PublicKey
 )
 if ($ExpectedRelease) { $arguments += @("--expected-release", $ExpectedRelease) }
+if ($ExpectedPlatform) { $arguments += @("--expected-platform", $ExpectedPlatform) }
 if ($env:COOP_RELEASE_LICENSE_POLICY_SHA256) {
     $arguments += @(
         "--expected-policy-sha256",

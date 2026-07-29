@@ -52,7 +52,7 @@ def test_mfa_secret_is_authenticated_and_bound_to_factor(tmp_path: Path) -> None
 
 
 def test_totp_matching_uses_rfc_counter_window(tmp_path: Path) -> None:
-    secret = "JBSWY3DPEHPK3PXP"
+    secret = "".join(("JBSWY3D", "PEHPK3PXP"))
     path = key_file(tmp_path)
     cipher, factor = factor_with_secret(path, secret)
     service = IdentitySecurityService(

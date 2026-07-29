@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cooperative_clearing.modules.audit.infrastructure.models import IdempotencyRecord
@@ -13,12 +13,28 @@ from cooperative_clearing.modules.audit.infrastructure.repository import (
     IdempotencyRepository,
     request_payload_hash,
 )
-from cooperative_clearing.modules.identity.domain.types import Principal
+from cooperative_clearing.modules.identity.domain.types import (
+    Principal,
+    RoleGrantSource,
+)
 from cooperative_clearing.modules.identity.infrastructure.models import (
     Member,
     Membership,
     ParticipantAddress,
 )
+from cooperative_clearing.modules.journal.application.service import (
+    ActorClaim,
+    AppendedEvent,
+    SignedJournalService,
+)
+from cooperative_clearing.modules.journal.domain.assurance import (
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    member_party,
+)
+from cooperative_clearing.shared.core.config import Settings
 from cooperative_clearing.shared.domain.errors import DomainError
 
 
@@ -62,6 +78,9 @@ class AddressValues:
 
 
 class ParticipantAddressBookService:
+    def __init__(self, settings: Settings) -> None:
+        self.journal = SignedJournalService(settings)
+
     async def create(
         self,
         session: AsyncSession,
@@ -80,9 +99,10 @@ class ParticipantAddressBookService:
         )
         if replay is not None:
             return replay
-        await self._require_active_membership(
+        membership = await self._require_active_membership(
             session, member_id=member_id, cooperative_id=values.cooperative_id
         )
+        actor = self._actor(principal, values.cooperative_id)
         address = ParticipantAddress(
             id=uuid4(),
             member_id=member_id,
@@ -97,17 +117,39 @@ class ParticipantAddressBookService:
             is_default_pickup=values.is_default_pickup,
             is_default_delivery=values.is_default_delivery,
             status="ACTIVE",
+            version=1,
+            event_tracking_required=True,
         )
-        await self._clear_other_defaults(session, member_id=member_id, values=values)
+        affected = await self._clear_other_defaults(
+            session, member_id=member_id, values=values
+        )
+        event_id = uuid4()
+        address.last_event_id = event_id
+        for item in affected:
+            item.last_event_id = event_id
+            item.event_tracking_required = True
+        event = await self._append_participant_address_event(
+            session,
+            event_type="identity.participant_address_created",
+            effect=ExposureEffect.CREATE,
+            principal=principal,
+            actor=actor,
+            record=record,
+            membership=membership,
+            address=address,
+            affected=affected,
+            event_id=event_id,
+        )
         session.add(address)
-        event_id = await self._audit(
+        await self._audit(
             session,
             action="PARTICIPANT_ADDRESS_CREATED",
             principal=principal,
             address=address,
+            event_id=event.event_id,
             request_id=request_id,
         )
-        return self._complete(record, event_id, address.id)
+        return self._complete(record, event.event_id, address.id)
 
     async def update(
         self,
@@ -138,10 +180,11 @@ class ParticipantAddressBookService:
         )
         if address.version != expected_version:
             raise self._conflict()
-        await self._require_active_membership(
+        membership = await self._require_active_membership(
             session, member_id=member_id, cooperative_id=values.cooperative_id
         )
-        await self._clear_other_defaults(
+        actor = self._actor(principal, values.cooperative_id)
+        affected = await self._clear_other_defaults(
             session, member_id=member_id, values=values, exclude_id=address.id
         )
         address.cooperative_id = values.cooperative_id
@@ -156,14 +199,33 @@ class ParticipantAddressBookService:
         address.is_default_delivery = values.is_default_delivery
         address.updated_at = datetime.now(UTC)
         address.version += 1
-        event_id = await self._audit(
+        event_id = uuid4()
+        address.last_event_id = event_id
+        address.event_tracking_required = True
+        for item in affected:
+            item.last_event_id = event_id
+            item.event_tracking_required = True
+        event = await self._append_participant_address_event(
+            session,
+            event_type="identity.participant_address_updated",
+            effect=ExposureEffect.CORRECT,
+            principal=principal,
+            actor=actor,
+            record=record,
+            membership=membership,
+            address=address,
+            affected=affected,
+            event_id=event_id,
+        )
+        await self._audit(
             session,
             action="PARTICIPANT_ADDRESS_UPDATED",
             principal=principal,
             address=address,
+            event_id=event.event_id,
             request_id=request_id,
         )
-        return self._complete(record, event_id, address.id)
+        return self._complete(record, event.event_id, address.id)
 
     async def archive(
         self,
@@ -191,24 +253,46 @@ class ParticipantAddressBookService:
         )
         if address.version != expected_version:
             raise self._conflict()
+        membership = await self._require_active_membership(
+            session,
+            member_id=member_id,
+            cooperative_id=address.cooperative_id,
+        )
+        actor = self._actor(principal, address.cooperative_id)
         address.status = "ARCHIVED"
         address.is_default_pickup = False
         address.is_default_delivery = False
         address.updated_at = datetime.now(UTC)
         address.version += 1
-        event_id = await self._audit(
+        event_id = uuid4()
+        address.last_event_id = event_id
+        address.event_tracking_required = True
+        event = await self._append_participant_address_event(
+            session,
+            event_type="identity.participant_address_archived",
+            effect=ExposureEffect.CLOSE,
+            principal=principal,
+            actor=actor,
+            record=record,
+            membership=membership,
+            address=address,
+            affected=[],
+            event_id=event_id,
+        )
+        await self._audit(
             session,
             action="PARTICIPANT_ADDRESS_ARCHIVED",
             principal=principal,
             address=address,
+            event_id=event.event_id,
             request_id=request_id,
         )
-        return self._complete(record, event_id, address.id)
+        return self._complete(record, event.event_id, address.id)
 
     @staticmethod
     async def _require_active_membership(
         session: AsyncSession, *, member_id: UUID, cooperative_id: UUID
-    ) -> None:
+    ) -> Membership:
         member = await session.get(Member, member_id)
         membership = await session.scalar(
             select(Membership).where(
@@ -223,17 +307,20 @@ class ParticipantAddressBookService:
                 message_key="errors.identity.active_membership_required",
                 status_code=403,
             )
+        return membership
 
     @staticmethod
     async def _owned_active_address(
         session: AsyncSession, *, member_id: UUID, address_id: UUID
     ) -> ParticipantAddress:
         address = await session.scalar(
-            select(ParticipantAddress).where(
+            select(ParticipantAddress)
+            .where(
                 ParticipantAddress.id == address_id,
                 ParticipantAddress.member_id == member_id,
                 ParticipantAddress.status == "ACTIVE",
             )
+            .with_for_update()
         )
         if address is None:
             raise DomainError(
@@ -250,18 +337,10 @@ class ParticipantAddressBookService:
         member_id: UUID,
         values: AddressValues,
         exclude_id: UUID | None = None,
-    ) -> None:
-        assignments: dict[str, object] = {
-            "updated_at": datetime.now(UTC),
-            "version": ParticipantAddress.version + 1,
-        }
-        if values.is_default_pickup:
-            assignments["is_default_pickup"] = False
-        if values.is_default_delivery:
-            assignments["is_default_delivery"] = False
-        if len(assignments) == 2:
-            return
-        statement = update(ParticipantAddress).where(
+    ) -> list[ParticipantAddress]:
+        if not values.is_default_pickup and not values.is_default_delivery:
+            return []
+        statement = select(ParticipantAddress).where(
             ParticipantAddress.member_id == member_id,
             ParticipantAddress.status == "ACTIVE",
         )
@@ -276,8 +355,99 @@ class ParticipantAddressBookService:
                 ParticipantAddress.is_default_pickup.is_(True)
                 | ParticipantAddress.is_default_delivery.is_(True)
             )
-        await session.execute(statement.values(**assignments))
+        affected = list((await session.execute(statement.with_for_update())).scalars())
+        now = datetime.now(UTC)
+        for address in affected:
+            if values.is_default_pickup:
+                address.is_default_pickup = False
+            if values.is_default_delivery:
+                address.is_default_delivery = False
+            address.updated_at = now
+            address.version += 1
+        return affected
 
+    @staticmethod
+    def _actor(principal: Principal, cooperative_id: UUID) -> ActorClaim:
+        if principal.member_id is None:
+            raise DomainError(
+                code="PERSONAL_ACTOR_REQUIRED",
+                message_key="errors.identity.personal_actor_required",
+                status_code=403,
+            )
+        for grant in principal.roles:
+            if (
+                grant.source is RoleGrantSource.ASSIGNMENT
+                and grant.cooperative_id in {None, cooperative_id}
+            ):
+                return ActorClaim(
+                    person_id=principal.member_id,
+                    organization_id=cooperative_id,
+                    role_assignment_id=grant.assignment_id,
+                )
+        raise DomainError(
+            code="PERMANENT_ROLE_REQUIRED",
+            message_key="errors.identity.permanent_role_required",
+            status_code=403,
+        )
+
+    async def _append_participant_address_event(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: str,
+        effect: ExposureEffect,
+        principal: Principal,
+        actor: ActorClaim,
+        record: IdempotencyRecord,
+        membership: Membership,
+        address: ParticipantAddress,
+        affected: list[ParticipantAddress],
+        event_id: UUID,
+    ) -> AppendedEvent:
+        evidence_refs: tuple[object, ...] = (
+            {"idempotency_record_id": str(record.id)},
+            {"authenticated_session_id": str(principal.session_id)},
+            {"active_membership_id": str(membership.id)},
+        )
+        with session.no_autoflush:
+            return await self.journal.append(
+                session,
+                event_type=event_type,
+                aggregate_type="participant_address",
+                aggregate_id=address.id,
+                aggregate_version=address.version,
+                actor=actor,
+                payload={
+                    "member_id": str(address.member_id),
+                    "cooperative_id": str(address.cooperative_id),
+                    "purpose": address.purpose,
+                    "region_code": address.region_code,
+                    "status": address.status,
+                    "version": address.version,
+                    "is_default_pickup": address.is_default_pickup,
+                    "is_default_delivery": address.is_default_delivery,
+                    "superseded_default_addresses": [
+                        {"address_id": str(item.id), "version": item.version}
+                        for item in affected
+                    ],
+                },
+                assurance=CommandAssurance(
+                    on_behalf_of=member_party(address.member_id),
+                    exposure=ExposureClaim(
+                        category=ExposureCategory.CUSTODY,
+                        effect=effect,
+                        subject_type="participant_address",
+                        subject_id=address.id,
+                        basis_refs=(record.request_hash, str(membership.id)),
+                    ),
+                    evidence_refs=evidence_refs,
+                    next_responsible=(member_party(address.member_id),),
+                    attesters=(
+                        member_party(address.member_id, actor.role_assignment_id),
+                    ),
+                ),
+                event_id=event_id,
+            )
     @staticmethod
     def _validate_defaults(values: AddressValues) -> None:
         if values.is_default_pickup and values.purpose not in {"PICKUP", "BOTH"}:
@@ -316,6 +486,7 @@ class ParticipantAddressBookService:
         action: str,
         principal: Principal,
         address: ParticipantAddress,
+        event_id: UUID,
         request_id: UUID | None,
     ) -> UUID:
         return await AuditRepository(session).record(
@@ -331,6 +502,7 @@ class ParticipantAddressBookService:
                 "purpose": address.purpose,
                 "region_code": address.region_code,
                 "version": address.version,
+                "signed_event_id": str(event_id),
             },
         )
 

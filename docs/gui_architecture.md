@@ -163,6 +163,10 @@ Preview показывает неизменяемый summary hash, роль п�
 - формы валидируются Zod, но сервер повторяет проверки;
 - IndexedDB хранит shell, справочники, черновики и pending requests;
 - черновик не получает `event_id` и всегда маркируется как непринятый;
+- локальный offer draft имеет `authoritative=false`, `review_required=true`,
+  owner `user_id`, семидневный retention и optional Blob фотографии;
+- reconnect не запускает auto replay: пользователь повторно открывает и
+  проверяет каждый черновик перед явной публикацией;
 - закрытые ключи и избыточная PII в браузере не хранятся;
 - mutation после timeout проверяет idempotency result до повторной отправки.
 

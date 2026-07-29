@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -23,6 +24,16 @@ from cooperative_clearing.modules.identity.infrastructure.models import (
 )
 from cooperative_clearing.modules.inventory.infrastructure.models import EvidenceBlob, EvidenceLink
 from cooperative_clearing.modules.journal.application.service import ActorClaim
+from cooperative_clearing.modules.journal.domain.assurance import (
+    AccountabilityParty,
+    AccountabilityPartyKind,
+    CommandAssurance,
+    ExposureCategory,
+    ExposureClaim,
+    ExposureEffect,
+    actor_party,
+    member_party,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +41,100 @@ class CrisisCommandResult:
     event_id: UUID
     object_id: UUID
     replayed: bool
+
+
+CRISIS_ASSURANCE_EVENTS = {
+    "crisis.reserve_target_proposed": (ExposureEffect.REQUEST, False),
+    "crisis.reserve_target_retired": (ExposureEffect.REVOKE, True),
+    "crisis.reserve_target_approved": (ExposureEffect.APPROVE, True),
+    "crisis.reserve_snapshot_recorded": (ExposureEffect.RECORD, True),
+    "crisis.mandate_proposed": (ExposureEffect.REQUEST, False),
+    "crisis.mandate_activated": (ExposureEffect.APPROVE, True),
+    "crisis.mandate_reviewed": (ExposureEffect.DECIDE, True),
+    "crisis.rationing_rule_proposed": (ExposureEffect.REQUEST, False),
+    "crisis.rationing_rule_retired": (ExposureEffect.REVOKE, True),
+    "crisis.rationing_rule_approved": (ExposureEffect.APPROVE, True),
+    "crisis.rationing_previewed": (ExposureEffect.RECORD, False),
+    "crisis.rationing_confirmed": (ExposureEffect.RESERVE, True),
+    "crisis.rationing_cancelled": (ExposureEffect.RELEASE, True),
+    "crisis.ration_issued": (ExposureEffect.EXECUTE, True),
+    "crisis.paper_form_issued": (ExposureEffect.CREATE, False),
+    "crisis.paper_form_recorded": (ExposureEffect.RECORD, True),
+    "crisis.mandate_expired": (ExposureEffect.CLOSE, True),
+    "crisis.mandate_closed": (ExposureEffect.CLOSE, True),
+}
+
+
+def crisis_command_assurance(
+    *,
+    principal: Principal,
+    actor: ActorClaim,
+    event_type: str,
+    subject_type: str,
+    subject_id: UUID,
+    command_record: IdempotencyRecord | None = None,
+    evidence_refs: Sequence[object] = (),
+    next_member_ids: Sequence[UUID | None] = (),
+    attester_member_ids: Sequence[UUID | None] = (),
+    amount: Decimal | None = None,
+    unit: str | None = None,
+) -> CommandAssurance:
+    mapped = CRISIS_ASSURANCE_EVENTS.get(event_type)
+    if mapped is None or actor.organization_id is None:
+        raise crisis_error("COMMAND_ASSURANCE_EVENT_UNMAPPED", 500)
+    effect, is_decision = mapped
+    cooperative = AccountabilityParty(
+        kind=AccountabilityPartyKind.COOPERATIVE,
+        reference=str(actor.organization_id),
+    )
+    evidence: list[object] = [
+        {"authenticated_session_id": str(principal.session_id)},
+        {
+            "event_subject": {
+                "event_type": event_type,
+                "subject_type": subject_type,
+                "subject_id": str(subject_id),
+            }
+        },
+    ]
+    basis_refs = [event_type, str(subject_id)]
+    if command_record is not None:
+        evidence.append({"idempotency_record_id": str(command_record.id)})
+        basis_refs.append(command_record.request_hash)
+    evidence.extend(evidence_refs)
+    actor_ref = actor_party(actor)
+    next_parties = [cooperative]
+    seen_members: set[UUID] = set()
+    for member_id in next_member_ids:
+        if member_id is None:
+            continue
+        if member_id in seen_members:
+            continue
+        seen_members.add(member_id)
+        next_parties.append(member_party(member_id))
+    attesters = [
+        member_party(member_id)
+        for member_id in dict.fromkeys(attester_member_ids)
+        if member_id is not None
+    ]
+    if not is_decision:
+        attesters.append(actor_ref)
+    return CommandAssurance(
+        on_behalf_of=cooperative,
+        exposure=ExposureClaim(
+            category=ExposureCategory.CRISIS,
+            effect=effect,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            amount=amount,
+            unit=unit,
+            basis_refs=tuple(basis_refs),
+        ),
+        evidence_refs=tuple(evidence),
+        next_responsible=tuple(next_parties),
+        attesters=tuple(attesters),
+        approvers=(actor_ref,) if is_decision else (),
+    )
 
 
 async def begin_crisis_command(

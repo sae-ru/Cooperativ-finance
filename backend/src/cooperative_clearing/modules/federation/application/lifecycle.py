@@ -14,6 +14,7 @@ from cooperative_clearing.modules.federation.application.common import (
     begin_federation_command,
     complete_federation_command,
     federation_actor,
+    federation_command_assurance,
 )
 from cooperative_clearing.modules.federation.application.service import (
     AUDIT_ROLES,
@@ -44,12 +45,6 @@ from cooperative_clearing.modules.federation.infrastructure.models import (
     OfflineEpoch,
 )
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode
-from cooperative_clearing.modules.journal.domain.assurance import (
-    CommandAssurance,
-    ExposureCategory,
-    ExposureClaim,
-    ExposureEffect,
-)
 from cooperative_clearing.modules.journal.domain.crypto import (
     payload_hash,
     sha256_ref,
@@ -150,6 +145,18 @@ class NodeTrustService(FederationService):
             aggregate_version=1,
             actor=actor,
             payload={**terms, "node_id": str(node.id), "terms_hash": terms_hash},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.trust_contract_proposed",
+                subject_type="node_trust_contract",
+                subject_id=contract_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=({"terms_hash": terms_hash},),
+            ),
         )
         session.add(
             NodeTrustContract(
@@ -240,6 +247,21 @@ class NodeTrustService(FederationService):
             aggregate_version=contract.version + 1,
             actor=actor,
             payload={**payload, "node_id": str(node.id), "trust_level": contract.trust_level},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.trust_contract_activated",
+                subject_type="node_trust_contract",
+                subject_id=contract.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {"terms_hash": contract.terms_hash, "certificate_id": str(certificate)},
+                ),
+                attester_user_ids=(contract.proposed_by_user_id,),
+            ),
         )
         now = datetime.now(UTC)
         contract.status = "ACTIVE"
@@ -330,6 +352,20 @@ class NodeTrustService(FederationService):
             aggregate_version=1,
             actor=actor,
             payload={**payload, "terms_hash": terms_hash},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.bilateral_limit_proposed",
+                subject_type="node_bilateral_limit",
+                subject_id=limit_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=({"terms_hash": terms_hash},),
+                maximum_loss=Decimal(amounts["max_unsettled_obligations"]),
+                unit=str(payload["unit"]),
+            ),
         )
         session.add(
             NodeBilateralLimit(
@@ -428,6 +464,21 @@ class NodeTrustService(FederationService):
                 "node_id": str(limit.node_id),
                 "retired_limit_ids": [str(item.id) for item in old_limits],
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.bilateral_limit_activated",
+                subject_type="node_bilateral_limit",
+                subject_id=limit.id,
+                target_node_id=limit.node_id,
+                command_record=record,
+                evidence_refs=({"terms_hash": limit.terms_hash},),
+                attester_user_ids=(limit.proposed_by_user_id,),
+                maximum_loss=limit.max_unsettled_obligations,
+                unit=limit.unit,
+            ),
         )
         now = datetime.now(UTC)
         for old in old_limits:
@@ -506,7 +557,21 @@ class NodeTrustService(FederationService):
             aggregate_version=1,
             actor=actor,
             payload=payload,
-            evidence=[{"evidence_id": str(item)} for item in evidence_ids],
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_bond_activated",
+                subject_type="node_bond",
+                subject_id=bond_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=tuple({"evidence_id": str(item)} for item in evidence_ids),
+                amount=total,
+                maximum_loss=loss,
+                unit=str(payload["unit"]),
+            ),
         )
         session.add(
             NodeBond(
@@ -618,6 +683,21 @@ class NodeTrustService(FederationService):
                 "capabilities": contract.capabilities,
                 "responsible_roles": sorted(role_codes),
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_activated",
+                subject_type="external_node",
+                subject_id=node.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {"contract_id": str(contract.id), "terms_hash": contract.terms_hash},
+                ),
+                attester_user_ids=(contract.proposed_by_user_id, contract.approved_by_user_id),
+            ),
         )
         application = await self._locked(session, NodeApplication, contract.application_id)
         now = datetime.now(UTC)
@@ -674,12 +754,42 @@ class NodeTrustService(FederationService):
             raise federation_error("NODE_STATUS_TRANSITION_INVALID")
         event = await self.journal.append(
             session,
-            event_type=f"federation.node_{action}d",
+            event_type=(
+                "federation.node_suspended"
+                if action == "suspend"
+                else (
+                    "federation.node_quarantined"
+                    if action == "quarantine"
+                    else "federation.node_revoked"
+                )
+            ),
             aggregate_type="external_node",
             aggregate_id=node.id,
             aggregate_version=node.version + 1,
             actor=actor,
             payload={**payload, "previous_status": node.status},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type=(
+                    "federation.node_suspended"
+                    if action == "suspend"
+                    else (
+                        "federation.node_quarantined"
+                        if action == "quarantine"
+                        else "federation.node_revoked"
+                    )
+                ),
+                subject_type="external_node",
+                subject_id=node.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {"previous_status": node.status, "rationale": payload["rationale"]},
+                ),
+            ),
         )
         now = datetime.now(UTC)
         node.status = target_by_action[action]
@@ -762,7 +872,18 @@ class NodeTrustService(FederationService):
             aggregate_version=1,
             actor=actor,
             payload={**payload, "previous_node_status": node.status},
-            evidence=[{"evidence_id": str(item)} for item in evidence_ids],
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_incident_opened",
+                subject_type="node_security_incident",
+                subject_id=incident_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=tuple({"evidence_id": str(item)} for item in evidence_ids),
+            ),
         )
         now = datetime.now(UTC)
         session.add(
@@ -855,6 +976,19 @@ class NodeTrustService(FederationService):
             aggregate_version=incident.version + 1,
             actor=actor,
             payload={**payload, "node_id": str(incident.node_id)},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_incident_resolved",
+                subject_type="node_security_incident",
+                subject_id=incident.id,
+                target_node_id=incident.node_id,
+                command_record=record,
+                evidence_refs=tuple({"evidence_id": item} for item in incident.evidence_ids),
+                attester_user_ids=(incident.opened_by_user_id,),
+            ),
         )
         incident.status = "RESOLVED"
         incident.corrective_actions = corrective_actions
@@ -957,6 +1091,24 @@ class NodeTrustService(FederationService):
                 "old_fingerprint": old.fingerprint,
                 "continuity_verified": continuity_verified,
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_key_rotation_requested",
+                subject_type="node_key_rotation",
+                subject_id=rotation_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {
+                        "old_fingerprint": old.fingerprint,
+                        "new_fingerprint": payload["new_fingerprint"],
+                        "continuity_verified": continuity_verified,
+                    },
+                ),
+            ),
         )
         session.add(
             NodeCertificate(
@@ -1039,6 +1191,27 @@ class NodeTrustService(FederationService):
                 "old_fingerprint": old.fingerprint,
                 "new_fingerprint": new.fingerprint,
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_key_rotated"
+                if approve
+                else "federation.node_key_rotation_rejected",
+                subject_type="node_key_rotation",
+                subject_id=rotation.id,
+                target_node_id=rotation.node_id,
+                command_record=record,
+                evidence_refs=(
+                    {
+                        "old_fingerprint": old.fingerprint,
+                        "new_fingerprint": new.fingerprint,
+                        "continuity_verified": rotation.continuity_verified,
+                    },
+                ),
+                attester_user_ids=(rotation.requested_by_user_id,),
+            ),
         )
         now = datetime.now(UTC)
         rotation.status = "APPROVED" if approve else "REJECTED"
@@ -1134,6 +1307,23 @@ class NodeTrustService(FederationService):
                 "certificate_id": str(active_certificate),
                 "target_status": "LIMITED",
             },
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_rehabilitated_limited",
+                subject_type="external_node",
+                subject_id=node.id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=(
+                    {
+                        "certificate_id": str(active_certificate),
+                        "integrity_summary": integrity_summary,
+                    },
+                ),
+            ),
         )
         node.status = "LIMITED"
         node.trust_level = "LIMITED"
@@ -1219,6 +1409,18 @@ class NodeTrustService(FederationService):
             aggregate_version=1,
             actor=actor,
             payload={**policy, "policy_hash": policy_hash},
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.offline_epoch_opened",
+                subject_type="offline_epoch",
+                subject_id=epoch_id,
+                target_node_id=node.id,
+                command_record=record,
+                evidence_refs=({"policy_hash": policy_hash},),
+            ),
         )
         session.add(
             OfflineEpoch(
@@ -1277,6 +1479,8 @@ class NodeTrustService(FederationService):
         self._version(epoch.version, expected_version)
         if epoch.status != "OPEN":
             raise federation_error("OFFLINE_EPOCH_STATE_INVALID")
+        if epoch.external_node_id is None:
+            raise federation_error("OFFLINE_EPOCH_NODE_REQUIRED")
         if await session.scalar(
             select(FederationPaperForm.id).where(
                 FederationPaperForm.epoch_id == epoch.id,
@@ -1293,6 +1497,21 @@ class NodeTrustService(FederationService):
             actor=actor,
             payload={**payload, "policy_hash": epoch.policy_hash},
             offline_epoch_id=epoch.id,
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.offline_epoch_closed",
+                subject_type="offline_epoch",
+                subject_id=epoch.id,
+                target_node_id=epoch.external_node_id,
+                command_record=record,
+                evidence_refs=(
+                    {"policy_hash": epoch.policy_hash, "reconciliation": reconciliation},
+                ),
+                attester_user_ids=(epoch.opened_by_user_id,),
+            ),
         )
         epoch.status = "CLOSED"
         epoch.closed_event_id = event.event_id
@@ -1399,17 +1618,19 @@ class NodeTrustService(FederationService):
                 "exposure_after": str(preview.after),
                 "limit": str(preview.limit),
             },
-            assurance=CommandAssurance(
-                exposure=ExposureClaim(
-                    category=ExposureCategory.NODE,
-                    effect=ExposureEffect.RESERVE,
-                    subject_type="node_exposure",
-                    subject_id=exposure_id,
-                    amount=amount,
-                    unit=unit_code,
-                    basis_refs=(limit.terms_hash,),
-                ),
+            assurance=await federation_command_assurance(
+                session,
+                principal=principal,
+                actor=actor,
+                local_node_reference=self.settings.node_code,
+                event_type="federation.node_exposure_reserved",
+                subject_type="node_exposure",
+                subject_id=exposure_id,
+                target_node_id=node.id,
+                command_record=record,
                 evidence_refs=evidence_refs,
+                amount=amount,
+                unit=unit_code,
             ),
         )
         now = datetime.now(UTC)

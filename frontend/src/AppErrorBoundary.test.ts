@@ -7,6 +7,7 @@ describe("application asset recovery", () => {
   it("recognizes stale lazy chunks without treating ordinary errors as deploy failures", () => {
     expect(isOutdatedAssetError(new TypeError("Failed to fetch dynamically imported module: /assets/x.js"))).toBe(true);
     expect(isOutdatedAssetError(new Error("Loading chunk 42 failed"))).toBe(true);
+    expect(isOutdatedAssetError(new Error("Unable to preload CSS for /assets/x.css"))).toBe(true);
     expect(isOutdatedAssetError(new Error("Request rejected"))).toBe(false);
   });
 

@@ -1,6 +1,5 @@
 """Authenticated peer search, replay, and tamper handling against PostgreSQL."""
 
-import asyncio
 import hashlib
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -355,7 +354,7 @@ async def test_peer_goods_reservation_is_capacity_safe_and_irreversible_after_co
             **reserve_payload,
             "receipt_id": str(expiring_receipt_id),
             "purchase_intent_id": str(uuid4()),
-            "requested_expires_at": (expiry_now + timedelta(seconds=1)).isoformat(),
+            "requested_expires_at": (expiry_now + timedelta(seconds=5)).isoformat(),
         }
         expiring_request = PeerRequest(
             message_id=uuid4(),
@@ -374,7 +373,9 @@ async def test_peer_goods_reservation_is_capacity_safe_and_irreversible_after_co
                 signature=peer_signer.sign(canonicalize(expiring_request.document())),
             )
             await session.commit()
-        await asyncio.sleep(1.2)
+        async with database.session() as session:
+            await session.execute(select(func.pg_sleep(5.2)))
+            await session.commit()
         async with database.session() as session:
             expired = await expire_stale_reservations(session, settings=settings)
             await session.commit()

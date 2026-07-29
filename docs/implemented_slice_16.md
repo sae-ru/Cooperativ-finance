@@ -6,6 +6,10 @@
 на отдельном Compose project с отдельными network и volumes. Это не заменяет
 учение на физическом резервном host с назначенными recovery custodians.
 
+Актуализация: Slice 44 заменил application-only rollback на подписанный exact
+source/schema contract, проверяемый Alembic downgrade и journal checkpoint. См.
+[implemented_slice_44.md](implemented_slice_44.md).
+
 ## Изменения контракта backup
 
 `FULL` теперь означает одновременное наличие:

@@ -17,8 +17,17 @@
 - [x] Нет float в количестве, оценке и покрытии ([evidence](implemented_slice_31.md)).
 - [x] Партия прослеживается до права, исполнения и получателя ([evidence](implemented_slice_32.md)).
 - [x] Нет двойного выпуска, погашения, резервирования и execution ([evidence](implemented_slice_33.md)).
+- [x] Доменное изменение, signed event и outbox фиксируются или откатываются
+  вместе; worker restart сохраняет exactly-once receipt
+  ([evidence](implemented_slice_41.md)).
 - [x] Protected amount и solidarity contour недоступны взысканию.
-- [ ] Каждая critical command имеет actor/role/scope/evidence/exposure.
+- [x] Каждая critical command канонического software registry имеет
+  actor/role/scope/evidence/exposure (112 событий:
+  economic finality [Slice 34](implemented_slice_34.md),
+  recovery/break-glass/custody [Slice 35](implemented_slice_35.md),
+  role administration [Slice 36](implemented_slice_36.md),
+  sanctions/crisis [Slice 37](implemented_slice_37.md),
+  node authority/key lifecycle [Slice 38](implemented_slice_38.md)).
 - [x] Appeal и compensation проверены end-to-end ([evidence](implemented_slice_30.md)).
 - [x] Reserve status использует только physical verified evidence и bounded snapshot age ([evidence](implemented_slice_10.md)).
 - [x] Crisis mandate имеет dual control, mandatory review, expiry, maximum end и safe state ([evidence](implemented_slice_10.md)).
@@ -46,7 +55,7 @@
 
 - [ ] Threat model и independent security review завершены.
 - [ ] Production keys сгенерированы и разделены по назначению.
-- [ ] Private keys/secrets отсутствуют в Git/images/plain backup.
+- [x] Private keys/secrets отсутствуют в Git/images/plain backup ([evidence](implemented_slice_40.md)).
 - [x] Local auth, revoke, TOTP step-up и scoped break-glass протестированы ([evidence](implemented_slice_20.md)); WebAuthn остаётся отдельным gate.
 - [x] Release/package/event signatures имеют independent test vectors ([evidence](implemented_slice_15.md), [evidence](implemented_slice_11.md)).
 - [ ] Critical/high findings закрыты или formal accepted risk подписан.
@@ -59,15 +68,21 @@
 - [ ] Полный restore на резервном оборудовании укладывается в RTO.
 - [ ] RPO подтверждён измерением и сверкой событий.
 - [x] FULL backup включает DB, blobs, manifest, trust data и verified release ([evidence](implemented_slice_16.md)).
-- [x] Update, injected interrupted update, application rollback и FULL restore испытаны ([evidence](implemented_slice_16.md)).
+- [x] Update, interrupted update, signed application/schema rollback и FULL restore испытаны ([evidence](implemented_slice_16.md), [evidence](implemented_slice_44.md)).
 - [x] Paper forms и последующий независимый ввод испытаны локально и в federation epoch ([evidence](implemented_slice_10.md), [evidence](implemented_slice_11.md)).
 - [x] Offline export/import/simulation/conflict/apply drill завершён на integration-стенде ([evidence](implemented_slice_11.md)).
 - [x] Federation не является обязательной runtime-зависимостью local critical path ([evidence](implemented_slice_11.md)).
+- [x] Локальная критическая операция не зависит от доступности outbox worker;
+  crash до worker commit и конкурентный restart проверены
+  ([evidence](implemented_slice_41.md)).
 
 ## Quality
 
 - [ ] CI release gates зелёные на конкретном commit.
 - [ ] Migration с предыдущего production release проверена.
+- [x] Каждый bundle квалифицирует одну Linux-платформу, явно исключает вторую
+  архитектуру и проверяет platform всех образов и Docker host
+  ([evidence](implemented_slice_39.md)).
 - [x] Clearing golden/property/permutation tests зелёные ([evidence](implemented_slice_17.md)).
 - [x] Concurrency tests выполнены многократно ([evidence](implemented_slice_17.md)).
 - [x] OpenAPI compatibility report принят как инженерный gate ([evidence](implemented_slice_17.md)).
@@ -78,7 +93,7 @@
 ## Operations
 
 - [ ] Назначены оператор, security admin, backup custodian и on-call contacts.
-- [ ] Dashboards/alerts работают без внешнего Интернета (code-level baseline: [Slice 29](implemented_slice_29.md); target-host evidence не приложен).
+- [ ] Dashboards/alerts работают без внешнего Интернета (изолированный code-level gate: [Slice 46](implemented_slice_46.md); target-host evidence не приложен).
 - [ ] Runbooks доступны локально и на бумаге.
 - [ ] Clock, disk, UPS и certificate monitoring работают (code-level baseline: [Slice 29](implemented_slice_29.md); реальный ИБП и target host не проверены).
 - [ ] Support и escalation обучены без доступа к production secrets.
@@ -347,3 +362,73 @@ backend checkpoint: `251 passed, 1 deselected`, coverage `82.94%`; frontend:
 Пункты legal/governance, независимый security review, проверенный restore с
 RTO/RPO, целевой Linux host и полевой pilot остаются открытыми и не могут быть
 закрыты локальным тестом разработчика.
+
+## Текущее доказательство Slice 41
+
+Deferred PostgreSQL constraint не позволяет зафиксировать signed event без
+ровно одной NODE signature и одной canonical outbox row. Worker crash до commit
+полностью откатывает receipt/status, а два конкурентных worker-а после restart
+создают одну квитанцию. Populated migration cycle и рабочий узел с 434 событиями
+проверены; подробности: [implemented_slice_41.md](implemented_slice_41.md).
+
+Это закрывает инженерный критерий 127, но не внешний production review,
+target-host power-loss, remote CI на конкретном release и решение о будущем
+внешнем broker adapter.
+
+## Текущее доказательство Slice 42
+
+Браузерный draft имеет отдельную non-authoritative schema, сохраняется только в
+IndexedDB, изолирован по `user_id`, истекает через семь дней и не отправляется
+автоматически после reconnect. Полный frontend gate прошел `202` теста,
+typecheck и production PWA build. На рабочем Docker-узле save, reload и review
+оставили журнал на `434` событиях. Подробности:
+[implemented_slice_42.md](implemented_slice_42.md).
+
+Это закрывает инженерный критерий 128. Физическая потеря пользовательского
+устройства, очистка браузерного профиля и защита самого endpoint остаются
+эксплуатационными рисками; IndexedDB не заменяет серверный журнал или backup.
+
+## Текущее доказательство Slice 43
+
+Критерий 129 закрыт исполняемым software gate: backup, independent restore drill
+и destructive restore используют один read-only verifier журнала, node/MFA keys
+и всех evidence blobs. Живой узел прошёл `434` events, `55/55` evidence records,
+`3/3` MFA factors и orphan `0`; isolated DATA_ONLY drill восстановил schema
+`0038`, 149 таблиц и 47 файлов с `ok=true`.
+Синтетический FULL backup той же точки дополнительно прошёл signed release
+verification/load и independent restore; одноразовый release private key удалён.
+
+Production release key/media, независимая установка реального recovery material, target-host
+RTO/RPO и внешняя security/custodian ceremony остаются открытыми внешними gates и
+не подменяются локальным инженерным доказательством.
+
+## Текущее доказательство Slice 45
+
+Найденный при rollback drill адресный gap закрыт revision
+`0039_participant_address_events`. Пользовательские create/update/archive теперь
+атомарно фиксируют state, реальный signed event, NODE signature, canonical outbox,
+audit и idempotent response. База отдельно запрещает новую tracked mutation без
+нового event UUID.
+
+Интеграция проверяет idempotency, optimistic conflict, privacy, ownership,
+audit-failure rollback, работу без worker и прямой unsigned UPDATE. AST gate
+удерживает три адресных события в critical assurance registry; журнал и Alembic
+прошли отдельные regression gates. Подробности:
+[implemented_slice_45.md](implemented_slice_45.md).
+
+Это закрывает обнаруженный code-level разрыв, но не внешний privacy/legal review
+реальных правил хранения адресов и телефонов.
+
+## Текущее доказательство Slice 46
+
+Acceptance 131 проверяется в отдельном Docker-проекте с четырьмя internal
+сетями и заблокированным TEST-NET egress. Одноразовый read-only operator probe
+штатно меняет bootstrap-пароль, получает защищённые snapshot, host readiness и
+Prometheus metrics, проверяет bounded local logs и формирует redacted JSON.
+
+PowerShell и Bash прогоны на 2026-07-29 завершились `PASSED` на schema `0039`;
+оба LF checksum-манифеста прошли `sha256sum -c`. Подробности:
+[implemented_slice_46.md](implemented_slice_46.md).
+
+Operations checkbox остаётся открытым: нужны target-host evidence, реальный ИБП,
+назначенные люди, утверждённые retention/alert procedures и полевое учение.

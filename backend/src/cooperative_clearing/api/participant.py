@@ -11,7 +11,11 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from cooperative_clearing.api.auth import _request_uuid
-from cooperative_clearing.api.dependencies import DatabaseDependency, PrincipalDependency
+from cooperative_clearing.api.dependencies import (
+    DatabaseDependency,
+    PrincipalDependency,
+    SettingsDependency,
+)
 from cooperative_clearing.api.identity_schemas import CommandEnvelope, CommandResult
 from cooperative_clearing.modules.exchange.infrastructure.models import Deal, Obligation
 from cooperative_clearing.modules.federation.infrastructure.discovery_models import (
@@ -168,11 +172,12 @@ async def create_participant_address(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     member_id = _require_member(principal)
     async with database.session() as session:
         try:
-            result = await ParticipantAddressBookService().create(
+            result = await ParticipantAddressBookService(settings).create(
                 session,
                 principal=principal,
                 member_id=member_id,
@@ -194,11 +199,12 @@ async def update_participant_address(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     member_id = _require_member(principal)
     async with database.session() as session:
         try:
-            result = await ParticipantAddressBookService().update(
+            result = await ParticipantAddressBookService(settings).update(
                 session,
                 principal=principal,
                 member_id=member_id,
@@ -222,10 +228,11 @@ async def archive_participant_address(
     idempotency_key: IdempotencyKey,
     principal: PrincipalDependency,
     database: DatabaseDependency,
+    settings: SettingsDependency,
 ) -> CommandEnvelope:
     member_id = _require_member(principal)
     async with database.session() as session:
-        result = await ParticipantAddressBookService().archive(
+        result = await ParticipantAddressBookService(settings).archive(
             session,
             principal=principal,
             member_id=member_id,

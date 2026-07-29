@@ -20,6 +20,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.solidarity.application.common import (
@@ -963,6 +965,15 @@ class SolidarityService:
         approval_id = uuid4()
         assurance = (
             CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(actor_party(actor),),
+                attesters=(
+                    member_party(
+                        allocation.proposed_by_member_id,
+                        allocation.proposed_role_assignment_id,
+                    ),
+                ),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SOLIDARITY,
                     effect=ExposureEffect.RESERVE,
@@ -1109,6 +1120,9 @@ class SolidarityService:
                 "evidence": refs,
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(allocation.recipient_member_id),),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SOLIDARITY,
                     effect=ExposureEffect.EXECUTE,

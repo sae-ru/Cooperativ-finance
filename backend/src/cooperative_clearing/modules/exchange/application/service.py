@@ -68,6 +68,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.modules.rights.infrastructure.models import (
@@ -490,6 +492,9 @@ class ExchangeService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(obligation.creditor_member_id),),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.OBLIGATION,
                     effect=ExposureEffect.EXECUTE,
@@ -603,6 +608,20 @@ class ExchangeService:
             required=True,
         )
         redemption, right, lot = source
+        completed_event_id = redemption.completed_event_id
+        if completed_event_id is None:
+            raise exchange_error("FULFILLMENT_SOURCE_BROKEN", 409)
+        evidence_refs = (
+            *self._evidence_payload(evidence),
+            {
+                "event_id": str(completed_event_id),
+                "kind": "RIGHT_REDEMPTION",
+            },
+            {
+                "event_id": str(fulfillment.submitted_event_id),
+                "kind": "FULFILLMENT_SUBMISSION",
+            },
+        )
         event = await self.journal.append(
             session,
             event_type="obligations.fulfillment_provenance_reconciled",
@@ -620,8 +639,24 @@ class ExchangeService:
                 "source_owner_member_id": str(right.owner_member_id),
                 "intended_recipient_member_id": str(obligation.creditor_member_id),
                 "quantity": decimal_text(fulfillment.quantity),
-                "evidence": self._evidence_payload(evidence),
+                "evidence": list(evidence_refs),
             },
+            assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(obligation.creditor_member_id),),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
+                exposure=ExposureClaim(
+                    category=ExposureCategory.COMMODITY,
+                    effect=ExposureEffect.FINALIZE,
+                    subject_type="fulfillment_provenance",
+                    subject_id=fulfillment.id,
+                    amount=fulfillment.quantity,
+                    unit=str(obligation.unit_id),
+                    basis_refs=(str(completed_event_id),),
+                ),
+                evidence_refs=evidence_refs,
+            ),
         )
         session.add(
             FulfillmentProvenance(
@@ -730,6 +765,13 @@ class ExchangeService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(
+                    (member_party(obligation.debtor_member_id),)
+                    if amounts.remaining > 0
+                    else (actor_party(actor),)
+                ),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.OBLIGATION,
                     effect=ExposureEffect.REDUCE,

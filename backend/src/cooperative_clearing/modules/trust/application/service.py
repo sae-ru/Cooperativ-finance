@@ -22,6 +22,7 @@ from cooperative_clearing.modules.trust.application.common import (
     complete_trust_command,
     evidence_payload,
     link_evidence,
+    trust_command_assurance,
     trust_participant_actor,
     trust_role_actor,
 )
@@ -125,6 +126,14 @@ class TrustService:
             aggregate_version=1,
             actor=actor,
             payload={**terms_payload, "policy_id": str(policy_id), "terms_hash": terms_hash},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="trust.policy_proposed",
+                subject_type="trust_policy",
+                subject_id=policy_id,
+                command_record=record,
+            ),
         )
         session.add(
             TrustPolicy(
@@ -210,6 +219,14 @@ class TrustService:
                     "replacement_policy_id": str(policy.id),
                     "replacement_terms_hash": policy.terms_hash,
                 },
+                assurance=trust_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="trust.policy_superseded",
+                    subject_type="trust_policy",
+                    subject_id=current.id,
+                    command_record=record,
+                ),
             )
             current.status = "SUPERSEDED"
             current.version += 1
@@ -232,6 +249,14 @@ class TrustService:
             aggregate_version=policy.version + 1,
             actor=actor,
             payload={**payload, "terms_hash": policy.terms_hash},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="trust.policy_approved",
+                subject_type="trust_policy",
+                subject_id=policy.id,
+                command_record=record,
+            ),
         )
         policy.status = "ACTIVE"
         policy.approved_by_user_id = principal.user_id
@@ -331,6 +356,16 @@ class TrustService:
             aggregate_version=1,
             actor=actor,
             payload={**payload, "case_id": str(case_id), "evidence": evidence_refs},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="disputes.dispute_opened",
+                subject_type="trust_case",
+                subject_id=case_id,
+                command_record=record,
+                evidence_refs=evidence_refs,
+                next_member_ids=(subject_member_id, claimant_member_id),
+            ),
         )
         session.add(
             TrustCase(
@@ -412,6 +447,16 @@ class TrustService:
             aggregate_version=case.version + 1,
             actor=actor,
             payload={**payload, "evidence": refs},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="disputes.response_recorded",
+                subject_type="trust_case",
+                subject_id=case.id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         case.response_text = str(payload["response_text"])
         case.response_evidence_refs = refs
@@ -469,6 +514,15 @@ class TrustService:
             aggregate_version=case.version + 1,
             actor=actor,
             payload=payload,
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="disputes.case_ready_for_decision",
+                subject_type="trust_case",
+                subject_id=case.id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         case.status = "READY_FOR_DECISION"
         case.version += 1
@@ -543,6 +597,15 @@ class TrustService:
             aggregate_version=1,
             actor=actor,
             payload={**payload, "declaration_id": str(declaration_id)},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="disputes.conflict_declared",
+                subject_type="conflict_declaration",
+                subject_id=declaration_id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         session.add(
             ConflictDeclaration(
@@ -642,6 +705,15 @@ class TrustService:
                 "measure_id": str(measure_id),
                 "subject_member_id": str(case.subject_member_id),
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="sanctions.protective_measure_imposed",
+                subject_type="protective_measure",
+                subject_id=measure_id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         session.add(
             ProtectiveMeasure(
@@ -712,6 +784,15 @@ class TrustService:
             aggregate_version=measure.version + 1,
             actor=actor,
             payload=payload,
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="sanctions.protective_measure_lifted",
+                subject_type="protective_measure",
+                subject_id=measure.id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         now = datetime.now(UTC)
         measure.status = "LIFTED"
@@ -834,6 +915,16 @@ class TrustService:
                 "evidence": refs,
                 "policy_version": self._policy_label(policy),
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="disputes.decision_issued",
+                subject_type="arbitration_decision",
+                subject_id=decision_id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         session.add(
             ArbitrationDecision(
@@ -957,6 +1048,15 @@ class TrustService:
                 "sanction_id": str(sanction_id),
                 "subject_member_id": str(case.subject_member_id),
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="sanctions.sanction_proposed",
+                subject_type="sanction",
+                subject_id=sanction_id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         session.add(
             Sanction(
@@ -1076,6 +1176,16 @@ class TrustService:
                 "status": "DISPUTED",
                 "policy_version": decision.policy_version,
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="reputation.event_recorded",
+                subject_type="reputation_event",
+                subject_id=event_id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         session.add(
             ReputationEvent(
@@ -1171,6 +1281,16 @@ class TrustService:
             aggregate_version=1,
             actor=actor,
             payload={**payload, "appeal_id": str(appeal_id), "evidence": refs},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="appeals.appeal_submitted",
+                subject_type="appeal",
+                subject_id=appeal_id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         session.add(
             Appeal(
@@ -1287,6 +1407,16 @@ class TrustService:
                 "evidence": refs,
                 "policy_version": original.policy_version,
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="appeals.appeal_decided",
+                subject_type="arbitration_decision",
+                subject_id=decision_id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(case.subject_member_id, case.claimant_member_id),
+            ),
         )
         decision = ArbitrationDecision(
             id=decision_id,
@@ -1404,6 +1534,15 @@ class TrustService:
             aggregate_version=sanction.version + 1,
             actor=actor,
             payload=payload,
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="sanctions.sanction_finalized",
+                subject_type="sanction",
+                subject_id=sanction.id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         sanction.status = "ACTIVE"
         sanction.finalized_by_user_id = principal.user_id
@@ -1496,6 +1635,15 @@ class TrustService:
                 "plan_id": str(plan_id),
                 "subject_member_id": str(case.subject_member_id),
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="rehabilitation.plan_created",
+                subject_type="rehabilitation_plan",
+                subject_id=plan_id,
+                command_record=record,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         session.add(
             RehabilitationPlan(
@@ -1588,6 +1736,16 @@ class TrustService:
             aggregate_version=plan.version + 1,
             actor=actor,
             payload={**payload, "sequence": step.sequence, "evidence": refs},
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="rehabilitation.step_completed",
+                subject_type="rehabilitation_plan",
+                subject_id=plan.id,
+                command_record=record,
+                evidence_refs=refs,
+                next_member_ids=(plan.subject_member_id,),
+            ),
         )
         step.status = "COMPLETED"
         step.evidence_refs = refs
@@ -1662,6 +1820,15 @@ class TrustService:
             aggregate_version=plan.version + 1,
             actor=actor,
             payload=payload,
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type="rehabilitation.plan_completed",
+                subject_type="rehabilitation_plan",
+                subject_id=plan.id,
+                command_record=record,
+                next_member_ids=(plan.subject_member_id,),
+            ),
         )
         plan.status = "COMPLETED"
         plan.closed_by_user_id = principal.user_id
@@ -1738,6 +1905,14 @@ class TrustService:
                     "appeal_decision_id": str(appeal_decision.id),
                     "appeal_outcome": "AFFIRMED",
                 },
+                assurance=trust_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="sanctions.sanction_finalized",
+                    subject_type="sanction",
+                    subject_id=sanction.id,
+                    next_member_ids=(case.subject_member_id,),
+                ),
             )
             sanction.status = "ACTIVE"
             sanction.finalized_by_user_id = principal.user_id
@@ -1805,6 +1980,14 @@ class TrustService:
                     "appeal_decision_id": str(appeal_decision.id),
                     "appeal_outcome": outcome.value,
                 },
+                assurance=trust_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="sanctions.sanction_revoked",
+                    subject_type="sanction",
+                    subject_id=sanction.id,
+                    next_member_ids=(case.subject_member_id,),
+                ),
             )
             sanction.status = "REVOKED"
             sanction.revoked_event_id = event.event_id
@@ -1844,6 +2027,14 @@ class TrustService:
                     "appeal_decision_id": str(appeal_decision.id),
                     "appeal_outcome": outcome.value,
                 },
+                assurance=trust_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="sanctions.protective_measure_revoked",
+                    subject_type="protective_measure",
+                    subject_id=measure.id,
+                    next_member_ids=(case.subject_member_id,),
+                ),
             )
             measure.status = "REVOKED"
             measure.lifted_by_user_id = principal.user_id
@@ -1876,6 +2067,14 @@ class TrustService:
                     "appeal_decision_id": str(appeal_decision.id),
                     "appeal_outcome": outcome.value,
                 },
+                assurance=trust_command_assurance(
+                    principal=principal,
+                    actor=actor,
+                    event_type="rehabilitation.plan_cancelled",
+                    subject_type="rehabilitation_plan",
+                    subject_id=plan.id,
+                    next_member_ids=(case.subject_member_id,),
+                ),
             )
             plan.status = "CANCELLED"
             plan.closed_by_user_id = principal.user_id
@@ -2014,6 +2213,14 @@ class TrustService:
                 "corrects_event_id": str(corrects_event_id) if corrects_event_id else None,
                 "policy_version": policy_version,
             },
+            assurance=trust_command_assurance(
+                principal=principal,
+                actor=actor,
+                event_type=event_type,
+                subject_type="reputation_event",
+                subject_id=item_id,
+                next_member_ids=(case.subject_member_id,),
+            ),
         )
         item = ReputationEvent(
             id=item_id,

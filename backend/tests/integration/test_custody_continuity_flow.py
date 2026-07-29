@@ -539,5 +539,41 @@ async def test_emergency_custody_keeps_old_custodian_until_personal_acceptance()
                 "responsibility.emergency_custody_accepted",
                 "responsibility.emergency_custody_transferred",
             }.issubset(event_types)
+            responsibility_events = list(
+                (
+                    await session.execute(
+                        select(SignedEvent).where(
+                            SignedEvent.aggregate_id.in_([case.id, lot.id]),
+                            SignedEvent.event_type.like("responsibility.%"),
+                        )
+                    )
+                ).scalars()
+            )
+            assurances = {
+                item.event_type: item.payload["_command_assurance"]
+                for item in responsibility_events
+            }
+            assert all(
+                item["format"] == "critical-command-assurance-v2"
+                for item in assurances.values()
+            )
+            started_exposure = assurances[
+                "responsibility.custody_continuity_started"
+            ]["exposure"]
+            assert started_exposure["category"] == "CUSTODY"
+            assert started_exposure["maximum_loss"] == "500.0000"
+            assert assurances["responsibility.custody_hold_applied"]["exposure"][
+                "effect"
+            ] == "HOLD"
+            for event_type in (
+                "responsibility.temporary_custodian_approved",
+                "responsibility.emergency_custody_accepted",
+                "responsibility.emergency_custody_transferred",
+            ):
+                next_party = assurances[event_type]["next_responsible"][0]
+                assert next_party["reference"] == str(members["candidate"])
+                assert next_party["role_assignment_id"] == str(
+                    candidate_role.assignment_id
+                )
     finally:
         await database.dispose()

@@ -52,7 +52,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
   "integration: requires a real PostgreSQL instance",
-  "acceptance: requires the isolated multi-node Docker topology",
+  "acceptance: requires an isolated Docker topology and dedicated persisted state",
 ]
 
 [tool.coverage.run]

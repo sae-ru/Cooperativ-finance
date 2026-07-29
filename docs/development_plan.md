@@ -524,3 +524,199 @@ idempotency и DB constraints дают один хозяйственный ре�
 
 Доказательства и остаточная DBA-граница:
 [implemented_slice_33.md](implemented_slice_33.md).
+
+## Slice 34. Подписанная цепочка ответственности
+
+Экономически критические application services используют typed
+`CommandAssurance`. Journal fail-closed проверяет физического actor, активные
+user/role claims, represented party и scope, evidence, точную exposure,
+attesters/approvers и следующих ответственных, затем подписывает snapshot как
+часть immutable payload.
+
+AST quality gate связывает канонический registry из 24 event types со всеми
+call sites. Формат v2 не переписывает исторические v1 events. RU/EN клиент
+скрывает технические коды отказа и сообщает, что rollback сохранил данные.
+
+Доказательства и оставшийся authority/security/custody scope:
+[implemented_slice_34.md](implemented_slice_34.md).
+## Slice 35. Полномочия и физическая сохранность
+
+Fail-closed registry расширен с 24 до 40 событий. Account recovery,
+break-glass и emergency custody используют тот же typed assurance: requester,
+independent approver, target member, cooperative/node scope, evidence,
+maximum loss или точное количество партии и следующий ответственный.
+
+Security authority не может быть назначена техническому user без member.
+Emergency custody не меняет хранителя до личного acceptance кандидата; hold,
+approval и каждая lot transfer подписываются отдельно.
+
+Доказательства и оставшийся role/sanctions/crisis/node-authority scope:
+[implemented_slice_35.md](implemented_slice_35.md).
+
+## Slice 36. Персональная ответственность за роли
+
+Fail-closed registry расширен с 40 до 45 событий. Обычная роль активируется
+только для active member и сразу передаёт ответственность получателю.
+Привилегированная роль требует независимого решения; request, approve, reject и
+revoke подписывают инициатора, решающего, target member, scope, evidence и
+следующего ответственного.
+
+Audit остаётся вторичным индексом, а signed event создаётся атомарно с
+`RoleAssignment`. Технический user без member не может получить персональное
+полномочие.
+
+Доказательства и оставшийся sanctions/crisis/node-authority scope:
+[implemented_slice_36.md](implemented_slice_36.md).
+
+## Slice 37. Санкции и кризисные решения
+
+Fail-closed registry расширен с 45 до 87 событий. Trust policy, disputes,
+protective measures, sanctions, appeals, reputation и rehabilitation теперь
+подписывают инициатора, независимого решающего, затронутого участника, evidence,
+effect и следующий ответственный шаг.
+
+Reserve target/snapshot, crisis mandate/review/close, rationing и paper forms
+используют тот же контракт. Количественные операции сохраняют exact Decimal и
+unit; выдача ресурса указывает получателя, но не создаёт долг или репутацию.
+
+Доказательства и оставшийся node-authority scope:
+[implemented_slice_37.md](implemented_slice_37.md).
+
+## Slice 38. Ответственность внешнего узла
+
+Fail-closed registry расширен с 87 до 112 событий. Onboarding, именованные роли,
+trust contract, bilateral limit, bond, activation, status, incident, key
+rotation, rehabilitation, offline epoch и node exposure используют общий
+`CommandAssurance`.
+
+Каждая команда фиксирует локальный represented node, внешний target node, всех
+действующих именованных ответственных, evidence, исторических участников,
+независимое решение и точный предел риска там, где он возникает. AST gate
+связывает registry со всеми call sites.
+
+Канонический software gate критических команд закрыт. Остальные пункты
+production readiness, включая legal, policy, operations и pilot evidence,
+закрываются независимо.
+
+Доказательства и остаточные границы:
+[implemented_slice_38.md](implemented_slice_38.md).
+
+## Slice 39. Платформенный контракт офлайн-релиза
+
+Signed bundle v2 квалифицирует ровно одну из `linux/amd64` и `linux/arm64`,
+явно исключает вторую и требует совпадения всех четырёх runtime-образов.
+Verifier сверяет independently expected platform, Docker host до импорта и
+каждый загруженный image после импорта.
+
+Критерий 122 закрыт на code-level без ложного объявления ARM64: поддержка
+возникает только у ARM64 bundle, прошедшего тот же полный release gate.
+
+Доказательства и внешние границы:
+[implemented_slice_39.md](implemented_slice_39.md).
+## Slice 40. Проверяемое отсутствие открытых секретов
+
+Redacted-аудитор проверяет source, node payload, каждый Docker layer, `.env`,
+PostgreSQL и backup v2. Release manifest подписывает шесть scope summaries, но
+verifier независимо повторяет payload/image scans и отклоняет ложный `PASSED`.
+
+Backup хранит checksummed file audit и SQL evidence, а restore drill повторяет
+SQL уже на восстановленной БД. Критерий 126 закрыт исполняемыми gates; внешний
+security review и production key ceremony остаются отдельными решениями.
+
+Доказательства и границы:
+[implemented_slice_40.md](implemented_slice_40.md).
+
+## Slice 41. Атомарное событие и outbox
+
+Revision `0038_atomic_event_outbox` переносит гарантию event/signature/outbox с
+одной только дисциплины application service на deferred PostgreSQL constraint.
+Worker сверяет весь envelope, блокирует только outbox и атомарно фиксирует
+идемпотентную receipt.
+
+Fault tests покрывают incomplete commit, crash до worker commit, два
+конкурентных restart и tampered payload. Критерий 127 закрыт; внешний broker,
+target-host power-loss и remote release CI остаются отдельными gates.
+
+Доказательства и границы:
+[implemented_slice_41.md](implemented_slice_41.md).
+
+## Slice 42. Безопасный браузерный офлайн-черновик
+
+Форма предложения сохраняет локальный `cooperative-browser-draft-v1` в
+IndexedDB без server identity и command API. Запись ограничена владельцем,
+удаляется через семь дней, повторно проверяется после reconnect и публикуется
+только отдельным действием пользователя.
+
+Validator отклоняет поврежденные записи и рекурсивно запрещает event identity.
+Component tests и живой Docker-браузер подтверждают, что save/reload/review не
+меняют signed event count. Критерий 128 закрыт.
+
+Доказательства и инструкция:
+[implemented_slice_42.md](implemented_slice_42.md),
+[offline-drafts.md](user-guide/offline-drafts.md).
+
+## Slice 43. Проверяемое полное восстановление
+
+Read-only `coopctl verify-restore-consistency` связывает journal integrity,
+активный node signing key, все TOTP secrets и все `READY` evidence blobs в один
+fail-closed отчёт. Backup исполняет его в quiesced boundary, independent drill
+после распаковки в одноразовые volumes, destructive restore до открытия gateway.
+
+Unit и PostgreSQL integration tests проверяют подменённый ciphertext, orphan
+blob и несовпадающие node/MFA keys. Живой isolated restore вернул schema `0038`,
+149 таблиц, 434 события и проверил 55/55 evidence records. Критерий 129 закрыт
+исполняемым software gate, включая синтетический FULL backup с exact signed
+release. Production custodians, production keys/media и target-host RTO/RPO
+остаются отдельными организационными gates.
+
+Доказательства и границы: [implemented_slice_43.md](implemented_slice_43.md).
+## Slice 44. Подписанная совместимость и проверяемый rollback
+
+Bundle v2 получил обязательный compatibility contract с точными source
+release/schema и target schema. Update отклоняет неподписанный, неизвестный или
+неподдерживаемый переход до импорта образов и mutation узла.
+
+Rollback повторно проверяет оба bundle, выполняет target migration downgrade,
+возвращает реальные старые образы и сравнивает journal sequence/hash до и после.
+Изолированный drill сохранил принятую после backup сделку и событие 267 при
+возврате `0038 -> 0037`.
+
+Доказательства и границы: [implemented_slice_44.md](implemented_slice_44.md).
+
+## Slice 45. Сквозная ответственность адресной книги
+
+Исправление production-инварианта после реального update/rollback drill:
+participant address API больше не выдаёт audit UUID за event UUID. Create,
+update и archive создают `identity.participant_address_*` signed event с
+`critical-command-assurance-v2`, NODE signature, outbox, audit и state одной
+транзакцией.
+
+Revision `0039_participant_address_events` связывает каждую новую или изменённую
+tracked-запись с `last_event_id`. PostgreSQL trigger запрещает mutation без нового
+события. Preallocated event UUID и deferred FK устраняют ORM auto-flush раньше
+journal append. Legacy-адрес переводится в tracked state первой обычной командой;
+demo bootstrap не перезаписывает tracked user data.
+
+Immutable payload намеренно не содержит полный адрес, имя, телефон, инструкции
+или метку. Проверки включают audit-failure rollback, idempotent replay, worker-off
+commit, прямой unsigned UPDATE, AST assurance registry, journal regression,
+`alembic check` и `0038 -> 0039 -> 0038 -> 0039` migration drill.
+Подробности: [implemented_slice_45.md](implemented_slice_45.md).
+
+## Slice 46. Локальная наблюдаемость без Интернета
+
+Критерий 131 закрывается отдельной Docker-топологией, в которой `edge`, `app`,
+`web` и `data` имеют `Internal=true`, а одноразовый read-only operator probe
+работает внутри локальной `edge`-сети. Probe требует local health/readiness,
+защищённые snapshot/host-readiness/Prometheus metrics, bounded runtime logs,
+блокировку TEST-NET egress и отсутствие обязательного telemetry exporter.
+
+Bootstrap-оператор штатно меняет временный пароль в памяти сценария. Отчёт не
+содержит пароль, token или сырые metrics; логи остаются локальными и не входят в
+diagnostic bundle. Linux и PowerShell обёртки создают checksum evidence и
+удаляют одноразовый стек, не затрагивая основной узел.
+
+Доказательства и внешние границы:
+[implemented_slice_46.md](implemented_slice_46.md). Target host, реальный ИБП,
+retention, назначенные операторы и независимый privacy/security review остаются
+production-gates.

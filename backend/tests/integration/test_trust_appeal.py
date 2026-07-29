@@ -11,6 +11,7 @@ from cooperative_clearing.cli import initialize_node, seed_demo
 from cooperative_clearing.main import create_app
 from cooperative_clearing.modules.identity.application.bootstrap import stable_id
 from cooperative_clearing.modules.identity.domain.types import Principal, RoleCode, RoleGrant
+from cooperative_clearing.modules.journal.infrastructure.models import SignedEvent
 from cooperative_clearing.modules.trust.infrastructure.models import (
     Appeal,
     ArbitrationDecision,
@@ -107,6 +108,24 @@ async def test_overturned_demo_appeal_corrects_consequences_without_erasing_hist
                     )
                 ).scalars()
             )
+            aggregate_ids = {
+                case.id,
+                appeal.id,
+                measure.id,
+                sanction.id,
+                plan.id,
+                *(item.id for item in events),
+                *(item.id for item in decisions),
+            }
+            signed_events = list(
+                (
+                    await session.execute(
+                        select(SignedEvent).where(
+                            SignedEvent.aggregate_id.in_(aggregate_ids)
+                        )
+                    )
+                ).scalars()
+            )
 
         assert case.status == "CLOSED" and case.version == 7
         assert appeal.status == "DECIDED" and appeal.outcome == "OVERTURNED"
@@ -122,6 +141,42 @@ async def test_overturned_demo_appeal_corrects_consequences_without_erasing_hist
             ("APPEAL", "OVERTURNED"),
             ("ORIGINAL", "SUBSTANTIATED"),
         ]
+        assurance_by_type = {
+            item.event_type: item.payload["_command_assurance"]
+            for item in signed_events
+            if "_command_assurance" in item.payload
+        }
+        expected_types = {
+            "disputes.dispute_opened",
+            "disputes.decision_issued",
+            "sanctions.protective_measure_imposed",
+            "sanctions.protective_measure_revoked",
+            "sanctions.sanction_proposed",
+            "sanctions.sanction_revoked",
+            "appeals.appeal_submitted",
+            "appeals.appeal_decided",
+            "reputation.event_recorded",
+            "reputation.event_corrected",
+            "rehabilitation.plan_created",
+            "rehabilitation.plan_cancelled",
+        }
+        if assurance_by_type:
+            assert expected_types <= assurance_by_type.keys()
+            assert all(
+                assurance["format"] == "critical-command-assurance-v2"
+                for assurance in assurance_by_type.values()
+            )
+            assert assurance_by_type["sanctions.protective_measure_imposed"]["exposure"][
+                "effect"
+            ] == "HOLD"
+            assert assurance_by_type["reputation.event_corrected"]["exposure"][
+                "category"
+            ] == "REPUTATION"
+            for event_type in expected_types:
+                assert str(case.subject_member_id) in {
+                    party["reference"]
+                    for party in assurance_by_type[event_type]["next_responsible"]
+                }
     finally:
         await database.dispose()
 

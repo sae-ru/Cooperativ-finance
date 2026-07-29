@@ -16,19 +16,58 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
-BUNDLE_FORMAT = "cooperative-clearing-release-v1"
+try:
+    from supply_secret_audit import (
+        REPORT_FORMAT as SECRET_AUDIT_REPORT_FORMAT,
+    )
+    from supply_secret_audit import (
+        ScopeAudit,
+        SecretAuditError,
+        audit_files,
+        audit_image_archive,
+    )
+    from supply_secret_audit import (
+        build_report as build_secret_audit_report,
+    )
+    from supply_secret_audit import (
+        require_clean as require_secret_audit_clean,
+    )
+except ModuleNotFoundError:
+    from scripts.supply_secret_audit import (
+        REPORT_FORMAT as SECRET_AUDIT_REPORT_FORMAT,
+    )
+    from scripts.supply_secret_audit import (
+        ScopeAudit,
+        SecretAuditError,
+        audit_files,
+        audit_image_archive,
+    )
+    from scripts.supply_secret_audit import (
+        build_report as build_secret_audit_report,
+    )
+    from scripts.supply_secret_audit import (
+        require_clean as require_secret_audit_clean,
+    )
+
+BUNDLE_FORMAT = "cooperative-clearing-release-v2"
+COMPATIBILITY_CONTRACT_FORMAT = "cooperative-clearing-release-compatibility-v1"
+PLATFORM_CONTRACT_FORMAT = "cooperative-clearing-release-platform-v1"
 LICENSE_REPORT_FORMAT = "cooperative-clearing-license-report-v1"
 LICENSE_POLICY_FORMAT = "cooperative-clearing-license-policy-v1"
 SIGNATURE_ALGORITHM = "Ed25519"
 RELEASE_PATTERN = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$")
+SCHEMA_REVISION_PATTERN = re.compile(r"^[0-9A-Za-z][0-9A-Za-z_-]{0,127}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+KNOWN_RELEASE_ARCHITECTURES = ("amd64", "arm64")
+ARCHITECTURE_ALIASES = {"x86_64": "amd64", "aarch64": "arm64"}
 
 REQUIRED_IMAGE_ROLES = ("backend", "frontend", "gateway", "postgres")
 NODE_PAYLOAD = (
@@ -36,6 +75,7 @@ NODE_PAYLOAD = (
     "LICENSE",
     "README.md",
     "compose.yaml",
+    "compose.observability-test.yaml",
     "start.bat",
     "start.sh",
     "backend/openapi.json",
@@ -53,8 +93,18 @@ NODE_PAYLOAD = (
     "docs/implemented_slice_17.md",
     "docs/implemented_slice_28.md",
     "docs/implemented_slice_29.md",
+    "docs/implemented_slice_39.md",
+    "docs/implemented_slice_40.md",
+    "docs/implemented_slice_41.md",
+    "docs/implemented_slice_42.md",
+    "docs/implemented_slice_43.md",
+    "docs/implemented_slice_44.md",
+    "docs/implemented_slice_45.md",
+    "docs/implemented_slice_46.md",
+    "docs/user-guide/offline-drafts.md",
     "docs/observability.md",
     "infra/postgres/init-runtime-role.sh",
+    "infra/postgres/verify-secret-storage.sql",
     "scripts/backup-node.ps1",
     "scripts/backup-node.sh",
     "scripts/bootstrap-node.ps1",
@@ -62,10 +112,14 @@ NODE_PAYLOAD = (
     "scripts/collect-production-evidence.ps1",
     "scripts/collect-production-evidence.sh",
     "scripts/diagnostic_bundle.py",
+    "scripts/local_observability_probe.py",
     "scripts/openapi_compat.py",
     "scripts/operational_status.py",
     "scripts/release_bundle.py",
     "scripts/runtime_environment.py",
+    "scripts/supply_secret_audit.py",
+    "scripts/test-local-observability.ps1",
+    "scripts/test-local-observability.sh",
     "scripts/restore-node.ps1",
     "scripts/restore-node.sh",
     "scripts/rollback-node.ps1",
@@ -321,6 +375,17 @@ def git_value(root: Path, *arguments: str) -> str:
     return run_checked(["git", *arguments], cwd=root).decode("utf-8").strip()
 
 
+def git_source_paths(root: Path) -> list[str]:
+    payload = run_checked(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+    )
+    try:
+        return [item for item in payload.decode("utf-8").split("\0") if item]
+    except UnicodeError as exc:
+        fail(f"Cannot decode Git source inventory: {exc}")
+
+
 def source_metadata(root: Path, allow_dirty: bool) -> dict[str, Any]:
     commit = git_value(root, "rev-parse", "HEAD")
     dirty_output = git_value(root, "status", "--short", "--untracked-files=all")
@@ -368,6 +433,46 @@ def protocol_metadata(root: Path) -> dict[str, str]:
     }
 
 
+def build_compatibility_contract(
+    root: Path,
+    target_release: str,
+    upgrade_sources: list[str],
+) -> dict[str, Any]:
+    target_schema = schema_revision(root)
+    transitions: list[dict[str, object]] = []
+    seen: set[tuple[str, str]] = set()
+    for source in upgrade_sources:
+        if source.count("@") != 1:
+            fail("Upgrade source must use RELEASE@SCHEMA format")
+        source_release, source_schema = source.split("@", 1)
+        if not RELEASE_PATTERN.fullmatch(source_release):
+            fail(f"Upgrade source has an invalid release: {source_release}")
+        if not SCHEMA_REVISION_PATTERN.fullmatch(source_schema):
+            fail(f"Upgrade source has an invalid schema revision: {source_schema}")
+        if source_release == target_release:
+            fail("Upgrade source release must differ from target release")
+        key = (source_release, source_schema)
+        if key in seen:
+            fail(f"Duplicate upgrade source: {source}")
+        seen.add(key)
+        transitions.append(
+            {
+                "source_release": source_release,
+                "source_schema_revision": source_schema,
+                "rollback_mode": "alembic-downgrade",
+                "post_backup_events": "preserved",
+            }
+        )
+    return {
+        "format": COMPATIBILITY_CONTRACT_FORMAT,
+        "database_schema_revision": target_schema,
+        "migration_strategy": "expand-contract",
+        "clean_install": True,
+        "supported_upgrades": transitions,
+        "protocols": protocol_metadata(root),
+    }
+
+
 def inspect_image(reference: str) -> dict[str, Any]:
     raw = run_checked(["docker", "image", "inspect", reference])
     try:
@@ -392,6 +497,100 @@ def inspect_image(reference: str) -> dict[str, Any]:
         "layers": [item for item in layers if isinstance(item, str)],
     }
 
+
+def normalize_platform(value: Any) -> str:
+    if not isinstance(value, str) or value.count("/") != 1:
+        fail("Release platform must use the os/architecture form")
+    operating_system, architecture = (
+        part.strip().lower() for part in value.split("/", 1)
+    )
+    architecture = ARCHITECTURE_ALIASES.get(architecture, architecture)
+    if operating_system != "linux" or architecture not in KNOWN_RELEASE_ARCHITECTURES:
+        fail(f"Unsupported release platform: {value}")
+    return f"{operating_system}/{architecture}"
+
+
+def build_platform_contract(
+    qualified_platform: str, images: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    target = normalize_platform(qualified_platform)
+    image_platforms = {
+        normalize_platform(f"{image.get('os')}/{image.get('architecture')}")
+        for image in images.values()
+    }
+    if image_platforms != {target}:
+        fail(
+            "Release images do not all match the qualified platform "
+            f"{target}: {sorted(image_platforms)}"
+        )
+    operating_system, target_architecture = target.split("/", 1)
+    return {
+        "format": PLATFORM_CONTRACT_FORMAT,
+        "qualification": "full-release-gate",
+        "qualified_platforms": [target],
+        "excluded_platforms": [
+            {
+                "platform": f"{operating_system}/{architecture}",
+                "reason": "not-qualified-for-this-release",
+            }
+            for architecture in KNOWN_RELEASE_ARCHITECTURES
+            if architecture != target_architecture
+        ],
+    }
+
+
+def validate_platform_contract(
+    value: Any,
+    image_rows: list[dict[str, Any]],
+    expected_platform: str | None,
+) -> str:
+    if not isinstance(value, dict) or value.get("format") != PLATFORM_CONTRACT_FORMAT:
+        fail("Signed release platform contract is missing or unsupported")
+    qualified = value.get("qualified_platforms")
+    excluded = value.get("excluded_platforms")
+    if value.get("qualification") != "full-release-gate":
+        fail("Release platform does not have full-gate qualification")
+    if not isinstance(qualified, list) or len(qualified) != 1:
+        fail("Release must contain exactly one qualified platform")
+    target = normalize_platform(qualified[0])
+    if not isinstance(excluded, list):
+        fail("Release platform exclusions are missing")
+    excluded_platforms: set[str] = set()
+    for item in excluded:
+        if (
+            not isinstance(item, dict)
+            or item.get("reason") != "not-qualified-for-this-release"
+        ):
+            fail("Release platform exclusion is invalid")
+        platform = normalize_platform(item.get("platform"))
+        if platform == target or platform in excluded_platforms:
+            fail("Release platform exclusions contain a duplicate or qualified platform")
+        excluded_platforms.add(platform)
+    declared = {target, *excluded_platforms}
+    required = {f"linux/{architecture}" for architecture in KNOWN_RELEASE_ARCHITECTURES}
+    if declared != required:
+        fail("Release must qualify or explicitly exclude amd64 and arm64")
+    image_platforms = {
+        normalize_platform(f"{image.get('os')}/{image.get('architecture')}")
+        for image in image_rows
+    }
+    if image_platforms != {target}:
+        fail(
+            "Signed image platforms do not match the qualified platform "
+            f"{target}: {sorted(image_platforms)}"
+        )
+    if expected_platform:
+        normalized_expected = normalize_platform(expected_platform)
+        if normalized_expected != target:
+            fail(f"Expected platform {normalized_expected}, bundle contains {target}")
+    return target
+
+
+def docker_host_platform() -> str:
+    raw = run_checked(
+        ["docker", "info", "--format", "{{.OSType}}/{{.Architecture}}"]
+    ).decode("utf-8", errors="strict").strip()
+    return normalize_platform(raw)
 
 def parse_control_records(value: str) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
@@ -681,6 +880,40 @@ def copy_node_payload(root: Path, bundle: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def audit_file_scope(
+    root: Path,
+    relative_paths: list[str],
+    *,
+    scope: str,
+    strict_literals: bool,
+) -> ScopeAudit:
+    try:
+        return audit_files(
+            root,
+            relative_paths,
+            scope=scope,
+            strict_literals=strict_literals,
+        )
+    except (OSError, UnicodeError) as exc:
+        fail(f"Cannot audit {scope}: {exc}")
+
+
+def audit_image_scope(archive: Path, *, scope: str) -> ScopeAudit:
+    try:
+        return audit_image_archive(archive, scope=scope)
+    except (OSError, tarfile.TarError) as exc:
+        fail(f"Cannot audit {scope}: {exc}")
+
+
+def clean_secret_audit_report(scopes: list[ScopeAudit]) -> dict[str, object]:
+    report = build_secret_audit_report(scopes)
+    try:
+        require_secret_audit_clean(report)
+    except SecretAuditError as exc:
+        fail(str(exc))
+    return report
+
+
 def write_checksums(bundle: Path) -> None:
     rows = []
     for path in sorted(bundle.rglob("*")):
@@ -716,6 +949,12 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
         fail("Release private key must be stored outside the source tree")
     policy = load_policy(policy_path)
     source = source_metadata(root, args.allow_dirty)
+    source_secret_scope = audit_file_scope(
+        root,
+        git_source_paths(root),
+        scope="source",
+        strict_literals=True,
+    )
 
     references = {
         "backend": args.backend_image or f"cooperative-clearing/backend:{release}",
@@ -725,6 +964,7 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
     }
     images = {role: inspect_image(reference) for role, reference in references.items()}
     inspect_image(args.frontend_audit_image)
+    platform = build_platform_contract(args.qualified_platform, images)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.name}.building-{os.getpid()}")
@@ -742,6 +982,15 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
         policy_descriptor = descriptor(temporary, policy_relative)
         policy["_sha256"] = policy_descriptor["sha256"]
         node_payload = copy_node_payload(root, temporary)
+        secret_scopes = [
+            source_secret_scope,
+            audit_file_scope(
+                temporary,
+                [str(row["path"]) for row in node_payload],
+                scope="node-payload",
+                strict_literals=True,
+            ),
+        ]
 
         image_rows = []
         total_licenses = {"allowed": 0, "blocked": 0, "review_required": 0}
@@ -751,6 +1000,9 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
             archive_relative = f"images/{role}.oci.tar"
             archive_path = safe_path(temporary, archive_relative)
             run_checked(["docker", "image", "save", "--output", str(archive_path), reference])
+            secret_scopes.append(
+                audit_image_scope(archive_path, scope=f"image:{role}")
+            )
 
             sbom = build_sbom(role, reference, image, args.frontend_audit_image)
             sbom_relative = f"metadata/sbom/{role}.cdx.json"
@@ -786,16 +1038,30 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
                 }
             )
 
+        secret_report = clean_secret_audit_report(secret_scopes)
+        secret_report_relative = "metadata/secret-audit.json"
+        safe_path(temporary, secret_report_relative).write_bytes(
+            canonical_json(secret_report)
+        )
+        secret_audit = {
+            **descriptor(temporary, secret_report_relative),
+            "format": SECRET_AUDIT_REPORT_FORMAT,
+            "status": secret_report["status"],
+            "finding_count": secret_report["finding_count"],
+            "scope_count": len(secret_report["scopes"]),
+        }
+
         manifest = {
             "format": BUNDLE_FORMAT,
-            "version": "1",
+            "version": "2",
             "release": release,
             "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
             "source": source,
-            "compatibility": {
-                "database_schema_revision": schema_revision(root),
-                "protocols": protocol_metadata(root),
-            },
+            "compatibility": build_compatibility_contract(
+                root,
+                release,
+                list(getattr(args, "upgrade_from", []) or []),
+            ),
             "signature": {
                 "algorithm": SIGNATURE_ALGORITHM,
                 "public_key_fingerprint": signing_fingerprint(private_key),
@@ -803,6 +1069,8 @@ def create_bundle(args: argparse.Namespace) -> dict[str, Any]:
             },
             "license_policy": policy_descriptor,
             "license_summary": total_licenses,
+            "secret_audit": secret_audit,
+            "platform": platform,
             "images": image_rows,
             "node_payload": node_payload,
         }
@@ -941,6 +1209,177 @@ def validate_license_report(
     return actual
 
 
+def validate_secret_audit_report(
+    bundle: Path,
+    value: Any,
+    payload_paths: list[str],
+    archive_rows: list[tuple[str, str, str, str]],
+) -> dict[str, Any]:
+    relative = verify_descriptor(bundle, value, "Secret audit report")
+    report = load_json(safe_path(bundle, relative))
+    if (
+        not isinstance(report, dict)
+        or report.get("format") != SECRET_AUDIT_REPORT_FORMAT
+        or value.get("format") != SECRET_AUDIT_REPORT_FORMAT
+        or report.get("status") != "PASSED"
+        or value.get("status") != "PASSED"
+        or report.get("finding_count") != 0
+        or value.get("finding_count") != 0
+    ):
+        fail("Signed secret audit report is not a clean supported report")
+    rows = report.get("scopes")
+    if not isinstance(rows, list):
+        fail("Signed secret audit scope inventory is missing")
+    signed_by_scope: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("scope"), str):
+            fail("Signed secret audit contains an invalid scope")
+        scope = row["scope"]
+        if scope in signed_by_scope:
+            fail(f"Signed secret audit contains duplicate scope {scope}")
+        for field_name in (
+            "files_scanned",
+            "bytes_scanned",
+            "public_demo_literals",
+        ):
+            count = row.get(field_name)
+            if (
+                not isinstance(count, int)
+                or isinstance(count, bool)
+                or count < 0
+                or (field_name == "files_scanned" and count == 0)
+            ):
+                fail(f"Signed secret audit scope {scope} has invalid {field_name}")
+        if row.get("findings") != []:
+            fail(f"Signed secret audit scope {scope} is not clean")
+        signed_by_scope[scope] = row
+
+    expected_scopes = {
+        "source",
+        "node-payload",
+        *(f"image:{role}" for role in REQUIRED_IMAGE_ROLES),
+    }
+    if set(signed_by_scope) != expected_scopes or value.get("scope_count") != len(
+        expected_scopes
+    ):
+        fail("Signed secret audit scope inventory is incomplete")
+
+    fresh_scopes = [
+        audit_file_scope(
+            bundle,
+            payload_paths,
+            scope="node-payload",
+            strict_literals=True,
+        )
+    ]
+    fresh_scopes.extend(
+        audit_image_scope(
+            safe_path(bundle, archive_relative),
+            scope=f"image:{role}",
+        )
+        for role, _reference, _image_id, archive_relative in archive_rows
+    )
+    clean_secret_audit_report(fresh_scopes)
+    for scope in fresh_scopes:
+        if scope.as_report() != signed_by_scope[scope.scope]:
+            fail(f"Independent secret audit differs for scope {scope.scope}")
+    return {
+        "status": "PASSED",
+        "finding_count": 0,
+        "scope_count": len(expected_scopes),
+    }
+
+
+def validate_compatibility_contract(
+    value: Any,
+    *,
+    target_release: str,
+    installed_release: str | None,
+    installed_schema: str | None,
+) -> tuple[str, dict[str, str] | None]:
+    if (installed_release is None) != (installed_schema is None):
+        fail("Installed release and schema must be supplied together")
+    if not isinstance(value, dict):
+        fail("Signed compatibility contract is missing")
+    target_schema = value.get("database_schema_revision")
+    protocols = value.get("protocols")
+    transitions = value.get("supported_upgrades")
+    if (
+        value.get("format") != COMPATIBILITY_CONTRACT_FORMAT
+        or value.get("migration_strategy") != "expand-contract"
+        or value.get("clean_install") is not True
+        or not isinstance(target_schema, str)
+        or not SCHEMA_REVISION_PATTERN.fullmatch(target_schema)
+        or not isinstance(protocols, dict)
+        or set(protocols) != {"peer", "sync", "federated_clearing"}
+        or not all(
+            isinstance(protocol, str) and 0 < len(protocol) <= 64
+            for protocol in protocols.values()
+        )
+        or not isinstance(transitions, list)
+        or len(transitions) > 64
+    ):
+        fail("Signed compatibility contract is invalid or unsupported")
+
+    normalized: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    expected_fields = {
+        "source_release",
+        "source_schema_revision",
+        "rollback_mode",
+        "post_backup_events",
+    }
+    for transition in transitions:
+        if not isinstance(transition, dict) or set(transition) != expected_fields:
+            fail("Signed compatibility transition is invalid")
+        source_release = transition.get("source_release")
+        source_schema = transition.get("source_schema_revision")
+        if (
+            not isinstance(source_release, str)
+            or not RELEASE_PATTERN.fullmatch(source_release)
+            or source_release == target_release
+            or not isinstance(source_schema, str)
+            or not SCHEMA_REVISION_PATTERN.fullmatch(source_schema)
+            or transition.get("rollback_mode") != "alembic-downgrade"
+            or transition.get("post_backup_events") != "preserved"
+        ):
+            fail("Signed compatibility transition is invalid")
+        key = (source_release, source_schema)
+        if key in seen:
+            fail("Signed compatibility contract contains a duplicate transition")
+        seen.add(key)
+        normalized.append(
+            {
+                "source_release": source_release,
+                "source_schema_revision": source_schema,
+                "rollback_mode": "alembic-downgrade",
+                "post_backup_events": "preserved",
+            }
+        )
+
+    matched = None
+    if installed_release is not None and installed_schema is not None:
+        if not RELEASE_PATTERN.fullmatch(installed_release):
+            fail("Installed release identifier is invalid")
+        if not SCHEMA_REVISION_PATTERN.fullmatch(installed_schema):
+            fail("Installed schema revision is invalid")
+        matched = next(
+            (
+                transition
+                for transition in normalized
+                if transition["source_release"] == installed_release
+                and transition["source_schema_revision"] == installed_schema
+            ),
+            None,
+        )
+        if matched is None:
+            fail(
+                "Release is incompatible with installed release "
+                f"{installed_release} and schema {installed_schema}"
+            )
+    return target_schema, matched
+
+
 def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
     bundle = Path(args.bundle).resolve()
     public_key = Path(args.public_key).resolve()
@@ -978,7 +1417,11 @@ def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
     verify_signature(public_key, manifest_bytes, signature)
 
     manifest = load_json(manifest_path)
-    if not isinstance(manifest, dict) or manifest.get("format") != BUNDLE_FORMAT:
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("format") != BUNDLE_FORMAT
+        or manifest.get("version") != "2"
+    ):
         fail("Unsupported release manifest format")
     release = manifest.get("release")
     if not isinstance(release, str) or not RELEASE_PATTERN.fullmatch(release):
@@ -996,6 +1439,13 @@ def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
     actual_fingerprint = public_key_fingerprint(public_key)
     if signature_metadata.get("public_key_fingerprint") != actual_fingerprint:
         fail("Release key fingerprint does not match signed manifest")
+
+    target_schema, transition = validate_compatibility_contract(
+        manifest.get("compatibility"),
+        target_release=release,
+        installed_release=getattr(args, "installed_release", None),
+        installed_schema=getattr(args, "installed_schema", None),
+    )
 
     policy = validate_policy(
         bundle,
@@ -1019,6 +1469,11 @@ def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
     roles = [row.get("role") for row in image_rows if isinstance(row, dict)]
     if sorted(roles) != sorted(REQUIRED_IMAGE_ROLES) or len(roles) != len(set(roles)):
         fail("Signed image roles are invalid")
+    target_platform = validate_platform_contract(
+        manifest.get("platform"),
+        image_rows,
+        args.expected_platform,
+    )
 
     aggregate = {"allowed": 0, "blocked": 0, "review_required": 0}
     archive_rows: list[tuple[str, str, str, str]] = []
@@ -1045,8 +1500,20 @@ def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
 
     if manifest.get("license_summary") != aggregate:
         fail("Aggregate license summary does not match image reports")
+    secret_audit = validate_secret_audit_report(
+        bundle,
+        manifest.get("secret_audit"),
+        payload_paths,
+        archive_rows,
+    )
 
     if args.load_images:
+        host_platform = docker_host_platform()
+        if host_platform != target_platform:
+            fail(
+                f"Docker host platform {host_platform} does not match "
+                f"release platform {target_platform}"
+            )
         for role, reference, expected_id, archive_relative in sorted(archive_rows):
             archive_path = safe_path(bundle, archive_relative)
             expected_archive_hash = checksums[archive_relative]
@@ -1058,14 +1525,26 @@ def verify_bundle(args: argparse.Namespace) -> dict[str, Any]:
                 fail(
                     f"Loaded image {role} has ID {loaded['id']}, expected {expected_id}"
                 )
+            loaded_platform = normalize_platform(
+                f"{loaded.get('os')}/{loaded.get('architecture')}"
+            )
+            if loaded_platform != target_platform:
+                fail(
+                    f"Loaded image {role} platform {loaded_platform} does not match "
+                    f"release platform {target_platform}"
+                )
 
     return {
         "status": "VERIFIED",
         "release": release,
+        "platform": target_platform,
+        "database_schema_revision": target_schema,
+        "transition": transition,
         "public_key_fingerprint": actual_fingerprint,
         "image_count": len(image_rows),
         "node_payload_count": len(payload_paths),
         "license_summary": aggregate,
+        "secret_audit": secret_audit,
         "images_loaded": bool(args.load_images),
     }
 
@@ -1087,6 +1566,7 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--release", required=True)
     create.add_argument("--output", required=True)
     create.add_argument("--private-key", required=True)
+    create.add_argument("--qualified-platform", required=True)
     create.add_argument("--root", default=str(root))
     create.add_argument(
         "--license-policy",
@@ -1101,6 +1581,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="cooperative-clearing/frontend-test:local",
     )
     create.add_argument("--allow-dirty", action="store_true")
+    create.add_argument(
+        "--upgrade-from",
+        action="append",
+        default=[],
+        metavar="RELEASE@SCHEMA",
+        help="allow one exact signed upgrade source; repeat for additional sources",
+    )
 
     verify = subparsers.add_parser(
         "verify", help="verify a signed bundle before installation"
@@ -1109,6 +1596,9 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--public-key", required=True)
     verify.add_argument("--expected-release")
     verify.add_argument("--expected-policy-sha256")
+    verify.add_argument("--expected-platform")
+    verify.add_argument("--installed-release")
+    verify.add_argument("--installed-schema")
     verify.add_argument("--load-images", action="store_true")
     return parser
 
@@ -1130,12 +1620,18 @@ def main() -> int:
             result = {
                 "status": "CREATED",
                 "release": manifest["release"],
+                "platform": manifest["platform"]["qualified_platforms"][0],
                 "output": str(Path(args.output).resolve()),
                 "public_key_fingerprint": manifest["signature"][
                     "public_key_fingerprint"
                 ],
                 "image_count": len(manifest["images"]),
                 "license_summary": manifest["license_summary"],
+                "secret_audit": {
+                    "status": manifest["secret_audit"]["status"],
+                    "finding_count": manifest["secret_audit"]["finding_count"],
+                    "scope_count": manifest["secret_audit"]["scope_count"],
+                },
             }
         else:
             result = verify_bundle(args)

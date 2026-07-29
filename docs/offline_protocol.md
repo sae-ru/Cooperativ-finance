@@ -10,6 +10,10 @@
 
 Эти режимы нельзя смешивать в интерфейсе или протоколе.
 
+Браузерная часть второго режима реализована в Slice 42 для предложений товаров
+и услуг. IndexedDB хранит только versioned non-authoritative draft без
+`event_id`; API не кэшируется, reconnect требует ручного review и publish.
+
 ## Offline epoch узла
 
 Epoch открывается подписанной policy и содержит:

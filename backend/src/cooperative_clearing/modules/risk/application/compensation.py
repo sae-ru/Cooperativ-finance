@@ -20,6 +20,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.risk.application.common import (
     RiskCommandResult,
@@ -214,6 +216,15 @@ class CompensationService:
                 "evidence": refs,
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(recipient_member_id),),
+                attesters=(
+                    member_party(
+                        decision.issued_by_member_id,
+                        decision.issued_role_assignment_id,
+                    ),
+                ),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.RESERVE,
@@ -336,6 +347,9 @@ class CompensationService:
                 "destination_balance_after": decimal_text(destination_after),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(transfer.recipient_member_id),),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.TRANSFER,
@@ -464,6 +478,9 @@ class CompensationService:
                 "evidence": refs,
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(transfer.responsible_member_id),),
+                approvers=(member_party(actor.person_id, actor.role_assignment_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.SHARE,
                     effect=ExposureEffect.RELEASE,

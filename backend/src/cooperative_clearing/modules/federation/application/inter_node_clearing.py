@@ -53,6 +53,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    node_party,
 )
 from cooperative_clearing.modules.journal.domain.crypto import canonicalize, payload_hash
 from cooperative_clearing.modules.journal.infrastructure.models import NodeChainState
@@ -545,6 +547,9 @@ class InterNodeClearingService:
             actor=actor,
             payload=document,
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(node_party(self.settings.node_code),),
+                attesters=(node_party(self.settings.node_code),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.NODE,
                     effect=ExposureEffect.RESERVE,
@@ -920,6 +925,9 @@ class InterNodeClearingService:
             actor=_actor_from_cycle(cycle),
             payload=document,
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(_actor_from_cycle(cycle)),
+                next_responsible=tuple(node_party(code) for code in required),
+                approvers=tuple(node_party(code) for code in required),
                 exposure=ExposureClaim(
                     category=ExposureCategory.NODE,
                     effect=ExposureEffect.FINALIZE,
@@ -1077,6 +1085,8 @@ class InterNodeClearingService:
                 "local_obligation_ids": [str(row.id) for row in rows],
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(_actor_from_cycle(cycle)),
+                next_responsible=(node_party(self.settings.node_code),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.NODE,
                     effect=ExposureEffect.EXECUTE,
@@ -1338,6 +1348,11 @@ class InterNodeClearingService:
             actor=_actor_from_cycle(cycle),
             payload=document,
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(_actor_from_cycle(cycle)),
+                next_responsible=(),
+                approvers=tuple(
+                    node_party(code) for code in sorted(cycle.affected_node_codes)
+                ),
                 exposure=ExposureClaim(
                     category=ExposureCategory.NODE,
                     effect=ExposureEffect.FINALIZE,

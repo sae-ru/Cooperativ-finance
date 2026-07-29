@@ -42,6 +42,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.rights.domain.types import (
     FREEZABLE_RIGHT_STATUSES,
@@ -148,6 +150,8 @@ class CommodityRightsService:
                 "available_before": decimal_text(balance.available_quantity),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(actor_party(actor),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.COMMODITY,
                     effect=ExposureEffect.RESERVE,
@@ -176,6 +180,8 @@ class CommodityRightsService:
                 "rights_issued_after": decimal_text(state.issued),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(owner_member_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.COMMODITY,
                     effect=ExposureEffect.CREATE,
@@ -291,6 +297,8 @@ class CommodityRightsService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(to_member_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.COMMODITY,
                     effect=ExposureEffect.TRANSFER,
@@ -613,6 +621,8 @@ class CommodityRightsService:
                 "evidence": list(evidence_refs),
             },
             assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(member_party(right.owner_member_id),),
                 exposure=ExposureClaim(
                     category=ExposureCategory.COMMODITY,
                     effect=ExposureEffect.EXECUTE,

@@ -1,0 +1,26 @@
+services:
+  api:
+    environment:
+      COOP_ALLOWED_HOSTS: '["localhost","127.0.0.1","testserver","nginx","gateway"]'
+
+  observability-probe:
+    image: cooperative-clearing/backend:${COOP_RELEASE:-0.1.0-dev}
+    profiles: ["observability"]
+    command: ["true"]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    networks:
+      - edge
+    secrets:
+      - source: bootstrap_security_password
+        target: operator_password
+    volumes:
+      - ./scripts:/workspace/scripts:ro
+      - ${COOP_OBSERVABILITY_EVIDENCE_DIR:-./evidence}:/evidence:ro
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  edge:
+    internal: true

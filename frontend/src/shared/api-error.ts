@@ -26,6 +26,13 @@ export function userErrorMessage(error: unknown, language?: string): string {
 
   const code = apiError.code.toUpperCase();
 
+  if (
+    code.startsWith("COMMAND_ASSURANCE_")
+    || code.startsWith("CRITICAL_COMMAND_")
+    || code.startsWith("ACTOR_")
+  ) {
+    return translate("errors.commandAssuranceFailed");
+  }
   if (code === "RISK_COMPENSATION_DECISION_NOT_FINAL") {
     return translate("errors.compensationDecisionNotFinal");
   }

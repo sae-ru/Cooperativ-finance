@@ -66,6 +66,8 @@ from cooperative_clearing.modules.journal.domain.assurance import (
     ExposureCategory,
     ExposureClaim,
     ExposureEffect,
+    actor_party,
+    member_party,
 )
 from cooperative_clearing.modules.journal.domain.crypto import payload_hash
 from cooperative_clearing.shared.core.config import Settings
@@ -984,6 +986,18 @@ class ClearingService:
         ):
             raise clearing_error("FINALIZE_RECALCULATION_MISMATCH", 409)
         result_by_id = {UUID(item.obligation_id): item for item in result.entries}
+        approvals = list(
+            (
+                await session.execute(
+                    select(ClearingApproval)
+                    .where(ClearingApproval.cycle_id == cycle.id)
+                    .order_by(ClearingApproval.id)
+                )
+            ).scalars()
+        )
+        approval_parties = tuple(
+            member_party(item.member_id, item.role_assignment_id) for item in approvals
+        )
         obligations = list(
             (
                 await session.execute(
@@ -1040,6 +1054,14 @@ class ClearingService:
                     "result_hash": result.result_hash,
                 },
                 assurance=CommandAssurance(
+                    on_behalf_of=actor_party(actor),
+                    next_responsible=(
+                        (member_party(obligation.debtor_member_id),)
+                        if entry.amount_after > 0
+                        else ()
+                    ),
+                    attesters=(member_party(actor.person_id, actor.role_assignment_id),),
+                    approvers=approval_parties,
                     exposure=ExposureClaim(
                         category=ExposureCategory.OBLIGATION,
                         effect=ExposureEffect.REDUCE,
@@ -1065,15 +1087,6 @@ class ClearingService:
             )
         statement_specs = self._statement_specs(cycle, result)
         statement_hashes = [payload_hash(value) for value in statement_specs]
-        approvals = list(
-            (
-                await session.execute(
-                    select(ClearingApproval)
-                    .where(ClearingApproval.cycle_id == cycle.id)
-                    .order_by(ClearingApproval.id)
-                )
-            ).scalars()
-        )
         unsigned_proof: dict[str, object] = {
             "cycle_id": str(cycle.id),
             "input_hash": result.input_hash,
@@ -1088,6 +1101,16 @@ class ClearingService:
         }
         proof_hash = payload_hash(unsigned_proof)
         proof_payload = {**unsigned_proof, "proof_hash": proof_hash}
+        finalization_evidence = (
+            {
+                "input_hash": result.input_hash,
+                "parameters_hash": result.parameters_hash,
+                "result_hash": result.result_hash,
+                "proof_hash": proof_hash,
+                "approval_event_ids": [str(item.event_id) for item in approvals],
+                "kind": "CLEARING_FINALIZATION_PROOF",
+            },
+        )
         final_event = await self.journal.append(
             session,
             event_type="clearing.cycle_finalized",
@@ -1104,6 +1127,25 @@ class ClearingService:
                 "statement_hashes": statement_hashes,
                 "total_cleared": decimal_string(result.total_cleared),
             },
+            assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(actor_party(actor),),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
+                approvers=approval_parties,
+                exposure=ExposureClaim(
+                    category=ExposureCategory.OBLIGATION,
+                    effect=ExposureEffect.FINALIZE,
+                    subject_type="clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(
+                        result.input_hash,
+                        result.parameters_hash,
+                        result.result_hash,
+                        proof_hash,
+                    ),
+                ),
+                evidence_refs=finalization_evidence,
+            ),
         )
         proof_id = uuid4()
         session.add(
@@ -1249,6 +1291,26 @@ class ClearingService:
             aggregate_version=cycle.version + 1,
             actor=actor,
             payload={**payload, "export_id": str(export_id), "package_hash": package_hash},
+            assurance=CommandAssurance(
+                on_behalf_of=actor_party(actor),
+                next_responsible=(),
+                attesters=(member_party(actor.person_id, actor.role_assignment_id),),
+                exposure=ExposureClaim(
+                    category=ExposureCategory.OBLIGATION,
+                    effect=ExposureEffect.FINALIZE,
+                    subject_type="clearing_cycle",
+                    subject_id=cycle.id,
+                    basis_refs=(proof.proof_hash, package_hash),
+                ),
+                evidence_refs=(
+                    {
+                        "event_id": str(proof.finalized_event_id),
+                        "proof_hash": proof.proof_hash,
+                        "package_hash": package_hash,
+                        "kind": "CLEARING_RECONCILIATION_PROOF",
+                    },
+                ),
+            ),
         )
         session.add(
             ClearingAccountingExport(

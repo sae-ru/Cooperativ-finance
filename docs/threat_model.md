@@ -86,6 +86,8 @@ operator/key store, backup/media, system/paper process.
 - другой логистический пользователь пытается продолжить принятый заказ;
 - заявитель, должник или кредитор пытается разрешить собственный спор;
 - два workers одновременно применяют одну outbox запись;
+- приложение пытается commit signed event без signature или outbox;
+- worker падает после consumer receipt, но до изменения outbox status;
 - два клиента резервируют последний остаток;
 - импорт содержит валидную подпись и несовместимую policy version;
 - package пропускает часть node sequence;
@@ -399,3 +401,57 @@ allowlist соответствует реальному egress внешней п
 | повтор settlement дважды двигает паи | transfer lock, version, active-case uniqueness и атомарный debit/credit | компромисс runtime DB-role вместе с приложением |
 | сетевой retry создаёт второй результат | scoped idempotency registry с payload hash | клиент теряет ключ и намеренно создаёт новую команду; доменные locks всё равно ограничивают итог |
 | событие есть без хозяйственного результата или наоборот | event, state, audit и command record в одной DB transaction | внешнее evidence/blob storage требует отдельной reconciliation |
+
+## Подписанная ответственность Slice 34
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| application service забывает ответственность | fail-closed registry и AST coverage всех call sites | неверная классификация нового события требует review registry |
+| роль подменена в payload | journal заново читает active assignment/user и сравнивает member/cooperative scope | привилегированный DBA и runtime key скомпрометированы вместе |
+| человек действует от имени чужого кооператива | typed `on_behalf_of` обязан совпасть с actor organization | неверно выданная global role требует governance review |
+| evidence заменено после команды | полный список и SHA-256 digest входят в signed envelope | ложное, но корректно подписанное физическое заявление |
+| exposure скрыта или округлена | Decimal/Numeric, exact string, category/effect/subject/max loss/basis refs | неверная policy может разрешить слишком высокий предел |
+| независимые approvals теряются | role-bound approvers/attesters подписаны вместе с результатом | сговор разных персональных учётных записей |
+| ответственность «повисает в воздухе» | явный список next responsible; affected federation nodes перечисляются все | фактическое принятие физической сохранности требует отдельного custody workflow |
+| новый payload выдаётся за старый формат | v2 identifier; v1 events не переписываются | legacy history требует операторской классификации |
+## Полномочия и физическая сохранность Slice 35
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| recovery захватывает учётную запись без личной ответственности | персональный requester, независимый approver, evidence, target member и обязательная смена пароля входят в signed assurance | сговор requester и формально независимого approver |
+| break-glass превращается в постоянную или делегируемую власть | allowlist ролей, bounded expiry, permanent-role approver, запрет делегирования и подписанный revoke | аварийная роль может быть злоупотреблена в пределах короткого окна |
+| технический user становится безымянной стороной | target security authority обязан иметь связанный member | bootstrap/system accounts требуют отдельной machine-authority модели |
+| товар меняет хранителя до его согласия | hold, independent inventory, approval и личное acceptance; lot custodian меняется атомарно с transfer event | ложное physical evidence при сговоре участников |
+| custody exposure скрыта | maximum loss назначения, количество каждой партии и unit подписываются | неверно заданный лимит исходного назначения |
+| отказ или снятие hold теряют следующего ответственного | reject/decline/block/release возвращают next step кооперативу | кооператив может организационно не назначить нового кандидата вовремя |
+
+## Санкции и кризисные решения Slice 37
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| санкция становится безымянным автоматическим наказанием | личный requester, независимый decider, subject, evidence и appeal path входят в signed assurance | сговор участников процедуры и ложные доказательства |
+| отмена решения переписывает неудобную историю | revoke/correction/rehabilitation создают новые события, исходные immutable | неверная операторская интерпретация legacy history |
+| кризисный мандат расширяется без контроля | proposer/activator/controller, scope, review, expiry и safe close подписаны | формально допустимый, но чрезмерно широкий исходный scope |
+| распределение превышает физический остаток | verified snapshot, row lock, exact Decimal/unit и concurrency test | ложный физический пересчёт при сговоре |
+| бумажная форма теряет владельца | serial/checksum/expiry и assigned member входят в next responsibility | физическая утрата оригинала до reconciliation |
+
+## Управление ролями Slice 36
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| роль выдаётся безымянной технической записи | target обязан быть active member; actor обязан иметь permanent assignment | machine authority требует отдельной модели |
+| администратор сам создаёт привилегированную власть | self-assignment запрещён, запрос требует другого personal approver | сговор двух людей |
+| решение теряет инициатора | requester подписывается как attester, decider как approver | ложные основания могут быть согласованно подписаны |
+| обычная роль активируется без владельца | target member становится `next_responsible` в том же signed event | получатель может не приступить к обязанностям |
+| отказ или отзыв оставляет scope без ответственного | `next_responsible` возвращается кооперативу или локальному узлу | организационная задержка нового назначения |
+
+## Ответственность внешнего узла Slice 38
+
+| Угроза | Контроль | Остаточный риск |
+|---|---|---|
+| внешний узел действует как безымянный сервер | active named owner/technical/security/business/auditor parties входят в next responsibility | ложная идентификация или сговор всех ответственных |
+| trust или лимит меняется без следа | proposer/activator, terms hash, exact maximum loss и unit входят в signed assurance | ошибочно утверждённый чрезмерный лимит |
+| bond создаёт неограниченную ответственность пайщиков | amount, protected amount и bounded maximum loss подписаны; ordinary shares excluded policy сохраняется | юридическая исполнимость зависит от пилотной юрисдикции |
+| скомпрометированный ключ тихо заменяется | incident, old/new или continuity proof, независимое решение и fingerprints подписаны | компрометация runtime key вместе с независимыми аккаунтами |
+| revoke стирает прежние полномочия | suspend/quarantine/revoke/rehabilitate являются новыми immutable событиями | внешняя сторона может не получить revocation до синхронизации |
+| offline окно отвязано от контрагента | close требует external node, лимиты и reconciliation входят в assurance | физическая задержка обмена пакетами в пределах утверждённого окна |
